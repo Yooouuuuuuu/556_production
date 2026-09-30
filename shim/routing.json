@@ -1,0 +1,8 @@
+{
+  "default": "gemini-flash",
+  "lanes": {
+    "556": "gemini-flash",
+    "pro": "gemini",
+    "code": "claude"
+  }
+}

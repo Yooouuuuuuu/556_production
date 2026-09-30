@@ -1,0 +1,27 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>hiyori minimal test</title>
+<style>body{margin:0;background:#334}</style>
+<script src="/pixi.min.js"></script>
+<script src="/live2dcubismcore.min.js"></script>
+<script src="/plid-v5-bundle.js"></script>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="status" style="position:fixed;top:4px;left:4px;color:#0f0;font:12px monospace">booting</div>
+<script>
+(async function () {
+  var s = document.getElementById('status');
+  try {
+    
+    var app = new PIXI.Application({ view: document.getElementById('c'), width: 700, height: 900, backgroundColor: 0x333344 });
+    var model = await PIXI.live2d.Live2DModel.from('/hiyori/Hiyori.model3.json');
+    model.scale.set(0.25);
+    model.x = 100; model.y = 30;
+    app.stage.addChild(model);
+    s.textContent = 'model loaded ok';
+  } catch (e) { s.textContent = 'ERROR: ' + e.message; }
+})();
+</script>
+</body>
+</html>
