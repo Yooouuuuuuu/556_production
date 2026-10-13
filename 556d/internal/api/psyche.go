@@ -3,9 +3,11 @@ package api
 import (
 	"database/sql"
 	"encoding/json"
+	"io"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -73,7 +75,143 @@ func (a *API) psycheHandler(w http.ResponseWriter, r *http.Request) {
 		"id", "at", "kind", "counterpart", "payload")
 	out["appraisals"] = psycheQuery(db, "SELECT id, at, turn_id, platform, data, error, ms, applied_tick FROM appraisals ORDER BY id DESC LIMIT 20",
 		"id", "at", "turn_id", "platform", "data", "error", "ms", "applied_tick")
+	out["checks"] = psycheQuery(db, "SELECT id, at, platform, hits, excerpt FROM checks ORDER BY id DESC LIMIT 20", "id", "at", "platform", "hits", "excerpt")
+	var nchecks sql.NullInt64
+	_ = db.QueryRow("SELECT COUNT(*) FROM checks").Scan(&nchecks)
+	out["checks_total"] = nchecks.Int64
 	writeJSON(w, http.StatusOK, out)
+}
+
+// isSilence: her answer to an event turn that means "not now" (events.py SILENCE).
+func isSilence(s string) bool {
+	s = strings.Trim(strings.TrimSpace(s), "「」\"'()（）")
+	if s == "" || s == "沉默" {
+		return true
+	}
+	for _, e := range []string{"Model generated invalid tool call", "does not exist. Available tools", "Tool '", "[error", "Error:"} {
+		if strings.HasPrefix(s, e) || strings.Contains(s, e) {
+			return true // a platform error, not her words
+		}
+	}
+	return false
+}
+
+// hotPaths are the psyche.json keys the engine re-reads every tick; anything else needs her restart.
+var hotPaths = []string{"proactive", "life.busyness_mode", "cares_about"}
+
+func isHot(path string) bool {
+	for _, h := range hotPaths {
+		if path == h || strings.HasPrefix(path, h+".") || strings.HasPrefix(h, path+".") {
+			return true
+		}
+	}
+	return false
+}
+
+// mergeInto merges patch into dst recursively and reports whether a non-hot key changed.
+func mergeInto(dst, patch map[string]any, prefix string) (restart bool) {
+	for k, v := range patch {
+		path := k
+		if prefix != "" {
+			path = prefix + "." + k
+		}
+		pm, pok := v.(map[string]any)
+		dm, dok := dst[k].(map[string]any)
+		if pok && dok {
+			if mergeInto(dm, pm, path) {
+				restart = true
+			}
+			continue
+		}
+		old, _ := json.Marshal(dst[k])
+		new, _ := json.Marshal(v)
+		if string(old) != string(new) {
+			dst[k] = v
+			if !isHot(path) {
+				restart = true
+			}
+		}
+	}
+	return restart
+}
+
+// 主動 settings: GET/PUT psyche.json in her profile (written with defaults by the engine at her first start).
+func (a *API) psycheSettingsHandler(w http.ResponseWriter, r *http.Request) {
+	if cors(w, r, "GET, PUT, OPTIONS") {
+		return
+	}
+	name, dbPath, err := a.psychePath(r)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": err.Error()})
+		return
+	}
+	p := filepath.Join(filepath.Dir(dbPath), "psyche.json")
+	cur := map[string]any{}
+	exists := false
+	if raw, rerr := os.ReadFile(p); rerr == nil {
+		exists = json.Unmarshal([]byte(strings.TrimPrefix(string(raw), "\ufeff")), &cur) == nil
+	}
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, http.StatusOK, map[string]any{"companion": name, "exists": exists, "settings": cur})
+	case http.MethodPut:
+		var patch map[string]any
+		if derr := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&patch); derr != nil {
+			http.Error(w, "bad json", http.StatusBadRequest)
+			return
+		}
+		restart := mergeInto(cur, patch, "")
+		out, _ := json.MarshalIndent(cur, "", "  ")
+		if werr := os.WriteFile(p, append(out, '\n'), 0o644); werr != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": werr.Error()})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"companion": name, "settings": cur, "restart_required": restart})
+	default:
+		http.Error(w, "GET or PUT", http.StatusMethodNotAllowed)
+	}
+}
+
+// Commands for the engine (single writer): 556d only appends to the commands table, like memory deletes.
+func (a *API) psycheCommandHandler(w http.ResponseWriter, r *http.Request) {
+	if cors(w, r, "POST, OPTIONS") {
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+	name, dbPath, err := a.psychePath(r)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": err.Error()})
+		return
+	}
+	var body struct {
+		Op      string         `json:"op"`
+		Payload map[string]any `json:"payload"`
+	}
+	if derr := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&body); derr != nil || body.Op == "" {
+		http.Error(w, "bad json", http.StatusBadRequest)
+		return
+	}
+	if st, serr := os.Stat(dbPath); serr != nil || st.Size() == 0 {
+		writeJSON(w, http.StatusConflict, map[string]any{"error": "no psyche.db yet — start her once"})
+		return
+	}
+	db, err := sql.Open("sqlite", "file:"+filepath.ToSlash(dbPath)+"?_pragma=busy_timeout(5000)")
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+	defer db.Close()
+	pl, _ := json.Marshal(body.Payload)
+	res, err := db.Exec("INSERT INTO commands(op, payload, requested_at, requested_by) VALUES (?, ?, ?, ?)", body.Op, string(pl), float64(time.Now().UnixNano())/1e9, "556d")
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]any{"error": err.Error()})
+		return
+	}
+	id, _ := res.LastInsertId()
+	writeJSON(w, http.StatusOK, map[string]any{"companion": name, "id": id, "queued": true})
 }
 
 // psycheQuery returns rows as maps; TEXT columns named payload/data are passed through as JSON.
@@ -99,7 +237,7 @@ func psycheQuery(db *sql.DB, q string, cols ...string) []psycheRow {
 			if b, ok := v.([]byte); ok {
 				v = string(b)
 			}
-			if s, ok := v.(string); ok && (c == "payload" || c == "data") && json.Valid([]byte(s)) {
+			if s, ok := v.(string); ok && (c == "payload" || c == "data" || c == "hits") && json.Valid([]byte(s)) {
 				m[c] = json.RawMessage(s)
 				continue
 			}

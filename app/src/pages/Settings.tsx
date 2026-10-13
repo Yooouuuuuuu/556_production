@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, Settings as S, VoiceConfig } from '../api';
 import { VoiceSettings } from './VoiceSettings';
 import { ToolsSettings } from './ToolsSettings';
+import { ProactiveSettings } from './ProactiveSettings';
 import { DevSettings } from './DevSettings';
 import { t } from '../i18n';
 
@@ -115,6 +116,7 @@ export function Settings() {
       </section>
 
       <ToolsSettings onChanged={() => setRestartNeeded(true)} />
+      <ProactiveSettings onChanged={() => setRestartNeeded(true)} />
       <VoiceSettings />
 
       <label className="flex items-center gap-2 text-sm opacity-80">

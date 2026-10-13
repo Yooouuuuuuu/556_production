@@ -37,7 +37,7 @@ DEFAULTS: Dict[str, Any] = {
     ],
     "time": {
         "tick_s": 60,
-        "snapshot_interval_min": 15,
+        "snapshot_interval_min": 5,
         "affect_half_life_h": None,      # None = from neuroticism (2–6 h)
         "mood_regress_tau_h": 3.0,
         "mood_rise_max": 0.4,            # per hour
@@ -65,6 +65,34 @@ DEFAULTS: Dict[str, Any] = {
         "timeout_s": 60,
         "retries": 1,
     },
+    "life": {  # §14 her own life: the schedule template (local hours), busyness mode, projects, small events (rule table)
+        "schedule": {"bedtime": 23.5, "wake": 7.5, "bedtime_delay_max_h": 1.5,
+                     "work": [[9.5, 12.5], [14.0, 18.0]], "hobby": [[10.0, 12.0], [15.0, 17.0]], "meals": [[12.5, 13.5], [18.5, 19.5]]},
+        "busyness_mode": "work",          # work | hobby | none
+        "wake_on_message": True,
+        "projects": [{"title": "新歌的 demo", "stage": "錄音", "difficulty": 0.5, "progress": 0.0}],
+        "small_events": [
+            {"text": "錄音一次就過，很順", "v": 0.5, "R": 0.4, "p": 0.12, "kind": "work", "share": True},
+            {"text": "咖啡店新出的季節限定很好喝", "v": 0.3, "R": 0.2, "p": 0.15, "kind": "life", "share": True},
+            {"text": "耳機突然壞了", "v": -0.3, "R": 0.3, "p": 0.06, "kind": "life", "share": True},
+            {"text": "有點頭痛，應該是睡不夠", "v": -0.4, "R": 0.4, "p": 0.05, "kind": "unwell", "share": True},
+            {"text": "下午的會議臨時取消，多了一段空檔", "v": 0.2, "R": 0.2, "p": 0.1, "kind": "work", "share": False},
+        ],
+    },
+    "needs": {"k_aff": 0.08, "protest_end_h": 24, "despair_end_h": 120, "need_mood_coupling": 0.1,
+              "attachment_strength": 0.4},   # fixed until L5 grows it (0.7.0)
+    "proactive": {  # §16 — these apply without a restart (the engine re-reads them each tick)
+        "enabled": True,
+        "no_disturb": [[23.0, 8.0]],     # local hours; a reminder you asked for still passes
+        "daily_cap": 3,
+        "usage_threshold_min": 90,       # talked this long today -> no proactive (usage awareness)
+        "min_gap_min": 90,
+        "urge_gain": 2.5,
+        "occasion_floor": 0.1,
+        "reply_timeout_default_h": 6.0,  # until the latency model has 5 samples
+        "speak": "follow",               # app: speak proactive messages? follow (the current voice mode) | always | never
+    },
+    "tom": {"weekly_decay": 0.92},
     "llm": None,  # None = the llm block of kokoro.json (same lane as the memory observe)
 }
 
@@ -97,5 +125,5 @@ def load(home: Path, write_defaults: bool = True) -> Dict[str, Any]:
 
 def version(cfg: Dict[str, Any]) -> str:
     """Short hash of the parameters that shape the dynamics (psyche.db params table)."""
-    keep = {k: cfg.get(k) for k in ("character", "time", "impact", "expression")}
+    keep = {k: cfg.get(k) for k in ("character", "time", "impact", "expression", "needs", "life")}
     return hashlib.sha1(json.dumps(keep, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:12]

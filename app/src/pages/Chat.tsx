@@ -7,7 +7,7 @@ import { useVoice } from '../voice/loop';
 
 // The office chat: last X turns from /api/history, live updates from the hub, IME-safe composer.
 export function Chat() {
-  const { messages, talking, connected, error, setHistory, connect, selected } = useStore();
+  const { messages, talking, connected, error, setHistory, connect, selected, setHandsFree, setProactiveSpeak } = useStore();
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -21,11 +21,13 @@ export function Chat() {
   useEffect(() => {
     connect();
     api.voice().then((v) => setVoiceOk({ stt: v.voice.stt.kind !== 'none', tts: v.voice.tts.kind !== 'none' })).catch(() => {});
+    api.psycheSettings().then((r) => setProactiveSpeak((r.settings?.proactive?.speak as any) ?? 'follow')).catch(() => {});
     api.history().then((h) => setHistory(h.messages.map((m, i) => ({ id: `h${i}`, role: m.role, text: m.text, ts: m.ts, source: m.source }))))
       .catch(() => { /* backend not up yet; the header shows the status */ });
   }, [selected]);
 
   useEffect(() => { listRef.current?.scrollTo({ top: listRef.current.scrollHeight }); }, [messages, talking]);
+  useEffect(() => { setHandsFree(voice.handsfree); }, [voice.handsfree]);
 
   async function send() {
     const text = draft.trim();
@@ -85,7 +87,7 @@ export function Chat() {
             <div className={`max-w-[78%] px-3 py-2 rounded-2xl whitespace-pre-wrap leading-relaxed text-[15px] ${
               m.role === 'user' ? 'bg-pink-500/80 text-white rounded-br-sm' : 'bg-white/10 rounded-bl-sm'
             } ${m.streaming ? 'animate-pulse' : ''}`}>
-              {m.source && m.source !== 'app' && <span className="block text-[10px] uppercase tracking-wider opacity-60 mb-0.5">{m.source}</span>}
+              {m.source && m.source !== 'app' && <span className="block text-[10px] uppercase tracking-wider opacity-60 mb-0.5">{m.source === 'event' ? t('chat.badge_event') : m.source}</span>}
               {m.text}
             </div>
           </div>

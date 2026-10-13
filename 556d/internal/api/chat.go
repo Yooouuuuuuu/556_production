@@ -44,6 +44,7 @@ const appSessionKey = "556:app"
 // follower is the live tail of a companion's conversation: turns that arrive through her channels
 // are broadcast to the windows (the app's own turns were broadcast as they happened).
 type follower struct {
+	event bool // between her event-turn prompt (hidden) and her answer (shown as 主動)
 	sessionID string
 	cursor    int64
 	lastUser  string // attribution state: her reply belongs to the question before it
@@ -105,6 +106,8 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/voice/speak", a.voiceSpeak)      // text -> cached audio + speak_audio event (lipsync)
 	mux.HandleFunc("/api/config", a.configHandler)       // the config registry: every knob, dev panel
 	mux.HandleFunc("/api/shutdown", a.shutdownHandler)   // graceful daemon shutdown (companions finish up first)
+	mux.HandleFunc("/api/psyche/settings", a.psycheSettingsHandler) // psyche.json: 主動 gates apply at the next tick, the rest at her next start
+	mux.HandleFunc("/api/psyche/command", a.psycheCommandHandler)   // close a loop / add a reminder / add a life event — queued for the engine
 	mux.HandleFunc("/api/psyche", a.psycheHandler)       // 狀態: read-only view of her psyche.db (the engine in her process writes it)
 	mux.HandleFunc("/api/tools", a.toolsHandler)         // what she can do: baseline memory + extensions (restart applies)
 }
@@ -311,13 +314,18 @@ func (a *API) chat(w http.ResponseWriter, r *http.Request) {
 // mirrorToTelegram (c): echo an app exchange into your Telegram DM as plain text,
 // through her own bot token. No LLM; her gateway never sees its own bot's messages, so no loop.
 func (a *API) mirrorToTelegram(name, question, answer string) {
+	a.sendTelegram(name, "你問我："+strings.TrimSpace(question)+"\n\n我說："+strings.TrimSpace(answer))
+}
+
+// sendTelegram sends plain text to her home channel through her own bot (no LLM): the app mirror,
+// and her event-turn answers when she speaks first (same path, by design).
+func (a *API) sendTelegram(name, text string) {
 	env := a.mgr.Env(name)
 	token := env["TELEGRAM_BOT_TOKEN"]
 	chat := companions.TelegramChat(env)
 	if token == "" || chat == "" {
 		return
 	}
-	text := "你問我：" + strings.TrimSpace(question) + "\n\n我說：" + strings.TrimSpace(answer)
 	if rs := []rune(text); len(rs) > 3900 {
 		text = string(rs[:3900]) + "…"
 	}
@@ -621,6 +629,26 @@ func (a *API) follow(name, channel string) {
 		f.cursor = m.ID
 		if m.Role == "user" {
 			f.lastUser = m.Source
+		}
+		// her own event turn (the psyche engine speaks first): the user row is her prompt, not you — hidden;
+		// her answer shows with source "event" and goes to Telegram like an app turn; silence shows nothing
+		if m.Role == "user" && strings.HasPrefix(strings.TrimSpace(m.Text), "【事件】") {
+			f.event = true
+			continue
+		}
+		if f.event && m.Role == "assistant" {
+			f.event = false
+			if isSilence(m.Text) {
+				continue
+			}
+			a.emit(map[string]any{"type": "chat.complete", "companion": name, "text": m.Text, "status": "stop", "source": "event"})
+			a.emit(map[string]any{"type": "companion.state", "companion": name, "talking": false})
+			a.bubble(name, m.Text)
+			log.Printf("[api] %s: she spoke first (%d runes)%s", name, len([]rune(m.Text)), map[bool]string{true: " -> telegram", false: ""}[a.settings.Get().MirrorToTelegram])
+			if a.settings.Get().MirrorToTelegram {
+				go a.sendTelegram(name, m.Text)
+			}
+			continue
 		}
 		if m.Source == "app" {
 			continue

@@ -14,7 +14,7 @@ start: "roster ▶ start — manual; the only way she comes up (several may be a
 spawn: "supervisor spawns `hermes gateway run`\nAPI_SERVER_KEY / HOST / PORT in her env; job object; toolsets from platform_toolsets"
 ready: "/health 2xx (~5 s) -> 上線中; Telegram connected"
 open: "556d opens her ONE conversation if none is live:\nPOST /api/sessions + Telegram routing stamp\n(never opened by a message, from any surface)"
-ff: "psyche plugin loads the last snapshot and fast-forwards the offline hours:\nsleep, activities, projects, life events, rumination; due loops and unkept 「等我一下」 handled;\n「這幾天」 summary for the state block; no proactive messages back-filled (0.5.0 / 0.6.0)" {class: proposed}
+ff: "psyche plugin loads the last snapshot and fast-forwards the offline hours:\nsleep, activities, projects, life events, rumination; due loops and unkept 「等我一下」 handled;\n「這幾天」 summary for the state block; no proactive messages back-filled (0.5.0 / 0.6.0)"
 turns: "app, Telegram and event turns — one conversation; tick every minute while she runs"
 
 stopreq: "stop requested: roster ■ · app quit (POST /api/shutdown) · app died (parent watcher)" {shape: oval}
@@ -29,8 +29,8 @@ appexit: "app quit path: 556d exits by itself -> app.exit()"
 start -> spawn
 spawn -> ready
 ready -> open
-open -> ff {class: proposed}
-ff -> turns {class: proposed}
+open -> ff
+ff -> turns
 open -> turns
 turns -> stopreq
 stopreq -> idle

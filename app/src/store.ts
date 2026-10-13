@@ -1,7 +1,7 @@
 // Conversation state fed by the 556d hub WebSocket. Every window shares the same stream, so
 // the office chat, the avatar bubble and (later) other clients always agree.
 import { create } from 'zustand';
-import { BASE } from './api';
+import { api, BASE } from './api';
 
 export type Msg = { id: string; role: 'user' | 'assistant'; text: string; ts?: number; streaming?: boolean; source?: string };
 
@@ -17,6 +17,10 @@ type State = {
   motion: { name: string; n: number } | null; // last requested motion (bridge 'motion' events)
   lastReply: { n: number; text: string; status: string; source?: string } | null; // her latest completed reply (voice loop waits on it)
   speaking: { url: string; n: number; playing: boolean } | null; // speak_audio: the avatar lip-syncs / plays it
+  handsFree: boolean;                        // conversation mode is on (the 'follow' speak override follows it)
+  proactiveSpeak: 'follow' | 'always' | 'never'; // 主動 setting: speak her event-turn messages?
+  setHandsFree(on: boolean): void;
+  setProactiveSpeak(v: 'follow' | 'always' | 'never'): void;
   setHistory(msgs: Msg[]): void;
   setSelected(name: string, displayName?: string, avatarUrl?: string | null): void;
   connect(): void;
@@ -40,6 +44,10 @@ export const useStore = create<State>((set, get) => ({
   motion: null,
   lastReply: null,
   speaking: null,
+  handsFree: false,
+  proactiveSpeak: 'follow',
+  setHandsFree(on) { set({ handsFree: on }); },
+  setProactiveSpeak(v) { set({ proactiveSpeak: v }); },
 
   setHistory(msgs) { set({ messages: msgs }); },
   setSelected(name, displayName, avatarUrl) {
@@ -80,6 +88,12 @@ export const useStore = create<State>((set, get) => ({
             break;
           }
           case 'chat.complete': {
+            if (ev.source === 'event') { // she spoke first: spoken per the 主動 override, never part of a voice loop
+              const { proactiveSpeak, handsFree } = get();
+              if (ev.text && (proactiveSpeak === 'always' || (proactiveSpeak === 'follow' && handsFree))) api.speak(ev.text).catch(() => {});
+              set({ messages: [...messages, { id: nextId(), role: 'assistant', text: ev.text, ts: Date.now() / 1000, source: 'event' }] });
+              break;
+            }
             set({ lastReply: { n: Date.now(), text: ev.text ?? '', status: ev.status ?? 'stop', source: ev.source } });
             const last = messages[messages.length - 1];
             if (last && last.role === 'assistant' && last.streaming) {

@@ -127,6 +127,13 @@ loops, snapshots, params, owner heartbeat; WAL). Appraisal A runs on the `llm` b
 7–30 s per turn on Gemini flash. 556d reads `psyche.db` read-only for `GET /api/psyche` (狀態 tab) and waits for the last
 turn's appraisal before a planned stop. Tests: `plugins/psyche/tests` (pytest from the KeepsakeDB venv) and
 `tests/psyche_eval.py` (LLM eval set against a running character; judge = the same lane).
+**Proactive (0.6.0)**: the engine's tick decides the urge (urge.py); the decision is a replayable `proactive_fired` event;
+the send worker posts a narrator cue (events.py, `【事件】…`) to her own api_server with `X-556-Event` and her session
+id; her answer lands as a normal row; the hooks record `sent` / `silent`. 556d: follower → `chat.complete` with
+`source: event` + `sendTelegram` (same path as the app mirror); `GET/PUT /api/psyche/settings` (psyche.json, hot keys
+`proactive`, `life.busyness_mode`, `cares_about`); `POST /api/psyche/command` → `commands` table (close_loop,
+add_loop, life_event). Output checks (checks.py, record only) → `checks` table. Simulator: `tools/psychesim.py`
+(week / day / seeds / replay). Engine modules: life.py (sleep, activities, life events), needs.py, tom.py, urge.py.
 
 ## Third-party inventory (what is not ours, and where it lives)
 

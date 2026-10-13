@@ -33,8 +33,8 @@ Living doc; built 2026-10-03 → 2026-10-06 (0.4.0). Graph: `voice.d2`. Decision
 
 ## What is next
 
-- 0.6.0: an event turn (she speaks first) is spoken or not per the 主動 override; the mic is paused
-  meanwhile in conversation mode.
+- Built 0.6.0: an event turn (she speaks first) is spoken per the 主動 override — follow the conversation mode,
+  always, or never (the store calls the same speak route; the avatar plays it).
 - Inner life, stage 7: TTS prosody (pitch, rate) and Live2D parameters driven by her state; micro-expressions
   for suppressed emotions (`../inner-life/inner-life.md` §15).
 - Known gap: Fish transcripts come back in simplified Chinese; a zh-TW conversion step is pending.

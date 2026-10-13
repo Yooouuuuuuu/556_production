@@ -22,7 +22,7 @@ classes: {
 }
 
 legend: |md
-  solid = runs today (0.5.0) · **dashed pink** = 0.6.0 / 0.7.0 work
+  solid = runs today (0.6.0) · **dashed pink** = 0.7.0 work
 | {near: top-left}
 
 you: "你 — the person (named in Settings, else 製作人)" {shape: person}
@@ -34,7 +34,7 @@ app: "556 Production app (Electron)" {
     memory: "記憶 — long layer; toggle 近期紀錄"
     settings: "設定 — two tiers · 她會的事 (extensions) · 你 (name)"
     state: "狀態 — timeline, why, loops (0.5.0+)"
-    proactive: "主動 — schedule tab, no-disturb, sliders (0.6.0)" {class: proposed}
+    proactive: "主動 — schedule tab, no-disturb, sliders (0.6.0)"
   }
   avatar: "avatar window (Live2D) — follows the chat window"
 }
@@ -87,7 +87,7 @@ mane.kokoro -> daemon.embedder: "embeddings"
 mane.agent -> mane.psyche: "after the reply: appraisal A (parallel to observe)"
 mane.psyche -> mane.psydb: "events · appraisals · snapshots"
 mane.psyche -> mane.agent: "prefetch: 【她現在】 state block, never waits"
-mane.psyche -> mane.api: "event turn (X-556-Event) into her one conversation (0.6.0)" {class: proposed}
+mane.psyche -> mane.api: "event turn (X-556-Event) into her one conversation (0.6.0)"
 mane.agent -> daemon.shim: "chat completions (reply · observe · A)"
 daemon.shim -> llm
 daemon.transcript -> mane.state: "read-only: history, live tail;\nat start: open + stamp her one session if none is live"

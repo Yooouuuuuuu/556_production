@@ -293,7 +293,8 @@ func (m *Manager) awaitMemoryIdle(name string, max time.Duration) {
 }
 
 func lastUserMessageAt(stateDB string) float64 {
-	return scalarFloat(stateDB, "SELECT COALESCE(MAX(timestamp), 0) FROM messages WHERE role = 'user'")
+	// her own event turns (【事件】, the psyche engine speaking first) are user rows too, but nothing observes or appraises them
+	return scalarFloat(stateDB, "SELECT COALESCE(MAX(timestamp), 0) FROM messages WHERE role = 'user' AND content NOT LIKE '%【事件】%'")
 }
 
 // psycheCaughtUp: the psyche plugin's appraisal of the newest turn has landed (its `at` is the turn's

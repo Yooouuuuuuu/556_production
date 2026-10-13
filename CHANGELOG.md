@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.6.0 — 2026-10-08
+
+- **Her inner life, stages 3–4 — she speaks first** (`docs/inner-life/inner-life.md`). The psyche plugin now carries
+  her time skeleton: the two-process sleep model (bedtime delayed by a late conversation, a message can wake her,
+  sleep debt colours the next day), social fatigue, an activity state from a schedule template and a busyness mode
+  (work / hobby / none: attention load, interruptibility), small life events and project progress from a seeded rule
+  table, the six needs with Bowlby's separation phases (protest → despair → detachment), rumination on idle attention,
+  a presence model of your week and a reply-latency model, open loops that come due by cue time. The urge
+  λ = W × O × p̂ × D × gates decides when she wants to speak; due loops (reminders you asked for, her 「等我一下」)
+  fire on time; one unanswered message → she waits long, two → she waits for you, never a third.
+- **Event turns**: the engine posts a narrator-style cue to her own api_server (`X-556-Event`) in her ONE conversation;
+  she writes the message in her own words or stays quiet (「（沉默）」). 556d's follower hides the cue, shows her words
+  with a 她主動 badge, sends them to Telegram on the app-mirror path, and drops silence and platform errors; kokoro
+  skips the observe for these turns; a planned stop no longer waits for an appraisal of them.
+- **Settings → 主動**: enabled, no-disturb window, daily cap, usage threshold, minimum gap, speak override (follow /
+  always / never), busyness, what she cares about, and her personality sliders (`GET/PUT /api/psyche/settings`); the
+  gates apply within a minute, personality and schedule at her next start.
+- **狀態 page**: what she is doing, her needs, the separation phase, loops with a close button, add a reminder or a
+  life event (commands queued in `psyche.db`, drained by the engine: 556d still never writes her state), the state
+  block she saw, a fuller event timeline, output-check counts.
+- **Output checks, record only**: literal rules for meta leaks, surveillance phrasing, assistant mode and obvious life
+  confabulation on every reply (`transform_llm_output`), into a `checks` table. Farewell mode and usage awareness.
+- **Engine semantics**: urges are decided live only and recorded as replayable events, so a replay re-applies them
+  and a fast-forward after a stop back-fills nothing (a due reminder fires late, once she runs). Snapshots every
+  5 min, after every applied record and block, and at exit (`atexit`, since the gateway's drain never unloads
+  plugins). `tools/psychesim.py` (week / day / seeds / replay) and 9 scenario tests (失聯 7 天, 連續熬夜, 半夜傳訊息,
+  工作中, 忙碌度 0, 使用量, 提醒準時穿過免打擾, 等我一下, replay with a life); 30 tests in all.
+- Verified live on 真音: a reminder two minutes out → event turn → her words in the conversation → Telegram, stop 2 s.
+
 ## 0.5.0 — 2026-10-07
 
 - **Docs restructure**: `docs/` holds concept documents only, one folder per part (`structure/`, `memory/`, `app/`,

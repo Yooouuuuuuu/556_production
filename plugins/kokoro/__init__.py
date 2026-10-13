@@ -194,6 +194,8 @@ class KokoroMemoryProvider(MemoryProvider):
         """Runs on Hermes's serialized memory worker, so the observe is synchronous here."""
         if self._pipeline is None or self._agent_context != "primary":
             return
+        if (user_content or "").lstrip().startswith("【事件】"):
+            return  # her own event turn (psyche speaks first): nothing you said, nothing to remember about you
         with self._turn_lock:
             res = self._pipeline.observe(user_content, assistant_content,
                                          turn_id=_turn_key(session_id, user_content, assistant_content),

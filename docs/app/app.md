@@ -13,7 +13,11 @@ What landed since:
 - **0.5.0** (2026-10-07): 狀態 tab — energy and mood words, feelings right now with their causes, things on her mind,
   recent events and the appraisal per turn, read-only from `psyche.db` (`GET /api/psyche`); Settings → 你 now writes
   `people/你.md`.
-- **Coming**: 主動 settings with the schedule tab (0.6.0), three chats (0.7.0) — see
+- **0.6.0** (2026-10-08): Settings → 主動 (gates, speak override, busyness, what she cares about, personality
+  sliders); 狀態 gains what she is doing, her needs, the separation phase, loop close / add-reminder / add-life-event
+  commands, the state block she saw, a fuller timeline; chat shows her event-turn messages with a 她主動 badge and
+  speaks them per the override.
+- **Coming**: three chats (0.7.0) — see
   `../inner-life/inner-life.md`.
 - **Parked**: packaging (installer, updater, auto-start), pixel-alpha click-through for the avatar,
   emotion → avatar mapping, poke reactions, UI polish.

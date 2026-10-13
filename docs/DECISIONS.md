@@ -14,6 +14,23 @@ Design: `inner-life/inner-life.md` (its §0 lists every decision applied).
 - 製作人 → 你 (see v1 DECISIONS 2026-10-07): stored subject 你, rendered as her term for you.
 - Time constants keep their research defaults and are overridable in Settings; long-term thresholds are discussed before 0.7.0.
 
+## Built (2026-10-08) — inner life stages 3–4: proactive [inner-life]
+- Urges are decided live only and recorded as replayable `proactive_fired` events; replay re-applies the record,
+  a fast-forward after a stop decides nothing (no back-fill), a due loop fires at the first live tick. The first live
+  run showed why: a replay-decided urge set a pending flag that blocked the real reminder for an hour.
+- The gateway's planned-stop drain exits without unloading plugins, so the engine snapshots every 5 minutes, after
+  every applied record and rendered block, and from an `atexit` hook.
+- The event turn is a narrator's cue, not an instruction to "send a message": worded as an instruction, Gemini
+  invented a reply tool (`openmini_reply`). A platform error in her answer counts as silence on both sides.
+- A reminder you asked for passes every gate but "off" and "stopped" — including the conversation and no-disturb
+  gates — because it is time-critical and yours; everything spontaneous respects them all.
+- Her own event turns are user rows in `state.db`: the follower hides them, kokoro does not observe them, and the
+  stop wait ignores them.
+- 主動 settings are hot (the engine re-reads `psyche.json` each tick for proactive, busyness, cares_about); the
+  dynamics (personality, constants, schedule, time constants) still apply at her next start. The 狀態 page acts
+  through a `commands` table, like memory deletes.
+- Attachment strength is a fixed 0.4 until L5 grows it (0.7.0); the one counterpart is you.
+
 ## Built (2026-10-07) — inner life stages 0–2: how it was wired, what the first runs decided [inner-life]
 - Stage 0 answers. Hermes's `pre_llm_call` hook returns `{"context": …}` and Hermes appends it to the USER message
   right after the `<memory-context>` block, never the system prompt — exactly where the design wanted the state block;

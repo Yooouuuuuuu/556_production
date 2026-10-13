@@ -1,7 +1,7 @@
 # Structure — one process per character, 556d around her
 
 Living doc; last verified 2026-10-07 (0.5.0 tools). Graphs in this folder are D2 sources: solid = what runs
-today (0.5.0, incl. the psyche plugin), dashed pink = 0.6.0 (proactive) and 0.7.0 (three characters) work. Discord and MCP stay dashed. Why things are this way: `../DECISIONS.md`.
+today (0.6.0, incl. proactive), dashed pink = 0.7.0 (three characters) work. Discord and MCP stay dashed. Why things are this way: `../DECISIONS.md`.
 
 ## 1. The shape — `structure.d2`
 
@@ -28,7 +28,7 @@ today (0.5.0, incl. the psyche plugin), dashed pink = 0.6.0 (proactive) and 0.7.
   is waited for; the appraisal shapes the *next* turn through the state block. Prefetch (memory search,
   state block) reads what has landed and never waits, voice or text.
 - Two mirrors: app → Telegram as plain text; Telegram → app through the follower, with a badge.
-- Section D of the graph is the 0.6.0 event turn: the engine posts facts to her own API with
+- Section D of the graph is the event turn (built 0.6.0): the engine posts a narrator cue to her own API with
   `X-556-Event`; her words land as a normal row in her one conversation, the follower shows them in the
   app, 556d sends them to Telegram on the same path as the app mirror, and the 主動 override decides
   whether they are spoken.
@@ -55,8 +55,8 @@ today (0.5.0, incl. the psyche plugin), dashed pink = 0.6.0 (proactive) and 0.7.
   the last turn (and, 0.5.0, the appraisal queue), planned-stop marker, drain, exit 0; kill only after
   60 s. No "Gateway shutting down" ping to Telegram.
 - Her time is continuous: at start the engine loads the last snapshot and fast-forwards the offline hours
-  (sleep, activities, projects, life events, due loops, a 「這幾天」 summary); no proactive messages are
-  back-filled. While she is stopped nothing ticks: she is not living and cannot speak first.
+  (sleep, activities, projects, life events, due loops); no proactive messages are back-filled — a reminder
+  that came due while she was stopped fires at her first live tick. While she is stopped nothing ticks: she is not living and cannot speak first.
 
 ## 5. Zones
 
