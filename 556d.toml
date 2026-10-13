@@ -33,7 +33,7 @@ native_tools = false
 
 [shim.backends.gemini-flash]
 base_url = "http://localhost:18765/v1"
-model = "agyapi/gemini-3.7-flash"
+model = "agyapi/gemini-3.8-flash"
 native_tools = false
 
 [shim.backends.claude]

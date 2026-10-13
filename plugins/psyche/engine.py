@@ -1135,7 +1135,9 @@ class Engine:
                 return RL.expressed_level(i["intensity"], expressiveness=expr, bond=rel["bond"], suppressed=(tired and i["type"] in model.NEGATIVE))
             act = [i for i in mine if shown(i) >= thr] + [i for i in others_ if shown(i) >= thr * 1.5]
             act_zh = L.ACTIVITIES.get(self.activity, L.ACTIVITIES["rest"])[4]
-            if self.activity == "chat":
+            if counterpart != MAIN:
+                act_zh = f"正在跟{term}說話（不是跟{self.term_fn()}），本來{act_zh}"
+            elif self.activity == "chat":
                 act_zh = "在跟" + term + "聊天"
             lines = [f"【{self.pr}現在】", f"在做：{act_zh}，{L.energy_word(self.energy, self.activity)}"]
             _, oct_zh, strength = model.octant(self.mood)

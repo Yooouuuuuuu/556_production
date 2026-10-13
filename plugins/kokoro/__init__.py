@@ -159,7 +159,7 @@ class KokoroMemoryProvider(MemoryProvider):
         except Exception:
             return ""
         term = self._address_term(self._cfg)
-        return f"\n\nAbout {term} — the person you are talking to (profile maintained in the app):\n" + text[:2000] if text else ""
+        return f"\n\nAbout {term} (profile maintained in the app; a per-turn note says who is talking to you right now):\n" + text[:2000] if text else ""
 
     # -- counterparts (0.7.0): her session with you, or a session 556d keyed 556:agent:<name> ---------
     def _counterpart_of(self, session_id: str) -> str:
@@ -216,7 +216,9 @@ class KokoroMemoryProvider(MemoryProvider):
             text = p.read_text(encoding="utf-8").strip() if p.exists() else ""
         except Exception:
             return ""
-        return f"\n\nAbout {self._display_name(counterpart)} — the character you are talking to now (her person file):\n" + text[:2000] if text else ""
+        name = self._display_name(counterpart)
+        head = f"\n\n現在跟你說話的是{name}，不是{self._address_term(self._cfg)}。About {name} (person file):\n"
+        return head + text[:2000] if text else head.rstrip(":\n") + "。"
 
     def _memory_block_text(self) -> str:
         return (self._cfg.get("system_prompt_block") or

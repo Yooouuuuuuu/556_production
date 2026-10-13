@@ -231,6 +231,20 @@ func (s *SettingsStore) applyKokoro(v Settings) error {
 	return os.WriteFile(p, out, 0o644)
 }
 
+// addressDefault reads kokoro.json address_default of the bound profile ("" when absent).
+func (s *SettingsStore) addressDefault() string {
+	raw, err := os.ReadFile(filepath.Join(s.profileDir(), "kokoro.json"))
+	if err != nil {
+		return ""
+	}
+	var m map[string]any
+	if json.Unmarshal(raw, &m) != nil {
+		return ""
+	}
+	t, _ := m["address_default"].(string)
+	return strings.TrimSpace(t)
+}
+
 // applyUserMD keeps two managed lines in the profile's people/你.md (your person file, injected by
 // kokoro after the memory block): your name and the reply language. Everything else in the file is
 // left alone. An older memories/USER.md is carried over once and then removed.
@@ -248,7 +262,12 @@ func (s *SettingsStore) applyUserMD(v Settings) error {
 	if err != nil {
 		raw, _ = os.ReadFile(old) // first write: carry the old profile over
 	}
-	nameLine := "- 名字：（尚未設定，她叫你「製作人」）"
+	// how she addresses you until a name is set: kokoro.json address_default (製作人 for a blank companion; 哥 for a
+	// sibling); a long descriptive term is not worth quoting
+	nameLine := "- 名字：（尚未設定）"
+	if term := s.addressDefault(); term != "" && len([]rune(term)) <= 2 {
+		nameLine = "- 名字：（尚未設定，她叫你「" + term + "」）"
+	}
 	if strings.TrimSpace(v.YourName) != "" {
 		nameLine = "- 名字：" + strings.TrimSpace(v.YourName) + "（請這樣稱呼對方）"
 	}

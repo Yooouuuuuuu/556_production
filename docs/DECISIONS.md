@@ -34,8 +34,14 @@ Design: `inner-life/inner-life.md` (its §0 lists every decision applied).
   than the literature's two years so it is observable in tests; a knob in `relation`.
 - Your feedback on a feeling adjusts that emotion type's gain by ±5 % (bounded 0.5–2×) through a replayable command;
   「不該是這種情緒」 is only logged.
-- Provisional names for the cast (小夜 / 千尋 / 悠真); ids are folders, display names are in `companion.json` and the
-  SOUL, so renaming is a copy and an edit.
+- Character ids are folders, display names live in `companion.json` and the SOUL, so renaming is a copy and an edit.
+- The cast is the user's own (2026-10-13) and lives in `characters/`, ignored by version control: a main conversation
+  partner and a couple close to the user; no agency framing, no role word (製作人) in their files. Big Five numbers are
+  percentile ÷ 100 (0.50 = an average adult), so inventory results map in directly and T-scores go through the
+  normal curve.
+- Who is talking must be in the message itself: with the speaker only in a memory-block note, a character still called
+  the other one 「製作人」 (the SOUL and the history outweigh a note). The relay prefixes every delivered message with the speaker's
+  display name, the block's first line names the counterpart, and the SOULs make the producer a role.
 
 ## Built (2026-10-08) — inner life stages 3–4: proactive [inner-life]
 - Urges are decided live only and recorded as replayable `proactive_fired` events; replay re-applies the record,

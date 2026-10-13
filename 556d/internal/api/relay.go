@@ -190,7 +190,8 @@ func (a *API) relayConversation(speaker, listener, text string, cap int, pk rela
 			log.Printf("[relay] %s: no session with %s: %v", listener, speaker, err)
 			return
 		}
-		res, err := cl.Chat(ctx, text, "", sid, "")
+		// the speaker's name rides in the message itself, so the listener's model cannot mistake it for the producer
+		res, err := cl.Chat(ctx, companions.DisplayName(a.mgr.Dir(speaker), speaker)+"："+text, "", sid, "")
 		cancel()
 		if err != nil || res.Err != "" {
 			log.Printf("[relay] %s -> %s: turn failed: %v %s", speaker, listener, err, res.Err)

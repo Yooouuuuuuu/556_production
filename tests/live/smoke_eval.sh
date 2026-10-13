@@ -10,6 +10,10 @@ P=$R/home/profiles/probe
 PW=D:/dev/556_production/home/profiles/probe
 LOG="$S/556d.smoke12.log"
 cd "$R"
+# never beside the app: the daemon owns :55600 and the app connects to whatever listens there
+if curl -s -m 2 http://127.0.0.1:55600/api/companions >/dev/null 2>&1 || tasklist //FI "IMAGENAME eq electron.exe" 2>/dev/null | grep -qi electron; then
+  echo "a 556d or the app is running — close the app first"; exit 2
+fi
 HERMES_HOME=$R/home PYTHONUTF8=1 timeout 60 $H profile delete probe --yes >/dev/null 2>&1; rm -rf "$P" 2>/dev/null
 powershell -NoProfile -ExecutionPolicy Bypass -File "$R/new-companion.ps1" -Name probe -DisplayName "試音" >/dev/null 2>&1; echo "[smoke12] probe: $(ls $P/plugins | tr '\n' ' ')"
 "$R/556d.exe" > "$LOG" 2>&1 &

@@ -1,15 +1,11 @@
-# characters/ — the 0.7.0 cast (provisional names)
+# characters/ — your cast (ignored by version control except this file)
 
-Three characters with full backgrounds, as versioned files; a profile is made with `new-companion.ps1` and
-these files are copied in with `install-character.ps1 -Name <id>`. Names are placeholders you can change:
-the id is the folder, the display name lives in `companion.json` and the SOUL.
+Each character is a folder `characters/<id>/`: `SOUL.md` (persona and background), `companion.json` (display name,
+avatar), `psyche.json` (personality as Big Five percentile ÷ 100, the six constants, schedule, small life events,
+relationship priors per counterpart), `kokoro.json` (keys merged into the profile's kokoro.json, e.g. `address_default`:
+how she addresses you until Settings → 你 has your name), `people/*.md` (how she sees you and the others; `你.md` is
+yours), `seeds.jsonl` (memories to load with `tools/seed-memories.py`).
 
-| id | display | who |
-| --- | --- | --- |
-| `sayo` | 小夜 | 24, singer-songwriter just signed; you have only just met (attachment from 0) |
-| `chihiro` | 千尋 | 27, vocalist; dating yuma for three years; your old acquaintance from a live house |
-| `yuma` | 悠真 | 29, arranger / producer; chihiro's boyfriend; your acquaintance of three years |
-
-Each folder: `SOUL.md` (persona and background), `companion.json`, `psyche.json` (personality, constants,
-schedule, small life events, relationship priors per counterpart), `people/*.md` (how they see you and each
-other), `seeds.jsonl` (shared memories to load into the character's KeepsakeDB store with `seed-memories.py`).
+Install into a profile: `install-character.ps1 -Name <id>` (creates the profile with `new-companion.ps1` when missing,
+then copies the files; restart her afterwards). Seed memories with the embedder up and the character not running.
+Keep the word 製作人 and any agency framing out of these files unless that is the world you want.

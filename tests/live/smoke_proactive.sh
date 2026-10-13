@@ -11,6 +11,10 @@ P=$R/home/profiles/mane
 PW=D:/dev/556_production/home/profiles/mane
 LOG="$S/556d.smoke13.log"
 cd "$R"
+# never beside the app: the daemon owns :55600 and the app connects to whatever listens there
+if curl -s -m 2 http://127.0.0.1:55600/api/companions >/dev/null 2>&1 || tasklist //FI "IMAGENAME eq electron.exe" 2>/dev/null | grep -qi electron; then
+  echo "a 556d or the app is running — close the app first"; exit 2
+fi
 "$R/556d.exe" > "$LOG" 2>&1 &
 PID=$!
 cleanup() { if kill -0 $PID 2>/dev/null; then kill $PID 2>/dev/null; fi; wait $PID 2>/dev/null; }

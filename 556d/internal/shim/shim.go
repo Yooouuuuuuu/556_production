@@ -251,7 +251,11 @@ func (s *Shim) chat(w http.ResponseWriter, r *http.Request) {
 						strings.Contains(cleaned, "returned no text"))
 					if broken {
 						lastCode, lastDetail = 502, p.name+" empty/glitch response"
-						log.Printf("[shim] lane=%s -> %s EMPTY (attempt %d/%d) %.1fs", lane, p.name, att, attempts, time.Since(t0).Seconds())
+						head := strings.TrimSpace(str(msg["content"]))
+						if rs := []rune(head); len(rs) > 160 {
+							head = string(rs[:160]) + "…"
+						}
+						log.Printf("[shim] lane=%s -> %s EMPTY (attempt %d/%d) %.1fs finish=%v body=%q", lane, p.name, att, attempts, time.Since(t0).Seconds(), ch["finish_reason"], head)
 						continue
 					}
 					if len(calls) > 0 {

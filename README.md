@@ -11,7 +11,7 @@ and a Live2D companion on your desktop.
 2. `cd app && npm install --ignore-scripts && npm run build` (see STACK.md for the Electron
    binary note), then `npm start` — the app starts and owns the whole backend.
 3. Terminal alternative: `556.cmd` (Hermes CLI/TUI; needs the app or `556d.exe` running).
-4. Characters: `install-character.ps1 -Name sayo|chihiro|yuma` (from `characters/`), then `tools/seed-memories.py <id>`
+4. Characters: `install-character.ps1 -Name <id>` (your own cast under `characters/`, ignored by version control), then `tools/seed-memories.py <id>`
    with 556d up and the character not running; `new-companion.ps1` makes a blank one.
 
 ## Memory language and embedding model

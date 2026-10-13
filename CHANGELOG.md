@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.7.1 — 2026-10-13
+
+- **Your cast lives outside version control**: `characters/<id>/` (SOUL, psyche.json, person files, seed memories,
+  kokoro keys) is ignored; only `characters/README.md` (the layout) is versioned. The characters designed in this
+  cycle are the user's own: a main conversation partner and a couple close to you, with no agency framing and no
+  role word (製作人) in their files; kokoro's injected profile header no longer calls you the producer who runs the
+  agency. Each character's `kokoro.json` sets how she addresses you until Settings → 你 has
+  your name; `install-character.ps1` merges those keys; the person file's unnamed line follows the term.
+- Fix: the shim's gemini-flash backend pointed at `agyapi/gemini-3.7-flash`, which Google retired (the proxy returned
+  404 as an instant empty reply); now `agyapi/gemini-3.8-flash`. The shim logs the backend's body on an empty reply.
+- Fix: in a conversation between characters the listener mistook the speaker for the producer. The relayed message now
+  carries the speaker's name, the state block's first line says who she is talking to, kokoro's per-turn note says the
+  same, and the SOUL template calls the producer a role instead of "whoever is talking to you".
+- Fix: the app's own messages showed the client name ("office") as a badge; badges now mark only channels and her
+  event turns.
+- Live scripts under `tests/live/` refuse to start while the app or a daemon is running (the daemon owns :55600 and
+  the app attaches to whatever listens there). Test artifacts under `tests/` are ignored.
+
 ## 0.7.0 — 2026-10-13
 
 - **Her inner life, stages 5–6 — relationships, hurt and repair, three characters** (`docs/inner-life/inner-life.md`).
@@ -19,8 +37,8 @@
   sides appraise, remember and update their relationship with the other as the counterpart; kokoro writes those
   memories with the other's name as the subject and injects the other's person file. `GET /api/relay/log` shows
   their conversations; the 狀態 page lists them when the character's 主動 → visibility allows.
-- **Three characters with full backgrounds** under `characters/` (provisional names): 小夜 (sayo, just met),
-  千尋 (chihiro) and 悠真 (yuma, the couple; your old acquaintances). Each has a SOUL with background, a
+- **Three characters with full backgrounds** under `characters/` (placeholders, later replaced by the user's own
+  cast): one just met, two old acquaintances who are a couple. Each has a SOUL with background, a
   psyche.json with personality, schedule, small life events and relationship priors per counterpart, person files
   for you and each other, and seed memories (`tools/seed-memories.py`). `install-character.ps1 <id>` makes the
   profile. 真音 stays as the test agent.

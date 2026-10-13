@@ -6,6 +6,9 @@ import { PushToTalk } from '../voice/recorder';
 import { useVoice } from '../voice/loop';
 
 // The office chat: last X turns from /api/history, live updates from the hub, IME-safe composer.
+// A badge marks where a message came from; the app's own clients (this window, history, voice, probes) get none.
+const OWN_SOURCES = new Set(['app', 'office', 'http', 'voice', 'smoke', 'eval']);
+
 export function Chat() {
   const { messages, talking, connected, error, setHistory, connect, selected, setHandsFree, setProactiveSpeak } = useStore();
   const [draft, setDraft] = useState('');
@@ -87,7 +90,7 @@ export function Chat() {
             <div className={`max-w-[78%] px-3 py-2 rounded-2xl whitespace-pre-wrap leading-relaxed text-[15px] ${
               m.role === 'user' ? 'bg-pink-500/80 text-white rounded-br-sm' : 'bg-white/10 rounded-bl-sm'
             } ${m.streaming ? 'animate-pulse' : ''}`}>
-              {m.source && m.source !== 'app' && <span className="block text-[10px] uppercase tracking-wider opacity-60 mb-0.5">{m.source === 'event' ? t('chat.badge_event') : m.source}</span>}
+              {m.source && !OWN_SOURCES.has(m.source) && <span className="block text-[10px] uppercase tracking-wider opacity-60 mb-0.5">{m.source === 'event' ? t('chat.badge_event') : m.source}</span>}
               {m.text}
             </div>
           </div>
