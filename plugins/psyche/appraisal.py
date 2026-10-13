@@ -1,0 +1,170 @@
+"""psyche.appraisal — pipeline A (inner-life.md §10): the one place that reads language.
+
+After a turn it answers "what just happened, and how much does it matter to her" as a small JSON of
+events with appraisal vectors (Appendix A.1, the core fields) plus open-loop changes. It reads what
+she cares about (cares_about in psyche.json), never her personality — that is B's job — and never
+evaluates the emotion she herself expressed. It runs in its own thread, fired at the same moment as
+the memory observe; nothing waits for it (§0).
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+import time
+from typing import Any, Dict, List, Optional, Sequence, Tuple
+
+EVENT_KINDS = [
+    "promise_kept", "promise_broken", "ignored", "dismissed", "praised_her", "criticized_her",
+    "shared_news_good", "shared_news_bad", "apology", "disclosed_personal", "asked_about_her",
+    "remembered_detail", "forgot_detail", "compared_her", "farewell", "return_after_absence",
+    "false_belief_corrected", "loop_resolved", "small_talk", "other",
+]
+LOOP_ORIGINS = ("counterpart_said", "her_promise", "counterpart_promise")
+
+SYSTEM = """You are the appraisal step of a fictional character's inner life. The character is a woman; the person
+she is talking to is called {term}. You read ONE conversation turn ({term}'s message and her reply) in
+context and report what happened from HER point of view, as data for a deterministic emotion model.
+Rules:
+- Report EVENTS, not her feelings. Do not evaluate the emotion she expressed in her reply; only use her
+  reply to understand what {term} said.
+- Judge importance by what she cares about (listed below), not by her personality.
+- Most turns contain 0 or 1 event. Small talk with nothing at stake: event_kind "small_talk", R ≤ 0.2, or no
+  events at all. Never invent events that did not happen in the text.
+- A promise, plan or date {term} mentions ("我週五面試", "明早八點提醒我", "晚上回來聊") is an OPEN LOOP: list it
+  under loops.new with the ISO time if one is implied (today is {today}). If {term} brings up or settles an
+  existing loop, list its id under loops.closed and report the outcome as an event with that loop_id.
+- Write "cause" as one short sentence in Traditional Chinese from her perspective, naming {term} as 「{term}」.
+Magnitude anchors (keep the scale stable across turns):
+  a promise to her broken without notice: v -0.5..-0.7, R 0.6..0.8, devalue 0.4..0.7, intent by how avoidable it was;
+  the same with a real reason told honestly: v -0.3, devalue 0.2;  {term} forgot something she told him: devalue ≥ 0.4;
+  sincere apology that owns the fault: event_kind apology, v +0.4..+0.6, intent 0.8;
+  praise of her work: v +0.6..+0.8, intent 0.7;  {term}'s own good/bad news: other_focus 1, other_v by how big it is for him;
+  small talk, logistics, neutral questions: small_talk with R ≤ 0.2 or no event.
+Fields per event (numbers in the given ranges):
+  event_kind: one of {kinds}
+  cause: short Traditional Chinese sentence
+  v: -1..1 valence for her (bad .. good)
+  R: 0..1 relevance / importance to her
+  u: 0..1 unexpectedness
+  cert: 0..1 (0 = not happened yet / uncertain future, 1 = happened)
+  agent: "self" | "other" | "circ" (who is responsible: her / {term} / circumstances)
+  intent: 0..1 how deliberate {term} was (only meaningful when agent = other)
+  devalue: 0..1 how much this says {term} values her less (broken promise, dismissal, forgotten detail)
+  ambiguity: 0..1 how open to interpretation
+  other_focus: 0..1 (1 = this is mainly about {term}'s own fortune, e.g. his news)
+  other_v: -1..1 good or bad for {term}
+  appeal: -1..1 like / dislike of a thing or idea mentioned (0 if none)
+  q: 0..1 quality of this interaction (deep, attentive = high; one-liners = low)
+  loop_id: id of a related open loop, or null
+Output JSON only, no prose:
+{{"events": [ ... up to {max_events} ... ],
+ "loops": {{"new": [{{"what": "...", "origin": "counterpart_said|her_promise|counterpart_promise",
+                     "cue_time": "YYYY-MM-DDTHH:MM" | null, "importance": 0..1}}],
+           "closed": ["loop id", ...]}},
+ "farewell": false}}"""
+
+
+def build_user(term: str, cares_about: Sequence[str], loops: Sequence[Dict[str, Any]],
+               recent: Sequence[Tuple[str, str]], user_text: str, assistant_text: str) -> str:
+    parts = ["## What she cares about"]
+    parts += [f"- {c}" for c in cares_about] or ["- (nothing listed)"]
+    parts.append("\n## Open loops (things she is waiting on)")
+    parts += [f"- {l['id']}: {l['what']}" + (f" (due {l['cue_time']})" if l.get("cue_time") else "") for l in loops] or ["- none"]
+    parts.append("\n## Recent turns (context only)")
+    for u, a in recent:
+        parts.append(f"{term}: {u[:400]}\n她: {a[:400]}")
+    if not recent:
+        parts.append("(none)")
+    parts.append("\n## THIS turn (appraise this)")
+    parts.append(f"{term}: {user_text[:1500]}\n她: {assistant_text[:800]}")
+    return "\n".join(parts)
+
+
+def extract_json(text: str) -> Dict[str, Any]:
+    t = text.strip()
+    m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", t, re.S)
+    if m:
+        t = m.group(1)
+    start = t.find("{")
+    if start < 0:
+        raise ValueError("no JSON object in reply")
+    depth = 0
+    for i in range(start, len(t)):
+        if t[i] == "{":
+            depth += 1
+        elif t[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return json.loads(t[start:i + 1])
+    raise ValueError("unbalanced JSON in reply")
+
+
+def _f(x: Any, lo: float, hi: float, default: float) -> float:
+    try:
+        v = float(x)
+    except (TypeError, ValueError):
+        return default
+    return lo if v < lo else hi if v > hi else v
+
+
+def normalize(data: Dict[str, Any], max_events: int = 3) -> Dict[str, Any]:
+    """Clamp ranges, drop junk, keep at most max_events — a malformed field becomes neutral, never a
+    reaction (§10: 寧可沒反應，不要亂反應)."""
+    events: List[Dict[str, Any]] = []
+    for ev in (data.get("events") or [])[:max_events]:
+        if not isinstance(ev, dict):
+            continue
+        kind = str(ev.get("event_kind") or "other")
+        if kind not in EVENT_KINDS:
+            kind = "other"
+        agent = str(ev.get("agent") or "circ").lower()
+        if agent not in ("self", "other", "circ"):
+            agent = "circ"
+        events.append({
+            "event_kind": kind,
+            "cause": str(ev.get("cause") or "")[:120],
+            "v": _f(ev.get("v"), -1, 1, 0.0), "R": _f(ev.get("R"), 0, 1, 0.3), "u": _f(ev.get("u"), 0, 1, 0.0),
+            "cert": _f(ev.get("cert"), 0, 1, 1.0), "agent": agent, "intent": _f(ev.get("intent"), 0, 1, 0.3),
+            "devalue": _f(ev.get("devalue"), 0, 1, 0.0), "ambiguity": _f(ev.get("ambiguity"), 0, 1, 0.0),
+            "other_focus": _f(ev.get("other_focus"), 0, 1, 0.0), "other_v": _f(ev.get("other_v"), -1, 1, 0.0),
+            "appeal": _f(ev.get("appeal"), -1, 1, 0.0), "q": _f(ev.get("q"), 0, 1, 0.3),
+            "loop_id": (str(ev["loop_id"]) if ev.get("loop_id") else None),
+        })
+    loops = data.get("loops") or {}
+    new = []
+    for l in (loops.get("new") or [])[:5]:
+        if isinstance(l, dict) and str(l.get("what") or "").strip():
+            origin = str(l.get("origin") or "counterpart_said")
+            new.append({"what": str(l["what"])[:120], "origin": origin if origin in LOOP_ORIGINS else "counterpart_said",
+                        "cue_time": (str(l["cue_time"])[:16] if l.get("cue_time") else None),
+                        "importance": _f(l.get("importance"), 0, 1, 0.5)})
+    closed = [str(x) for x in (loops.get("closed") or []) if x][:10]
+    return {"events": events, "loops": {"new": new, "closed": closed}, "farewell": bool(data.get("farewell"))}
+
+
+def turn_key(session_id: str, user_text: str, assistant_text: str) -> str:
+    """The same key kokoro stamps on memories (meta.turn_id), so the engine can annotate them later.
+    Mirrored in plugins/kokoro — keep both in sync."""
+    h = hashlib.sha1(f"{session_id}|{(user_text or '')[:300]}|{(assistant_text or '')[:300]}".encode("utf-8"))
+    return h.hexdigest()[:12]
+
+
+def run(llm: Any, *, term: str, cares_about: Sequence[str], loops: Sequence[Dict[str, Any]],
+        recent: Sequence[Tuple[str, str]], user_text: str, assistant_text: str, today: str,
+        max_events: int = 3, retries: int = 1) -> Tuple[Optional[Dict[str, Any]], str, Optional[str], float]:
+    """-> (normalized data or None, raw reply, error, ms). Retries once on a bad reply."""
+    system = SYSTEM.format(term=term, today=today, kinds=", ".join(EVENT_KINDS), max_events=max_events)
+    user = build_user(term, cares_about, loops, recent, user_text, assistant_text)
+    t0 = time.perf_counter()
+    raw, err = "", None
+    for attempt in range(1 + max(0, retries)):
+        try:
+            raw = llm.complete(system, user)
+            data = normalize(extract_json(raw), max_events)
+            return data, raw, None, (time.perf_counter() - t0) * 1000
+        except Exception as e:  # noqa: BLE001 — a failed appraisal is skipped, never a reaction
+            err = f"{type(e).__name__}: {e}"
+            if attempt < retries:
+                time.sleep(1.0)
+    return None, raw, err, (time.perf_counter() - t0) * 1000

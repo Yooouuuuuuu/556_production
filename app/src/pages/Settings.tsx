@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, Settings as S, VoiceConfig } from '../api';
 import { VoiceSettings } from './VoiceSettings';
+import { ToolsSettings } from './ToolsSettings';
 import { DevSettings } from './DevSettings';
 import { t } from '../i18n';
 
@@ -55,11 +56,11 @@ export function Settings() {
   return (
     <div className="h-full overflow-y-auto p-5 max-w-2xl space-y-5">
       <section className="space-y-3">
-        <h2 className="font-semibold">{t('settings.producer')}</h2>
+        <h2 className="font-semibold">{t('settings.you')}</h2>
         <div>
-          <label className={label}>{t('settings.producer_name')}</label>
-          <input className={field} value={s.producer_name ?? ''} placeholder={t('settings.producer_unnamed')} onChange={(e) => set('producer_name', e.target.value)} />
-          <p className="text-xs opacity-60 mt-1">{t('settings.producer_note')}</p>
+          <label className={label}>{t('settings.your_name')}</label>
+          <input className={field} value={s.your_name ?? ''} placeholder={t('settings.you_unnamed')} onChange={(e) => set('your_name', e.target.value)} />
+          <p className="text-xs opacity-60 mt-1">{t('settings.you_note')}</p>
         </div>
         <div>
           <label className={label}>{t('settings.reply_language')}</label>
@@ -113,6 +114,7 @@ export function Settings() {
         </div>
       </section>
 
+      <ToolsSettings onChanged={() => setRestartNeeded(true)} />
       <VoiceSettings />
 
       <label className="flex items-center gap-2 text-sm opacity-80">

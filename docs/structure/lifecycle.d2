@@ -1,31 +1,41 @@
 direction: down
 
-title: "Lifecycle — nothing auto-starts, every stop is graceful" {
+title: "Lifecycle (v2) — nothing auto-starts, every stop is graceful, her time is continuous" {
   shape: text
   near: top-center
   style.font-size: 20
 }
 
+classes: {
+  proposed: {style.stroke-dash: 4; style.stroke: "#c2185b"; style.font-color: "#c2185b"}
+}
+
 start: "roster ▶ start — manual; the only way she comes up (several may be active)" {shape: oval}
-spawn: "supervisor spawns `hermes gateway run`\nAPI_SERVER_KEY / HOST / PORT in her env; job object"
+spawn: "supervisor spawns `hermes gateway run`\nAPI_SERVER_KEY / HOST / PORT in her env; job object; toolsets from platform_toolsets"
 ready: "/health 2xx (~5 s) -> 上線中; Telegram connected"
 open: "556d opens her ONE conversation if none is live:\nPOST /api/sessions + Telegram routing stamp\n(never opened by a message, from any surface)"
-turns: "app and Telegram turns — one conversation"
+ff: "psyche plugin loads the last snapshot and fast-forwards the offline hours:\nsleep, activities, projects, life events, rumination; due loops and unkept 「等我一下」 handled;\n「這幾天」 summary for the state block; no proactive messages back-filled (0.5.0 / 0.6.0)" {class: proposed}
+turns: "app, Telegram and event turns — one conversation; tick every minute while she runs"
 
 stopreq: "stop requested: roster ■ · app quit (POST /api/shutdown) · app died (parent watcher)" {shape: oval}
 idle: "wait <= 30 s until pipeline_log has caught up with the newest user message\n(Hermes queues the observe a few seconds after the reply)"
+idle2: "0.5.0: also until the appraisal queue is empty; engine writes a snapshot"
 marker: "write .gateway-planned-stop.json\n(target = her Python pid from gateway.pid)"
 drain: "gateway watcher (0.5 s) -> drain: finish the turn,\nkokoro waits for an in-flight observe, exit 0\nno 「Gateway shutting down」 ping (restart notice off)"
 kill: "no exit after 60 s -> kill"
-gone: "process gone (typically 2–13 s) -> 收尾中 ends -> roster shows inactive"
+gone: "process gone (typically 2–13 s) -> 收尾中 ends -> roster shows inactive;\nwhile she is stopped nothing ticks — she is not living, and cannot speak first"
 appexit: "app quit path: 556d exits by itself -> app.exit()"
 
 start -> spawn
 spawn -> ready
 ready -> open
+open -> ff {class: proposed}
+ff -> turns {class: proposed}
 open -> turns
 turns -> stopreq
 stopreq -> idle
+idle -> idle2
+idle2 -> marker
 idle -> marker
 marker -> drain
 drain -> gone

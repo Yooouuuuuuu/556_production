@@ -1,0 +1,100 @@
+direction: down
+
+title: "Her inner life (v2) — the psyche engine: three inputs, one writer, four outlets, three easily-missed lines" {
+  shape: text
+  near: top-center
+  style.font-size: 20
+}
+
+classes: {
+  file: {shape: page}
+  step: {shape: hexagon}
+  vendor: {style.stroke: "#999999"; style.fill: "#f6f6f6"}
+  dark: {style.stroke: "#6a1b9a"; style.font-color: "#6a1b9a"; style.stroke-dash: 2}
+  later: {style.stroke-dash: 4; style.stroke: "#c2185b"; style.font-color: "#c2185b"}
+}
+
+legend: |md
+  Everything here is 0.5.0–0.7.0 work (inner-life.md). **purple dashed** = the three lines the first overview missed.
+  Versions: 0.5.0 = state block milestone (L0–L3, A, B) · 0.6.0 = time skeleton, needs, proactive · 0.7.0 = relationships, hurt/repair, three characters
+| {near: top-left}
+
+inputs: "inputs" {
+  turns: "conversation turns — app · Telegram · voice · other characters (0.7.0)\n→ appraisal A (LLM): events + appraisal vectors + loops; A reads what she cares about, not her personality"
+  tick: "time — fixed 1-minute tick (background thread in her process)"
+  life: "her life simulation — activity state, daily plan, projects, life events (rule tables, 0.6.0)"
+}
+
+engine: "psyche plugin — inside her Hermes process, beside kokoro; the ONLY writer" {
+  l0: "L0 personality — Big Five + 6 character constants (clinginess cap, tsundere, assertiveness, …); never changes"
+  l1: "L1 physiology — two-process sleep model, energy, sleep debt, social fatigue (0.6.0)"
+  l2: "L2 core affect (P / N / arousal as OU processes, mixed emotions kept) + PAD mood (pull–push, 8 octants)"
+  l3: "L3 emotion instances — type, target, cause, intensity, half-life, stacking, resolved_by; rumination (0.6.0)"
+  l4: "L4 needs — general affiliation, person-specific affiliation[p], competence, autonomy, certainty, novelty;\nprotest / despair / detachment (0.6.0)"
+  l5: "L5 relationship[p] — warmth, bond, closeness hours, disclosure depth, attachment strength, anxiety/avoidance, trust (Beta), commitment (0.7.0)"
+  l6: "L6 hurt ledger[p] — avoidance / resentment / benevolence; forgiveness; olive branch (0.7.0)"
+  tom: "theory of mind[p] — presence model, reply latency, other-state (0.6.0)"
+  loops: "open loops — what you said (incl. reminders), her life, her promises, your promises; cue.time / cue.event (0.6.0)"
+  b: "impact model B — deterministic: prototype matching → intensity → half-life/PAD → routing" {class: step}
+  aq: "A queue — the appraisal LLM call, fired together with kokoro's observe; results applied at the next tick" {class: step}
+  expr: "expression layer — regulation, display rules, five strategies (direct / reserved / humor / inverted / denial)" {class: step}
+  urge: "urge — λ = W × O × p̂_reply × D × gates; due loops bypass the probability (0.6.0)" {class: step}
+}
+
+db: "psyche.db (her profile)" {
+  class: file
+  t: |md
+    - events — append-only (turns, ticks, life, messages from 556d)
+    - appraisals — append-only (A results)
+    - instances — emotions, ledgers, loops (rebuildable)
+    - snapshots — full state every 15 min
+    - params — versions, loaded from psyche.json at start
+    daily seed = hash(character, date) → replay is exact
+  |
+}
+
+outlets: "outlets" {
+  block: "【她現在】 state block — ≤ 8 lines, words not numbers, transitions named;\ninjected at prefetch after the memory block; NEVER waits"
+  event: "event turn — POST to her own API with X-556-Event → a normal row in her ONE conversation\n→ app follower shows it, 556d sends it to Telegram, spoken per the 主動 override (0.6.0)"
+  av: "TTS prosody + Live2D parameters (stage 7)" {class: later}
+  page: "狀態 page + simulator — timeline, why, loops, relationship matrix; feedback buttons (too much / right / too little)"
+}
+
+hermes: "Hermes (vendor, unchanged)" {
+  class: vendor
+  hist: "conversation history (state.db)"
+  llm: "AIAgent → model shim :55601 → LLM"
+  hook: "transform_llm_output — output checks: manipulation, meta-leak, life confabulation, surveillance phrasing,\nemotion hallucination, assistant mode — RECORD ONLY at first"
+}
+
+d: "556d — hub, read-only here" {
+  ro: "reads psyche.db for the 狀態 page; writes psyche.json from Settings (restart applies)"
+  msg: "inter-agent messaging — message_person(p, text) between characters (0.7.0)" {class: later}
+}
+
+inputs.turns -> engine.aq
+engine.aq -> hermes.llm: "one LLM call per turn (2b)"
+engine.aq -> engine.b
+inputs.tick -> engine
+inputs.life -> engine
+engine.b -> engine.l3
+engine.b -> engine.l6
+engine.b -> engine.l5
+engine.l4 -> engine.urge
+engine.loops -> engine.urge
+engine -> db: "append events · appraisals · snapshots"
+db -> engine: "replay / fast-forward at start"
+engine.expr -> outlets.block
+engine.urge -> outlets.event
+engine.expr -> outlets.av {class: later}
+db -> outlets.page: "via 556d, read-only"
+outlets.block -> hermes.llm: "prefetch, with the memory block"
+outlets.event -> hermes.llm: "she writes it or stays quiet"
+hermes.llm -> hermes.hook: "reply text"
+hermes.hook -> db: "check results recorded as events"
+d.ro -> db
+d.msg -> inputs.turns: "0.7.0" {class: later}
+
+hermes.hist -> hermes.llm: "DARK LINE 1 — history's tone inertia reaches the next reply without the engine;\nthe state block names the transition to override it" {class: dark}
+hermes.llm -> engine.aq: "DARK LINE 2 — every LLM call (reply, observe, A, compression) goes through the shim: one observation point for all platforms" {class: dark}
+d.msg -> engine.tom: "DARK LINE 3 — other characters are counterparts too: relationship and ToM are indexed by p from day one" {class: dark}

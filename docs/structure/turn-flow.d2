@@ -1,0 +1,80 @@
+shape: sequence_diagram
+
+title: "One turn (v2) — 1 + 2: one reply you wait for, two background calls fired together" {
+  shape: text
+  near: top-center
+  style.font-size: 20
+}
+
+you: "你"
+app: "app window"
+d: "556d"
+api: "her API server"
+tg: "her Telegram adapter"
+agent: "AIAgent"
+state: "state.db (history)"
+kokoro: "kokoro -> KeepsakeDB"
+psyche: "psyche plugin (engine)"
+llm: "LLM (shim lane)"
+telegram: "Telegram"
+
+"A — turn from the app (today + 0.5.0 additions)": {
+  you -> app: "question (typed, or a voice turn with X-556-Voice)"
+  app -> d: "POST /api/chat"
+  d -> api: "/v1/chat/completions, non-stream\nX-Hermes-Session-Id = her ONE session"
+  api -> state: "load history (every surface)"
+  api -> agent: "run turn"
+  agent -> kokoro: "prefetch(question)"
+  kokoro -> kokoro: "1 embedding; long + short searched at once, hybrid top 5 each;\n subject 你 rendered as her term for you"
+  kokoro -> agent: "memory block + people/你.md"
+  agent -> psyche: "prefetch: read the latest landed state (0.5.0)"
+  psyche -> agent: "【她現在】 state block — NEVER waits for this turn's appraisal"
+  agent -> llm: "SOUL + history + memory + state + question  (call 1)"
+  llm -> agent: "reply"
+  agent -> state: "append user + assistant rows"
+  api -> d: "final text"
+  d -> app: "chat.delta + chat.complete (hub)"
+  d -> telegram: "sendMessage 「你問我 q / 我說 a」 — no LLM"
+  agent -> kokoro: "sync_turn — fired now"
+  agent -> psyche: "appraisal A — fired at the same time (0.5.0)"
+  kokoro -> llm: "observe (call 2a): ops (long) + note (short)"
+  psyche -> llm: "appraisal (call 2b): events + appraisal vectors + loops"
+  kokoro -> kokoro: "write the store (subject 你, source, turn_id, valence, arousal)"
+  psyche -> psyche: "append appraisals; impact model B at the next tick -> instances, ledgers, loops\n(result shapes the NEXT turn)"
+}
+
+"B — turn from Telegram": {
+  you -> telegram: "message to her bot"
+  telegram -> tg: "update"
+  tg -> state: "same session (agent:main:telegram:dm:<id>)"
+  tg -> agent: "run turn — history includes the app turns"
+  agent -> kokoro: "prefetch · sync_turn (as above)"
+  agent -> psyche: "state block · appraisal (as above)"
+  agent -> llm: "…"
+  llm -> agent: "reply"
+  agent -> state: "append rows (platform_message_id set)"
+  tg -> telegram: "reply"
+  d -> state: "follower: new rows since cursor? (every 2 s)"
+  d -> app: "chat.user + chat.complete, source = telegram (badge)"
+}
+
+"C — stop right after a reply": {
+  app -> d: "stop (roster) or quit (POST /api/shutdown)"
+  d -> state: "newest user message time"
+  d -> kokoro: "pipeline_log caught up? wait <= 30 s"
+  d -> psyche: "appraisal queue drained + snapshot (0.5.0)"
+  d -> agent: "planned-stop marker -> drain -> exit 0 (kill after 60 s)"
+}
+
+"D — event turn: she speaks first (0.6.0)": {
+  psyche -> psyche: "tick: a due loop (reminder, 「等我一下」) or the urge fires"
+  psyche -> api: "X-556-Event: facts of the occasion, same session id"
+  api -> agent: "run turn"
+  agent -> llm: "she writes it, or decides to stay quiet"
+  llm -> agent: "text (checks record only, nothing blocked)"
+  agent -> state: "append rows — a normal row in her ONE conversation"
+  d -> state: "follower sees the new row"
+  d -> app: "chat.complete, source = event (badge); spoken per the 主動 override"
+  d -> telegram: "sendMessage — same path as the app mirror"
+  psyche -> psyche: "wait-for-reply timer; past p90 -> small disappointment, never a follow-up"
+}

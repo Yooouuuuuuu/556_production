@@ -17,7 +17,7 @@ import (
 // The config registry: every knob the system has, declared once — where it lives (file + path),
 // its type, who it belongs to (agency or the selected companion), whether it is a developer
 // knob, and what changing it costs (restart her / restart the app / re-embed / reindex / migrate).
-// Rule from the Producer (2026-10-02): nothing may be fixed in a config file; everything is
+// Rule from the user (2026-10-02): nothing may be fixed in a config file; everything is
 // editable from Settings — non-technical knobs directly, the rest behind the developer toggle.
 // Limits: the TOML writer rewrites a `key = value` line without its inline comment; YAML keeps comments.
 //
@@ -72,7 +72,7 @@ func knobs() []Knob {
 		c("discord.token", "channels", "Discord bot token", "之後再做；放了 token 她啟動時就會上線", "secret", "restart_companion", "env", ".env", "DISCORD_BOT_TOKEN"),
 		c("discord.allowed_users", "channels", "Discord 允許的使用者 ID", "逗號分隔", "string", "restart_companion", "env", ".env", "DISCORD_ALLOWED_USERS"),
 		// ---- her memory engine (kokoro.json)
-		c("kokoro.subject", "memory", "記憶主詞", "每則關於你的記憶都以這個詞當主詞（預設 製作人）。改了會改寫並重新嵌入既有記憶。", "string", "migrate_subject", "json", "kokoro.json", "subject"),
+		c("kokoro.subject", "memory", "記憶主詞", "每則關於你的記憶都以這個詞當主詞存放（預設 你；注入時換成她對你的稱呼）。改了會改寫並重新嵌入既有記憶。", "string", "migrate_subject", "json", "kokoro.json", "subject"),
 		c("kokoro.tokenizer", "memory", "關鍵字分詞", "bigram（預設，繁中最準）或 jieba；改了會重建索引", "select", "reindex", "json", "kokoro.json", "tokenizer", "bigram", "jieba"),
 		c("kokoro.context_k", "memory", "每輪注入的記憶數", "", "int", "restart_companion", "json", "kokoro.json", "context_k"),
 		c("kokoro.max_candidates", "memory", "記憶管線候選數", "每輪給 L2 看的相似記憶數", "int", "restart_companion", "json", "kokoro.json", "max_candidates"),

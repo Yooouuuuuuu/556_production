@@ -21,3 +21,4 @@ New-Item -ItemType Directory -Force home\plugins | Out-Null
 Get-ChildItem plugins -Directory | ForEach-Object { if (-not (Test-Path (Join-Path 'home\plugins' $_.Name))) { New-Item -ItemType Junction -Path (Join-Path 'home\plugins' $_.Name) -Target $_.FullName | Out-Null } }
 # KeepsakeDB (memory engine) into the Hermes venv
 uv pip install --python vendor\hermes-agent\.venv\Scripts\python.exe -e D:\dev\KeepsakeDB
+uv pip install --python vendor\hermes-agent\.venv\Scripts\python.exe ddgs   # keyless web search for the 查網路 extension

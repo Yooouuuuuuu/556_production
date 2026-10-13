@@ -1,0 +1,98 @@
+direction: down
+
+title: "Inside her process (v2) — hermes gateway run with two plugins: kokoro (memory) and psyche (engine)" {
+  shape: text
+  near: top-center
+  style.font-size: 20
+}
+
+classes: {
+  ours: {style.stroke: "#2e7d32"; style.font-color: "#2e7d32"}
+  vendor: {style.stroke: "#999999"; style.fill: "#f6f6f6"}
+  file: {shape: page}
+  step: {shape: hexagon}
+  later: {style.stroke-dash: 4; style.stroke: "#c2185b"; style.font-color: "#c2185b"}
+}
+
+legend: |md
+  **green** = ours (config, plugins, env)  ·  **grey** = Hermes vendor code, never edited  ·  **dashed** = 0.6.0 / 0.7.0 work
+| {near: top-left}
+
+home: "HERMES_HOME = home/profiles/<name> — her folder (runtime, ignored by VCS)" {
+  class: ours
+  soul: "SOUL.md — persona; 0.7.0: full background for every character" {class: file}
+  people: "people/你.md — the person file (name, reply language written by Settings);\nreplaces memories/USER.md (0.5.0)" {class: file}
+  cfg: "config.yaml — model → shim lane · memory.provider: kokoro,\nbuilt-in memory writer OFF · platform_toolsets {api_server, telegram, cli}\n· platforms.telegram: restart notice off, slash commands admin-only" {class: file}
+  env: ".env — TELEGRAM_BOT_TOKEN · TELEGRAM_ALLOWED_USERS · TELEGRAM_HOME_CHANNEL\n(API_SERVER_KEY/HOST/PORT arrive from 556d at spawn)" {class: file}
+  kk: "kokoro.json — memory settings (subject 你, your_name, address_default 製作人, layers, LLM, embedder)" {class: file}
+  pj: "psyche.json — engine params (personality, constants, time constants; overridable), restart applies (0.5.0)" {class: file}
+  plug: "plugins/kokoro → junction (MemoryProvider)" {class: file}
+  plug2: "plugins/psyche → junction (engine plugin) (0.5.0)" {class: file}
+  state: "state.db — sessions + messages = her ONE conversation" {class: file}
+  store: "memory/<name>.db — KeepsakeDB (long + short layers)" {class: file}
+  psydb: "psyche.db — events · appraisals · instances · snapshots · params (0.5.0)" {class: file}
+  marks: "gateway.pid · gateway.lock · .gateway-planned-stop.json · logs/" {class: file}
+}
+
+gw: "hermes gateway run (Python, one process per character)" {
+  class: vendor
+  platforms: "platform adapters" {
+    api: "api_server — OpenAI-compatible API\n/v1/chat/completions · /api/sessions · /health · Bearer API_SERVER_KEY"
+    tg: "telegram — polling, allowlist, home channel"
+    dc: "discord" {class: later}
+  }
+  runner: "turn runner (gateway/run_turn*)" {
+    sess: "session store — key → session id"
+    hist: "rebuild history from state.db each turn (compression summarizes the middle)" {class: step}
+    tools: "toolsets for THIS platform = platform_toolsets[platform]\nbaseline [memory] → kokoro_search / kokoro_forget\n+ extensions (e.g. web → web_search, web_extract)" {class: step}
+    agent: "AIAgent — system prompt = SOUL + memory block + people file + 【她現在】 state block + tool schemas;\nLLM via the shim lane; tool loop; append rows" {class: step}
+    sync: "memory worker → provider.sync_turn after the reply" {class: step}
+    hook: "plugin hook transform_llm_output — output checks, record only (0.6.0)" {class: step; class: later}
+  }
+  mem: "kokoro (MemoryProvider) → KeepsakeDB:\nprefetch (one embedding, both layers, subject rendered) · observe (one LLM call → ops + note)" {class: ours}
+  psy: "psyche (engine plugin) — single writer of psyche.db (0.5.0):\n• 1-min tick on a background thread: OU exact solution, decay, needs, sleep model, life simulation, loops\n• A queue: appraisal LLM call fired together with observe, never waited for\n• impact model B (deterministic) → instances, ledgers, relationship vars\n• prefetch: 【她現在】 state block\n• 0.6.0: due loops + urge → event turn POSTed to her own api_server" {class: ours}
+  web: "web providers ring (keyless free tiers + DuckDuckGo) — only when the web extension is on"
+  life: "lifecycle — planned-stop watcher (0.5 s) → drain → exit 0;\nlifecycle ledger; control pipe"
+}
+
+d: "556d (Go) — around her, never inside" {
+  class: ours
+  spawn: "spawn with env; graceful stop via the marker"
+  cfgw: "writes config.yaml / kokoro.json / psyche.json / .env / people/你.md\n(Settings, dev registry, 她會的事, 主動)"
+  reads: "reads state.db and psyche.db read-only (history, live tail, 狀態 page);\nopens + stamps her one session at start"
+  chat: "POST /v1/chat/completions per app turn (X-Hermes-Session-Id)"
+  send: "Telegram send: app turns and her event turns -> her DM (plain text)"
+}
+
+home.cfg -> gw.runner.tools: "platform_toolsets"
+home.cfg -> gw.mem: "memory.provider"
+home.env -> gw.platforms.tg: "token, allowlist"
+home.soul -> gw.runner.agent
+home.people -> gw.mem: "injected after the memory block\n(Hermes's own USER.md injection is off)"
+home.kk -> gw.mem
+home.pj -> gw.psy
+home.plug -> gw.mem
+home.plug2 -> gw.psy
+gw.mem -> home.store: "search · write"
+gw.psy -> home.psydb: "append events / appraisals / snapshots"
+gw.runner.hist -> home.state
+gw.runner.agent -> home.state: "append user + assistant rows"
+gw.platforms.api -> gw.runner
+gw.platforms.tg -> gw.runner
+gw.runner.hist -> gw.runner.tools -> gw.runner.agent -> gw.runner.sync
+gw.runner.sync -> gw.mem: "observe (2a)"
+gw.runner.sync -> gw.psy: "appraisal (2b), same moment"
+gw.psy -> gw.runner.agent: "state block at prefetch"
+gw.psy -> gw.platforms.api: "event turn (X-556-Event) (0.6.0)" {class: later}
+gw.runner.agent -> gw.runner.hook: "reply text" {class: later}
+gw.runner.agent -> gw.web: "web_search (extension on)"
+gw.life -> home.marks
+d.spawn -> gw: "process + env"
+d.cfgw -> home.cfg
+d.cfgw -> home.people
+d.cfgw -> home.pj
+d.reads -> home.state
+d.reads -> home.psydb
+d.chat -> gw.platforms.api
+d.send -> gw.platforms.tg: "(through Telegram's servers, her bot token)"
+d.spawn -> home.marks: "planned-stop marker"

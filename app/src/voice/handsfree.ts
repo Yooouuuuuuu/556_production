@@ -60,7 +60,7 @@ export async function startHandsFree(p: VoiceHandsFree, h: HandsFreeHandlers): P
 
   return {
     pause() {
-      // echo guard: whatever the mic caught while she speaks is hers, not the Producer's
+      // echo guard: whatever the mic caught while she speaks is hers, not yours
       paused = true;
       vad.pause();
       if (grace) { clearTimeout(grace); grace = null; }

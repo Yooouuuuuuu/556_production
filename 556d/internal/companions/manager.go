@@ -1,5 +1,5 @@
 // Package companions is the roster: every Hermes profile under home/profiles/<name> is a
-// character. Nothing starts by itself — the Producer starts and stops each one from the app
+// character. Nothing starts by itself — you start and stop each one from the app
 // (several can be active at once; closing the app stops all through the job object).
 //
 // ONE process per character: her `hermes gateway run`. It carries her channel adapters
@@ -280,11 +280,12 @@ func (m *Manager) awaitMemoryIdle(name string, max time.Duration) {
 		if lastTurn == 0 {
 			return
 		}
-		if lastObserve(filepath.Join(dir, "memory", name+".db")) >= lastTurn {
+		if lastObserve(filepath.Join(dir, "memory", name+".db")) >= lastTurn &&
+			psycheCaughtUp(filepath.Join(dir, "psyche.db"), lastTurn) {
 			return
 		}
 		if time.Now().After(deadline) {
-			log.Printf("[companions] %s: memory pipeline still busy after %s; stopping anyway", name, max)
+			log.Printf("[companions] %s: memory pipeline / appraisal still busy after %s; stopping anyway", name, max)
 			return
 		}
 		time.Sleep(500 * time.Millisecond)
@@ -293,6 +294,15 @@ func (m *Manager) awaitMemoryIdle(name string, max time.Duration) {
 
 func lastUserMessageAt(stateDB string) float64 {
 	return scalarFloat(stateDB, "SELECT COALESCE(MAX(timestamp), 0) FROM messages WHERE role = 'user'")
+}
+
+// psycheCaughtUp: the psyche plugin's appraisal of the newest turn has landed (its `at` is the turn's
+// end), or there is no engine for this character.
+func psycheCaughtUp(psycheDB string, lastTurn float64) bool {
+	if _, err := os.Stat(psycheDB); err != nil {
+		return true
+	}
+	return scalarFloat(psycheDB, "SELECT COALESCE(MAX(at), 0) FROM appraisals") >= lastTurn
 }
 
 func lastObserve(memoryDB string) float64 {

@@ -3,7 +3,7 @@ import { api, CompanionInfo } from '../api';
 import { useStore } from '../store';
 import { t } from '../i18n';
 
-// The roster: every companion under home/profiles. Nothing starts by itself — the Producer
+// The roster: every companion under home/profiles. Nothing starts by itself — you
 // starts and stops each one here; several can be active at once. "Switch" makes her the one
 // the chat window (and therefore the avatar) is on.
 export function Roster() {

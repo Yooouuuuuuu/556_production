@@ -21,11 +21,19 @@ _CONFIG_NAME = "kokoro.json"
 _GLYPH = "💗"
 
 
+def _turn_key(session_id: str, user_text: str, assistant_text: str) -> str:
+    """Stamped on this turn's memories (meta.turn_id). Mirrors plugins/psyche/appraisal.turn_key, which the
+    psyche engine computes from the same post_llm_call texts, so emotion is aligned with memory later."""
+    import hashlib
+    h = hashlib.sha1(f"{session_id}|{(user_text or '')[:300]}|{(assistant_text or '')[:300]}".encode("utf-8"))
+    return h.hexdigest()[:12]
+
+
 def _read_config(hermes_home: Path) -> Dict[str, Any]:
     p = hermes_home / _CONFIG_NAME
     if not p.exists():
         return {}
-    with open(p, encoding="utf-8") as f:
+    with open(p, encoding="utf-8-sig") as f:
         return json.load(f)
 
 
@@ -92,7 +100,7 @@ class KokoroMemoryProvider(MemoryProvider):
             backup_dir=backup_dir, snapshot_text_only=bool(cfg.get("snapshot_text_only", False)),
             log_searches=bool(cfg.get("log_searches", True)), log_pipeline=bool(cfg.get("log_pipeline", True)),
             log_retention_days=cfg.get("log_retention_days", 90), slow_ms=float(cfg.get("slow_ms", 50)),
-            reindex_on_mismatch=True,  # the Producer may change the tokenizer in Settings; the store follows
+            reindex_on_mismatch=True,  # you may change the tokenizer in Settings; the store follows
         )
         if owner:
             self._store.start_owner_loop(float(cfg.get("owner_poll_s", 1.0)))
@@ -107,8 +115,9 @@ class KokoroMemoryProvider(MemoryProvider):
         self._pipeline = Pipeline(self._store, llm, PipelineConfig(
             language=cfg.get("language", "zh-TW"), max_candidates=int(cfg.get("max_candidates", 8)),
             consent_turns=int(cfg.get("consent_turns", 100)), context_k=int(cfg.get("context_k", 5)),
-            subject=cfg.get("subject") or None,            # fixed subject word, e.g. 製作人 (store constant)
-            user_name=cfg.get("producer_name") or None,    # prompt-layer only; written through from Settings
+            subject=cfg.get("subject") or None,            # fixed subject word in stored memories (你)
+            user_name=self._your_name(cfg) or None,          # prompt-layer only; written through from Settings
+            render_subject=self._address_term(cfg),         # how she refers to you when memories are injected
             retries=int(cfg.get("llm_retries", 1)),
             short_layer=bool(cfg.get("short_layer", True)), short_k=int(cfg.get("short_k", 5)),
             short_cap=int(cfg.get("short_cap", 1000)), surface=surfaces.get(platform, platform),
@@ -117,6 +126,40 @@ class KokoroMemoryProvider(MemoryProvider):
                     self._pipeline.cfg.language)
 
     def system_prompt_block(self) -> str:
+        return self._memory_block_text() + self._your_profile_block()
+
+    @staticmethod
+    def _your_name(cfg: Dict[str, Any]) -> str:
+        return str(cfg.get("your_name") or cfg.get("producer_name") or "").strip()
+
+    def _address_term(self, cfg: Dict[str, Any]) -> str:
+        """What she calls you: your name from Settings, else the role term (default 製作人)."""
+        return self._your_name(cfg) or str(cfg.get("address_default") or "製作人").strip()
+
+    def _render(self, text: str) -> str:
+        """Stored memories say 你; in anything she reads, 你 becomes her term for you."""
+        subj = self._pipeline.subject if self._pipeline else None
+        term = self._address_term(self._cfg)
+        return text.replace(subj, term) if subj and term and term != subj else text
+
+    def _your_profile_block(self) -> str:
+        """people/你.md (formerly memories/USER.md) — your profile the app maintains (name, reply language). Hermes's
+        built-in memory writer is off in 556 (one memory system), so kokoro carries the profile."""
+        if not self._home:
+            return ""
+        try:
+            text = ""
+            for rel in (("people", "你.md"), ("memories", "USER.md")):
+                p = self._home.joinpath(*rel)
+                if p.exists():
+                    text = p.read_text(encoding="utf-8").strip()
+                    break
+        except Exception:
+            return ""
+        term = self._address_term(self._cfg)
+        return f"\n\nAbout {term} — the person you are talking to (profile maintained in the app):\n" + text[:2000] if text else ""
+
+    def _memory_block_text(self) -> str:
         return (self._cfg.get("system_prompt_block") or
                 "Memory about the user is injected per turn as a 'Memory' block: 'Facts (long-term)' with "
                 "trust labels ([high] = certain, plain = likely) and 'Notes (recent, dated)' — one line per "
@@ -152,7 +195,9 @@ class KokoroMemoryProvider(MemoryProvider):
         if self._pipeline is None or self._agent_context != "primary":
             return
         with self._turn_lock:
-            res = self._pipeline.observe(user_content, assistant_content)
+            res = self._pipeline.observe(user_content, assistant_content,
+                                         turn_id=_turn_key(session_id, user_content, assistant_content),
+                                         source=self._pipeline.subject or None)
         if res.error:
             logger.warning("kokoro observe error: %s", res.error)
         elif res.applied:
@@ -200,7 +245,7 @@ class KokoroMemoryProvider(MemoryProvider):
                 layer = args.get("layer") if args.get("layer") in ("long", "short") else None
                 hits = self._store.search(str(args.get("query", "")), k=k, archived="meta", layer=layer)
                 return json.dumps({"results": [
-                    {"id": m.id, "text": m.text, "tags": m.tags, "label": m.label, "layer": m.layer,
+                    {"id": m.id, "text": self._render(m.text), "tags": m.tags, "label": m.label, "layer": m.layer,
                      "archived_reason": m.archive_reason if m.archived else None,
                      "dense": None if m.dense is None else round(m.dense, 3),
                      "bm25": None if m.bm25 is None else round(m.bm25, 2)} for m in hits]}, ensure_ascii=False)

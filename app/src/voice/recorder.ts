@@ -1,6 +1,6 @@
 // Mode 1 — press to record, press again to stop: one MediaRecorder clip, decoded and resampled to
 // 16 kHz mono WAV (the same container conversation mode sends — Fish's ASR rejects webm/opus),
-// sent to STT; the text lands in the composer for the Producer to send.
+// sent to STT; the text lands in the composer for you to send.
 import { encodeWav } from './audio';
 
 export class PushToTalk {

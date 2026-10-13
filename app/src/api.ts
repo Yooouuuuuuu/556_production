@@ -9,7 +9,7 @@ async function get<T>(path: string): Promise<T> {
 
 export type Settings = {
   companion_name: string;
-  producer_name: string;
+  your_name: string;
   reply_language: string;
   mirror_to_telegram: boolean;
   avatar_model: string;
@@ -30,6 +30,7 @@ export type MemoryStats = {
 };
 export type MemoryTag = { tag: string; count: number };
 export type VoiceProvider = { kind: string; base_url: string; api_key?: string; api_key_set?: boolean; model: string; voice?: string; format?: string; language?: string };
+export type ToolExtension = { key: string; label: string; help: string; toolsets: string[]; acts_in_world: boolean; enabled: boolean };
 export type VoiceHandsFree = { threshold: number; min_silence_ms: number; pre_roll_s: number; grace_s: number; min_turn_s: number; max_turn_s: number; echo_guard: boolean; spoken_style: string };
 export type VoiceConfig = { tts: VoiceProvider; stt: VoiceProvider; handsfree?: VoiceHandsFree };
 export type Knob = { key: string; group: string; label: string; help: string; type: string; options?: string[]; scope: string; dev: boolean; effect: string; value: any; set?: boolean };
@@ -45,7 +46,17 @@ async function errorOf(r: Response): Promise<string> {
   try { return JSON.parse(body).error || `HTTP ${r.status}`; } catch { return `HTTP ${r.status}: ${body.slice(0, 120).trim()}`; }
 }
 
+export type PsycheInstance = { id: string; born_at: number; type: string; target: string; cause: string; intensity0: number; half_life_h: number; stack_key: string; loop_id: string | null; resolved_at: number | null; resolved_by: string | null };
+export type PsycheLoop = { id: string; what: string; origin: string; cue_time: string | null; importance: number; state: string; created_at: number; closed_at: number | null };
+export type PsycheEvent = { id: number; at: number; kind: string; counterpart: string; payload: any };
+export type PsycheAppraisal = { id: number; at: number; turn_id: string; platform: string; data: any; error: string | null; ms: number; applied_tick: number | null };
+export type PsycheView = { companion: string; exists: boolean; running?: boolean; snapshot_at?: number;
+  snapshot?: { tick: number; t: number; affect: { pos: number; neg: number; ar: number }; mood: number[]; energy: number };
+  instances?: PsycheInstance[]; loops?: PsycheLoop[]; events?: PsycheEvent[]; appraisals?: PsycheAppraisal[] };
+
 export const api = {
+  // 狀態: her inner state, read-only from psyche.db
+  psyche: () => get<PsycheView>('/api/psyche'),
   memory: (p: { q?: string; tag?: string; archived?: boolean; limit?: number; layer?: 'long' | 'short' } = {}) => {
     const qs = new URLSearchParams();
     if (p.layer) qs.set('layer', p.layer);
@@ -122,6 +133,13 @@ export const api = {
   },
   speakEnd: () => fetch(BASE + '/api/voice/speak', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'end' }) }).then(() => undefined),
   speakPlaying: () => fetch(BASE + '/api/voice/speak', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'playing' }) }).then(() => undefined),
+  // tools: baseline memory + extensions per character; a restart applies changes
+  tools: () => get<{ companion: string; baseline: string[]; configured: boolean; extensions: ToolExtension[] }>('/api/tools'),
+  setTool: async (key: string, enabled: boolean) => {
+    const r = await fetch(BASE + '/api/tools', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ key, enabled }) });
+    if (!r.ok) throw new Error(await errorOf(r));
+    return r.json() as Promise<{ extensions: ToolExtension[]; toolsets: string[]; restart_required: boolean }>;
+  },
 };
 
 // Exposed by electron/preload.ts

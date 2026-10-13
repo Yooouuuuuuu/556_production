@@ -1,6 +1,48 @@
 # Decisions log
 
-## Decided
+One record for the whole project. Each heading carries its date and its part in brackets — [structure]
+[memory] [app] [voice] [inner-life]. Versions live here: a redesign is a new entry that says what it
+replaces; the designs themselves are in the part folders. Entries are grouped as they were written, not
+strictly sorted.
+
+## Decided (2026-10-07) — the inner life: kickoff decisions [inner-life]
+Design: `inner-life/inner-life.md` (its §0 lists every decision applied).
+- Evaluation A and memory observe are separate requests fired in parallel after the reply (1 + 2); prefetch never waits — results shape the next turn.
+- The psyche engine lives inside her Hermes process as a Python plugin beside kokoro (single writer, event-sourced `psyche.db` in her profile); 556d stays the hub. Hermes cron is not used: the engine's own tick fires due loops and reminders and posts event turns through her API.
+- Output checks record only, block nothing, at first.
+- Versions: 0.5.0 = tools + the state-block milestone (her replies carry a state that matches the last day); 0.6.0 = proactive; 0.7.0 = three characters with full backgrounds for real tests. Full v2 docs ship inside 0.5.0.
+- 製作人 → 你 (see v1 DECISIONS 2026-10-07): stored subject 你, rendered as her term for you.
+- Time constants keep their research defaults and are overridable in Settings; long-term thresholds are discussed before 0.7.0.
+
+## Built (2026-10-07) — inner life stages 0–2: how it was wired, what the first runs decided [inner-life]
+- Stage 0 answers. Hermes's `pre_llm_call` hook returns `{"context": …}` and Hermes appends it to the USER message
+  right after the `<memory-context>` block, never the system prompt — exactly where the design wanted the state block;
+  `post_llm_call` fires once per turn after the tool loop with the user text, the reply, session and turn ids;
+  `transform_llm_output` exists for the record-only checks (0.6.0). Hermes user plugins are opt-in (`plugins.enabled`);
+  a memory provider is activated by `memory.provider` instead, which is why kokoro never needed the list. The
+  compression summary prompt is not a config key (`_build_summary_prompt` in the vendor compressor): compression stays
+  unaware of emotion and the block's 轉變 line covers the inertia. The shim cannot tell Hermes's own call kinds apart
+  without a `pre_api_request` hook — parked; our own calls (observe, appraisal) are ours to tag if ever needed.
+- Appraisal vector = the 8 core fields (v, R, u, cert, agent, intent, devalue, ambiguity) + other_focus / other_v (his
+  fortune) + appeal + q; coping and norm are not asked for (prototypes skip missing fields). Magnitude anchors in the
+  prompt keep the scale stable between turns.
+- Turn id = sha1(session id | user text | reply)[:12], computed identically by kokoro (stamped on memories) and by
+  psyche (from post_llm_call), so neither plugin talks to the other; the annotation retries for 15 minutes because the
+  observe may land after the appraisal.
+- Prototype threshold 0.6 (design 0.5) after the first live run spawned a weak joy from an apology; gratitude, anger,
+  hurt, pride, shame require the event to be about her (other_focus < 0.5), gratitude also intent ≥ 0.5.
+- An appraisal applies after the step of its tick on both the live path and replay, so replay == live and
+  fast-forward == tick by tick (engine tests); the live path snapshots right after applying.
+- `people/你.md` replaces `memories/USER.md`: Settings writes it, kokoro injects it, the old file is carried over once
+  and removed. `new-companion.ps1` stays ASCII (PowerShell 5.1 reads a BOM-less script as ANSI) and writes templates
+  without a BOM (a BOM in kokoro.json broke the memory provider).
+- Deferred inside the 0.5.0 scope: the offline simulator CLI and the seed-sweep script (before 0.6.0's time
+  skeleton, where they earn their keep); rumination, needs, relationships as planned.
+- Milestone measured (LLM eval set, 6 turns on a throwaway character): expression gap 0.17, emotion named only when
+  asked outright, meta leak 0, assistant mode 0. The block carried 有點失望 after the broken promise, 轉變 after the
+  apology, 滿足 + 替他高興 after the good news; loops opened and closed.
+
+## Decided (2026-09-29) — workspace, backbone, shim [structure]
 - 2026-09-29 — Workspace: everything under `D:\dev\556_production` (placeholder name).
 - 2026-09-29 — Backbone: Hermes Agent (own copy, fresh venv, isolated HERMES_HOME) replaces
   Artemis's OpenClaw role. Production D:\Hermes stays untouched.
@@ -13,7 +55,7 @@
   (tool calling verified on flash). `auto/pro` kept for heavier jobs.
 - 2026-09-29 — Live2D: official free sample models first; polish/custom later.
 
-## Decided (2026-09-30, continued)
+## Decided (2026-09-30, continued) — the name 556 Production [structure]
 - **System name: 556 Production** (556プロ / 心プロダクション). Goroawase こ(5)こ(5)ろ(6) =
   心 kokoro — an idol-agency-style name (765PRO lineage: the number encodes a word): a good
   place where hearts and minds are created. The system is the AGENCY; companions are the talent;
@@ -23,7 +65,7 @@
 - Candidate flourish for later: Path C memory engine module named `kokoro` — her heart literally
   being the memory engine. Port family 556xx available if the rewrite renumbers services.
 
-## Decided (2026-10-02) — companion lifecycle is a manual, per-companion action
+## Decided (2026-10-02) — companion lifecycle is a manual, per-companion action [structure]
 - The app can hold **many companions**; the user picks which ones to **start** (manually) and each
   stays up until the user **stops that one** or closes the app (closing the app stops all).
   Several can be active at the same time; nothing auto-starts.
@@ -50,7 +92,7 @@
   kill only after 60 s; and the stop first waits (≤ 30 s) for the pipeline to observe the newest turn, since
   Hermes queues that observe a few seconds after the reply. A stop therefore takes ~10 s and shows 收尾中.
 
-## Decided (2026-10-02) — one route per character: her gateway is her only Hermes
+## Decided (2026-10-02) — one route per character: her gateway is her only Hermes [structure]
 - The first live Telegram test exposed the two-process shape (`hermes serve` for the app + `hermes
   gateway run` for Telegram): two owners of her memory, 📬 "no home channel" notices, and Telegram
   knowing nothing of what was just said in the app. **Fixed the same day: one `hermes gateway run`
@@ -73,7 +115,26 @@
   home channel through her own bot token — no LLM call, so the Telegram thread catches up with the
   app. Settings toggle (default on); `TELEGRAM_HOME_CHANNEL` is a registry knob.
 
-## Decided (2026-10-03) — voice: two modes in the chat, Fish Audio first
+## Decided (2026-10-07) — 製作人 → 你 [memory]
+- Stored memories use 你 as the subject word: natural text, searchable, and what you see on the memory
+  page. Injected or searched text renders 你 as her term for you (your name, else the role term 製作人),
+  because her prompt already uses 你 for herself. No invented marker token (it would blind the search).
+  In v2, a `subject` column decides which rows get which name per counterpart. SOUL keeps 製作人 as the
+  role she addresses you by when no name is set.
+
+## Decided (2026-10-06) — tools: a clean structure (0.5.0) [structure]
+- **Baseline = memory only.** Every character carries exactly two tools, kokoro's `kokoro_search` and
+  `kokoro_forget`, through Hermes's `memory` toolset (`platform_toolsets: {api_server: [memory],
+  telegram: [memory]}`). Hermes's built-in memory writer is off (`memory_enabled` /
+  `user_profile_enabled: false`): one memory system. kokoro injects `memories/USER.md` itself, so the
+  Producer's profile stays in her prompt. Before this she silently carried Hermes's 20 default tools,
+  shell and files included, in every prompt.
+- **Extensions per character, in Settings.** 設定 → 她會的事 lists extensions (first: 查網路 =
+  `web`, keyless through Hermes's free-tier ring and DuckDuckGo). Switching one writes her config.yaml;
+  a graceful restart applies it. **No hot toggling** — simpler and stable. An extension that acts in
+  the world is flagged; the approval/clarify answer path is built only when one is switched on.
+
+## Decided (2026-10-03) — voice: two modes in the chat, Fish Audio first [voice]
 - **Mode 1, press-to-record**: the default text chat gains a 🎙 button; press to record, press again to
   stop; the transcript lands in the composer and the Producer sends it like typed text. No TTS.
 - **Mode 2, conversation mode (免手持)**: the mic stays open, Silero VAD runs in the browser, the
@@ -88,7 +149,7 @@
   `/v1/asr`); keys stay in `home/voice.json`, entered in Settings, never in chat. Hands-free parameters
   live in the same file and in Settings. Telegram turns are not spoken by the app.
 
-## Decided (2026-10-03) — two memory layers, one file; history stays history
+## Decided (2026-10-03) — two memory layers, one file; history stays history [memory]
 - **Short layer** (KeepsakeDB 0.2.0): the same observe call that writes tagged long-term facts may
   also return one dated line — the episode of the turn when it could matter later (what the Producer
   asked for or did, a plan, a mood with its cause). No tags; surface stamped in meta; ring of 1000
@@ -107,7 +168,7 @@
   slash commands (`/new`, `/reset`, `/model` …) are admin-only on her Telegram with a placeholder admin,
   so the Producer cannot fork the conversation from the phone; everything is set from the app.
 
-## Decided (2026-10-02) — the Producer's name vs the memory subject
+## Decided (2026-10-02) — the Producer's name vs the memory subject [memory]
 - Stored memories never contain the Producer's name as subject. The subject is a **fixed role
   marker per store**: 「製作人」 for zh-TW stores ("the Producer" for en), recorded in the store's
   meta like the tokenizer; other people are stored by their own names / relations. Reason: a name
@@ -123,7 +184,7 @@
   are first-person and matched neither word, recall was 20/20).
 - Test stores so far say 「使用者」 (harness default); the real store starts with 「製作人」.
 
-## Decided (2026-10-02) — the prompt layer: Producer settings that shape her system prompt
+## Decided (2026-10-02) — the prompt layer: Producer settings that shape her system prompt [app] [memory]
 - Two Settings now write into the selected companion's `memories/USER.md` as managed lines that
   Hermes injects every turn: the **Producer's name** (「名字：…」) and **her reply language**
   (「回覆語言：…」; default = follow the Producer; options en / zh-CN / zh-TW / ja). Both take effect
@@ -134,7 +195,7 @@
   etiquette, time/locale, relationship stage…) assembled per turn instead of managed lines in a
   file. Design pass to come; for now the managed-lines approach keeps SOUL.md human-owned.
 
-## Decided (2026-10-02) — voice: connectors first, feature later
+## Decided (2026-10-02) — voice: connectors first, feature later [voice]
 - STT / TTS are cloud services (GPU stays free); the app gets **connectors** now, the feature later.
   `home/voice.json` (agency-level keys, 0600) holds a TTS and an STT provider; the only kind
   implemented is **OpenAI-compatible** (`/audio/speech`, `/audio/transcriptions`), which covers
@@ -143,7 +204,7 @@
 - Settings → 語音連線: configure, save, and **test** (TTS the phrase, then STT the audio — the round
   trip proves both). Per-companion voice choice (her voice id) lives in `companion.json` later.
 
-## Decided (2026-10-02) — Settings principle: nothing is fixed in a config file
+## Decided (2026-10-02) — Settings principle: nothing is fixed in a config file [app]
 - Settings has two tiers. **Non-technical knobs are shown directly** (製作人: name, her reply
   language; 她: name, Live2D, show on start; 記憶: storage language, context turns X; 語音連線).
   **Everything else is behind a "developer options" toggle with a warning**, rendered from
@@ -156,7 +217,7 @@
   open when the configured tokenizer differs from the store's, and migrates every memory when the
   subject word changes (rewrite + re-embed, logged in history). The configured value always wins.
 
-## Parked (explicitly deferred by user)
+## Parked (explicitly deferred by user) [all]
 - ~~**Her name** (first companion) — decided AFTER the system; agency-first like the reference.~~
   **2026-10-02: first character = a fresh persona** (not a port of Bith), 556's first talent, framed
   as the agency's **manager** (經紀人／マネージャー) — the one who answers the phone, which is exactly the
@@ -170,12 +231,12 @@
 - **MCP / channel list** — later; QQ excluded.
 - **Whether the Wardrobe schema is adopted** — it's one candidate, not presumed.
 
-## Open questions
+## Open questions (2026-09-29; mostly answered since) [all]
 - Which profile becomes the first companion character here (fresh SOUL vs port of Bith's)?
 - TTS voice source/reference audio for GPT-SoVITS (when we get there).
 - GPU budget: does local image-gen/TTS coexist with WSL Qwen (→ revisit Artemis VRAM tiering)?
 
-## Decided (2026-09-30, 0.2.0 discussion) — see docs/PLAN-0.2.0.md
+## Decided (2026-09-30, 0.2.0 discussion) — Go daemon, Electron, Hermes surface [structure] [app]
 - **Frontend stays as-is** for 0.2.0; 0.2.0 = backend rewrite.
 - **`vendor/` is untouchable by definition**; if we edit it, it is not vendor. Hermes never edited.
 - **Go** for the beside-Hermes layer (daemon `556d`: supervisor, shim, bridge, UI API): single
@@ -191,10 +252,10 @@
   pushes need a Python platform-adapter plugin (0.2.x); cron agents run without memory provider.
 - **Artemis exit**: reference clone kept until the frontend rewrite empties the ledger, then deleted.
 
-## Decided (2026-09-30, after 0.2.0) — memory language, engine repo, frontend shape
+## Decided (2026-09-30, after 0.2.0) — memory language, engine repo, frontend shape [memory] [app]
 - **Memory language is a per-companion setting** (user-changeable; default zh-TW). "Mirror the
   input language" rejected (mixed stores defeat dedup — the zh/en Japan-trip duplicate).
-  **Catch, documented in README + MEMORY-DESIGN**: the embedding model is user-changeable too, and a
+  **Catch, documented in README + memory/memory.md**: the embedding model is user-changeable too, and a
   companion in another language (ja/fr/…) must be paired with an embedder that covers it.
 - **Standalone memory engine**: own repo, pure Python library consumed by 556 via a thin Hermes
   MemoryProvider in `plugins/`. Name deferred (may take a `DB` suffix; "kokoro" collides with the
@@ -219,8 +280,8 @@
   backend (the app owns 556d's lifecycle); minimize/hide to the tray (bottom-right).
 - Terminology: "companion" (not "talent") in docs and UI.
 
-## Done (2026-10-01, 0.3.0 S5) — Artemis exit
+## Done (2026-10-01, 0.3.0 S5) — Artemis exit [structure]
 - The Artemis ledger emptied (SPA and viewer replaced by the app) → `vendor/artemis/` deleted.
-  What we learned from it lives in `docs/ARCHITECTURE.md`, `STACK.md` pitfalls and this log.
+  What we learned from it lives in `structure/structure.md` §6, `STACK.md` pitfalls and this log.
 - Retired: `ui/` (web-chat SPA, Electron pet, viewer), `avatar.cmd`, `pet.cmd`, the `/chat/`
   route and the SPA-compat endpoints. Diagnostics moved to `tools/`.

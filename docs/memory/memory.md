@@ -1,6 +1,24 @@
-# Memory design — PLAN OF RECORD (decided 2026-09-30)
+# Memory — history is not memory
 
-Research trail: `memory-notes.md`. This doc is the decided design.
+Living doc. Graph: `memory-layers.d2` (commentary in the last section). Decision trail: `../DECISIONS.md`.
+
+**Read this first — what changed since the plan of record (2026-09-30):**
+
+- The engine is **KeepsakeDB** (`D:\dev\KeepsakeDB`, 0.2.1) behind the Hermes provider `plugins/kokoro`.
+  Path A (mem0 + Qdrant) is history; Path C became KeepsakeDB (2026-10-01/02).
+- The "curated head" tier is off: Hermes's own MEMORY.md / USER.md writer is disabled
+  (`memory.memory_enabled: false`); the person file (`people/你.md`, formerly `memories/USER.md`)
+  is injected by kokoro after the memory block.
+- **Two layers** since 2026-10-03: long (tagged facts, trust labels, supersede/archive) and short (dated
+  notes), one file, one observe call, searched concurrently. A recent-exchange layer was tried and removed:
+  the last X turns are history, in Hermes's session store, shared by every surface.
+- Memories about you are **stored with the subject word 你** and rendered as her term for you (your name,
+  else 製作人) when injected or shown (2026-10-07, KeepsakeDB 0.2.1 `render_subject`).
+- Her *state* (how she is now) is not memory either: it lives in `psyche.db`
+  (`../inner-life/inner-life.md`). Since 0.5.0 every memory a turn writes carries `meta.turn_id` and
+  `meta.source`, and the engine annotates `valence`, `arousal`, `instance_ids` afterwards (KeepsakeDB 0.3.0).
+
+The rest of this doc is the design as decided, with its test record.
 
 ## The five-tier stack (who writes what; conflicts resolve top-down)
 
@@ -228,3 +246,17 @@ Realistic final packaging = one installer/launcher with bundled sidecars (roadma
   re-embedding the store (minutes at companion scale; the migration path A→C is the same tool).
 - Standalone engine: **KeepsakeDB** (`D:\dev\KeepsakeDB`, created 2026-10-01) — layered L1 store /
   L2 pipeline (unpluggable) / L3 integration; 556 keeps `kokoro` as the Hermes provider name.
+
+## History vs memory vs state — `memory-layers.d2`
+
+- Three stores feed her prompt: history (the verbatim session), memory (long facts + short dated notes),
+  and state (`psyche.db`, how she is now, derived from events).
+- Still one observe call per turn; it may return two strings (`ops` for long, `note` for short). Still one
+  embedding per prefetch, then both layers searched at once: the bigger layer starts first on its own read
+  connection, the smaller follows immediately, nothing waits but the final join; hybrid (dense + BM25,
+  RRF), top 5 each, a few ms per search.
+- Priority when they disagree: history first; then the newest entry regardless of layer; long breaks
+  ties; the pipeline supersedes the stale long fact afterwards. The state block names transitions
+  explicitly so the history's tone inertia does not win.
+- One file with a layer column (one owner, one backup), not two database files. 記憶 shows the long layer;
+  a toggle shows the short layer. 556d reads the store read-only and deletes through a command queue.

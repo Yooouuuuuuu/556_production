@@ -1,0 +1,5 @@
+name: psyche
+version: 0.1.0
+description: "psyche — 556 Production's inner-life engine: event-sourced state (core affect, mood, emotion instances, open loops) in psyche.db, appraisal A after each turn in parallel with the memory observe, the 【她現在】 state block before each reply."
+pip_dependencies:
+  - keepsakedb

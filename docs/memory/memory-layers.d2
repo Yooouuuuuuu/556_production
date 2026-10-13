@@ -1,0 +1,101 @@
+direction: right
+
+title: "History vs memory vs state (v2) — what goes into her prompt, and who wins" {
+  shape: text
+  near: top-center
+  style.font-size: 20
+}
+
+classes: {
+  proposed: {
+    style.stroke-dash: 4
+    style.stroke: "#c2185b"
+    style.font-color: "#c2185b"
+  }
+  file: {
+    shape: page
+  }
+  step: {
+    shape: hexagon
+  }
+}
+
+turn: "a turn, from any surface (app, Telegram, voice, event turn)" {shape: oval}
+
+history: "HISTORY — Hermes session store (state.db)" {
+  class: file
+  desc: |md
+    - exactly ONE session per character, shared by app / Telegram / event turns
+    - opened by the manual start from the roster; never opened by a message
+    - verbatim; survives restarts; auto-reset off
+    - compression summarizes the middle, keeps first 3 + last 20 messages
+    - the app window shows the last X turns (a display setting)
+  |
+}
+
+short: "SHORT-TERM — KeepsakeDB layer \"short\"" {
+  desc: |md
+    - one LLM-written dated line per turn that would matter next week
+    - no tags; surface stamped (事務所 / Telegram)
+    - ring of ~1000, oldest dropped, no TTL
+    - 記憶 shows it only behind a toggle (近期紀錄)
+    - searched exactly like long: hybrid, top 5, same embedding
+  |
+}
+
+long: "LONG-TERM — KeepsakeDB layer \"long\"" {
+  desc: |md
+    - facts with tags, trust labels [high] / plain
+    - add / update / supersede / archive (+ consent windows)
+    - **subject stored as 你** (fixed word; vector search stays sharp)
+    - rendered as her term for you (your name, else 製作人) when injected or shown
+    - 0.5.0: source · turn_id · valence · arousal · instance_ids (nullable)
+    - her own stance: subject = self (0.7.0)
+  |
+}
+
+psyche: "STATE — psyche.db (engine plugin, 0.5.0)" {
+  class: file
+  class: proposed
+  desc: |md
+    - not memory, not history: how she is *now*, derived from events
+    - events · appraisals (append-only) · instances · snapshots · params
+    - rebuilt by replay; fast-forwarded after a stop (world time continuous)
+  |
+}
+
+observe: "observe — ONE LLM call after the reply (background)\nreturns at most two strings" {class: step}
+appraise: "appraisal A — ONE LLM call fired at the same moment (0.5.0)\nevents + appraisal vectors + open loops; result lands for the NEXT turn" {class: step}
+read: "prefetch — ONE embedding, both layers searched AT ONCE (bigger first),\nhybrid (dense + BM25, RRF), top 5 each · subject 你 → her term for you" {class: step}
+stateread: "prefetch — read the latest landed state, NEVER wait (0.5.0)" {class: step}
+
+prompt: "her prompt for this turn" {
+  rule: |md
+    **Order**: SOUL · history (Hermes) · memory block (facts, notes) · people/你.md · 【她現在】 state block
+    **When layers disagree**
+    1. history is ground truth
+    2. otherwise the newest entry wins, whatever the layer
+    3. long breaks ties
+    (the pipeline then supersedes the stale long fact)
+    **State vs history**: the state block names transitions explicitly
+    (「剛才有點悶，現在已經消氣了」) so the history's tone inertia does not win.
+  |
+}
+
+turn -> history: "appended by Hermes, always"
+turn -> observe: "user + assistant text"
+turn -> appraise: "user + assistant text + open loops + her preferences"
+observe -> short: "string 1 — \"note\": the episode, or null"
+observe -> long: "string 2 — ops with tags, or noop"
+appraise -> psyche: "append; impact model B applies at the next tick"
+long -> read: "top 5, hybrid"
+short -> read: "top 5, hybrid (same embedding)"
+psyche -> stateread
+read -> prompt: "memory block"
+stateread -> prompt: "【她現在】 ≤ 8 lines, words not numbers"
+history -> prompt: "recent turns (Hermes)"
+
+onefile: "one SQLite file per character for memory (memory/<name>.db, layers = a column) and one for state (psyche.db);\n556d reads both read-only (記憶 page, 狀態 page)" {
+  shape: text
+  near: bottom-center
+}

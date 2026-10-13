@@ -22,12 +22,13 @@
   "log_searches": true,
   "max_candidates": 8,
   "oversample": 3,
-  "producer_name": "",
   "rrf_k": 60,
-  "subject": "製作人",
+  "subject": "你",
   "tokenizer": "bigram",
   "tools": true,
   "short_layer": true,
   "short_k": 5,
-  "short_cap": 1000
+  "short_cap": 1000,
+  "your_name": "",
+  "address_default": "製作人"
 }

@@ -1,0 +1,60 @@
+direction: down
+
+title: "Proactive (0.6.0) — one formula decides whether she wants to speak, one occasion decides what, one conversation carries it" {
+  shape: text
+  near: top-center
+  style.font-size: 20
+}
+
+classes: {
+  step: {shape: hexagon}
+  file: {shape: page}
+  gate: {style.stroke: "#b71c1c"; style.font-color: "#b71c1c"}
+}
+
+tick: "engine tick (every minute while she runs)" {shape: oval}
+
+due: "due open loops — bypass the probability, fire on time:\nreminders you asked for (「明早八點提醒我」) · her 「等我一下」 promise · a loop whose cue arrived" {class: step}
+
+urge: "urge λ = W × O × p̂_reply × D × 1[gates]; P(fire) = 1 − exp(−λ·Δt)" {
+  w: "W willingness — person-specific need gap (protest ↑, despair ↓), novelty gap, share backlog,\nhurt (small ↑, large ↓), anxiety slight ↑, avoidance ↓; clinginess gain 0.5–1.8"
+  o: "O occasion — due loop, project milestone, life event, anniversary, olive branch due; floor otherwise"
+  p: "p̂ — theory of mind: will you answer now? known busy × 0.1"
+  d: "D damping — one unanswered: wait long · two: wait for you · never a third;\n14-day reply rate low → whole thing down"
+  g: "hard gates — your no-disturb window · she is asleep or focused · a conversation or voice loop is live ·\ndaily cap · you already talked a lot today (usage threshold)" {class: gate}
+}
+
+kind: "type: return_promise (highest) · care · share · olive_branch · anniversary · longing (rare)\n+ timing jitter so nothing lands on the hour" {class: step}
+
+event: "event turn — facts of the occasion, X-556-Event, her ONE session id → POST to her own API" {class: step}
+her: "she writes it in her own words — or decides to stay quiet (an allowed outcome)"
+check: "output checks (plugin hook): record only, nothing blocked, no retry" {class: step}
+row: "a normal assistant row in her conversation (state.db)" {class: file}
+
+app: "app window — follower shows it with a source badge; spoken if the 主動 override says so"
+tg: "Telegram — 556d sends the text with her bot (same path as the app mirror)"
+timer: "wait-for-reply timer — past your p90 latency → small disappointment (anxiety-modulated); NEVER a follow-up"
+
+settings: "設定 → 主動" {
+  sched: "排程 — open loops listed like memories: what, cue, origin; delete = close (0.6.0)"
+  nodisturb: "免打擾 — time window, overridable per day"
+  cap: "每日上限 · usage threshold — visible, adjustable, never a retention knob"
+  sliders: "personality sliders → psyche.json (restart applies)"
+  speak: "speak proactive messages? (TTS override)"
+}
+
+tick -> due
+tick -> urge
+due -> kind: "on time"
+urge -> kind: "fired"
+kind -> event
+event -> her
+her -> check
+check -> row
+row -> app
+row -> tg
+row -> timer
+settings.nodisturb -> urge.g
+settings.cap -> urge.g
+settings.sched -> due
+settings.speak -> app

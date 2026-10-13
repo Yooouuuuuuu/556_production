@@ -1,0 +1,100 @@
+direction: down
+
+title: "556 Production v2 — structure: one process per character, her inner life inside it" {
+  shape: text
+  near: top-center
+  style.font-size: 20
+}
+
+classes: {
+  proposed: {
+    style.stroke-dash: 4
+    style.stroke: "#c2185b"
+    style.font-color: "#c2185b"
+  }
+  external: {
+    style.fill: "#f3f3f3"
+    style.stroke: "#999999"
+  }
+  file: {
+    shape: page
+  }
+}
+
+legend: |md
+  solid = runs today (0.5.0) · **dashed pink** = 0.6.0 / 0.7.0 work
+| {near: top-left}
+
+you: "你 — the person (named in Settings, else 製作人)" {shape: person}
+
+app: "556 Production app (Electron)" {
+  office: "office window" {
+    chat: "聊天 — the one conversation, source badges"
+    roster: "名單 — start / stop / switch"
+    memory: "記憶 — long layer; toggle 近期紀錄"
+    settings: "設定 — two tiers · 她會的事 (extensions) · 你 (name)"
+    state: "狀態 — timeline, why, loops (0.5.0+)"
+    proactive: "主動 — schedule tab, no-disturb, sliders (0.6.0)" {class: proposed}
+  }
+  avatar: "avatar window (Live2D) — follows the chat window"
+}
+
+daemon: "556d (Go, :55600) — hub around her, never inside, never a chat participant" {
+  hub: "hub API + /ws events"
+  mgr: "companions manager — start (opens her ONE session) / stop (graceful)"
+  transcript: "Transcript — her state.db, read-only"
+  follower: "follower — new rows (Telegram, event turns) -> windows (2 s poll)"
+  mirror: "Telegram send — app turns and her event turns -> DM, plain text, no LLM"
+  memapi: "memory page API — her store, delete via command queue"
+  psyapi: "狀態 page API — her psyche.db, read-only (0.5.0+)"
+  tools: "tools API — baseline [memory] + extensions per character (restart applies)"
+  sup: "supervisor — job object, planned-stop marker"
+  shim: "model shim :55601 (lanes)"
+  embedder: "bge-m3 llama-server :55602 (shared)"
+}
+
+mane: "真音 — ONE process: hermes gateway run (HERMES_HOME = home/profiles/mane)" {
+  api: "API server platform\n/v1/chat/completions · /api/sessions"
+  tg: "Telegram adapter — her own bot"
+  dc: "Discord adapter (later)" {class: proposed}
+  mcp: "MCP bindings (later, strictly hers)" {class: proposed}
+  agent: "AIAgent — SOUL, toolsets for this platform, compression"
+  kokoro: "kokoro plugin (MemoryProvider) — prefetch · observe"
+  psyche: "psyche plugin — THE engine: 1-min tick, A queue, impact model B,\nstate block, event turns; single writer of psyche.db (0.5.0)"
+  state: "state.db — THE one session + its messages = HISTORY" {class: file}
+  store: "memory/mane.db — KeepsakeDB = MEMORY\nlong (facts, subject 你) · short (dated notes)" {class: file}
+  psydb: "psyche.db — events · appraisals · instances · snapshots · params (0.5.0)" {class: file}
+  cfg: "SOUL.md · config.yaml · kokoro.json · psyche.json · .env · people/你.md" {class: file}
+}
+
+telegram: "Telegram servers" {class: external}
+llm: "Gemini / Claude proxy :18765" {class: external}
+
+you -> app.office.chat: "types / speaks"
+you -> telegram: "DM to her bot"
+app.office -> daemon.hub: "HTTP + WebSocket"
+app.avatar -> daemon.hub: "/ws bubbles · speak_audio"
+daemon.hub -> mane.api: "one non-stream request per turn\nX-Hermes-Session-Id = her conversation"
+telegram -> mane.tg: "polling"
+mane.api -> mane.agent
+mane.tg -> mane.agent
+mane.dc -> mane.agent {class: proposed}
+mane.mcp -> mane.agent {class: proposed}
+mane.agent -> mane.state: "load history · append the turn"
+mane.agent -> mane.kokoro: "prefetch · sync_turn"
+mane.kokoro -> mane.store: "search · observe"
+mane.kokoro -> daemon.embedder: "embeddings"
+mane.agent -> mane.psyche: "after the reply: appraisal A (parallel to observe)"
+mane.psyche -> mane.psydb: "events · appraisals · snapshots"
+mane.psyche -> mane.agent: "prefetch: 【她現在】 state block, never waits"
+mane.psyche -> mane.api: "event turn (X-556-Event) into her one conversation (0.6.0)" {class: proposed}
+mane.agent -> daemon.shim: "chat completions (reply · observe · A)"
+daemon.shim -> llm
+daemon.transcript -> mane.state: "read-only: history, live tail;\nat start: open + stamp her one session if none is live"
+daemon.follower -> daemon.hub: "Telegram turns and event turns as chat events (badge)"
+daemon.mirror -> telegram: "sendMessage"
+daemon.memapi -> mane.store: "read-only + delete commands"
+daemon.psyapi -> mane.psydb: "read-only"
+daemon.tools -> mane.cfg: "platform_toolsets"
+daemon.mgr -> daemon.sup: "spawn · planned stop"
+daemon.sup -> mane: "process"

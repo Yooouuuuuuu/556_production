@@ -105,6 +105,8 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/voice/speak", a.voiceSpeak)      // text -> cached audio + speak_audio event (lipsync)
 	mux.HandleFunc("/api/config", a.configHandler)       // the config registry: every knob, dev panel
 	mux.HandleFunc("/api/shutdown", a.shutdownHandler)   // graceful daemon shutdown (companions finish up first)
+	mux.HandleFunc("/api/psyche", a.psycheHandler)       // 狀態: read-only view of her psyche.db (the engine in her process writes it)
+	mux.HandleFunc("/api/tools", a.toolsHandler)         // what she can do: baseline memory + extensions (restart applies)
 }
 
 func (a *API) shutdownHandler(w http.ResponseWriter, r *http.Request) {
@@ -306,7 +308,7 @@ func (a *API) chat(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// mirrorToTelegram (c): echo an app exchange into the Producer's Telegram DM as plain text,
+// mirrorToTelegram (c): echo an app exchange into your Telegram DM as plain text,
 // through her own bot token. No LLM; her gateway never sees its own bot's messages, so no loop.
 func (a *API) mirrorToTelegram(name, question, answer string) {
 	env := a.mgr.Env(name)
@@ -500,7 +502,7 @@ func (a *API) openConversation(name string) {
 
 // conversation resolves which Hermes session an app turn continues.
 //
-// A Telegram-bound companion has ONE conversation: her DM with the Producer, keyed by the gateway as
+// A Telegram-bound companion has ONE conversation: her DM with you, keyed by the gateway as
 // agent:main:telegram:dm:<chat>. The app joins it by id (X-Hermes-Session-Id; the gateway rebuilds
 // context from state.db every turn, so both surfaces see one history). When it does not exist yet —
 // the app spoke first — 556d creates it through her API and stamps the Telegram routing identity on

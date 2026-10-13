@@ -16,10 +16,11 @@ and a Live2D companion on your desktop.
 Each companion stores memories in a chosen language (default Traditional Chinese; changeable in
 Settings). The embedding model is changeable too — the default `bge-m3` covers zh/ja/en/fr and
 100+ more, but **if you run a companion in a language your embedder doesn't cover, change the
-embedder as well**; the two settings travel together (see `docs/MEMORY-DESIGN.md`). Changing the
+embedder as well**; the two settings travel together (see `docs/memory/memory.md`). Changing the
 embedder re-embeds the store.
 
 ## Docs
-`docs/STACK.md` (exact inventory) · `docs/ROADMAP.md` · `docs/DECISIONS.md` ·
-`docs/MEMORY-DESIGN.md` · `docs/FRONTEND-DESIGN.md` · `docs/PLAN-0.3.0.md` · `CHANGELOG.md`.
+`docs/README.md` is the map: one folder per part (`structure/`, `memory/`, `app/`, `voice/`, `inner-life/`), each a
+living concept doc with its graphs; `docs/DECISIONS.md` and `docs/STACK.md` at the docs root; working documents
+(roadmap, test list) are `docs/*.local.md`, ignored. `CHANGELOG.md` is per version.
 Version control is jj; `vendor/` is never edited.

@@ -18,9 +18,9 @@ import (
 type Settings struct {
 	SelectedCompanion string `json:"selected_companion"` // which companion the windows are on (roster selection)
 	CompanionName     string `json:"companion_name"`     // display name of the SELECTED companion (companion.json)
-	ProducerName      string `json:"producer_name"`   // the user; lives in the prompt layer (USER.md, kokoro.json), never as the memory subject
-	ReplyLanguage     string `json:"reply_language"`  // "" = follow the Producer; en | zh-CN | zh-TW | ja (prompt layer: USER.md)
-	MirrorToTelegram  bool   `json:"mirror_to_telegram"` // (c) echo app exchanges into the Producer's Telegram DM (plain text, no LLM)
+	YourName          string `json:"your_name"`       // you; lives in the prompt layer (people/你.md, kokoro.json) — memories store 你 and render it as this namject
+	ReplyLanguage     string `json:"reply_language"`  // "" = follow you; en | zh-CN | zh-TW | ja (prompt layer: people/你.md)
+	MirrorToTelegram  bool   `json:"mirror_to_telegram"` // (c) echo app exchanges into your Telegram DM (plain text, no LLM)
 	AvatarModel       string `json:"avatar_model"` // path under assets/live2d, e.g. hiyori/Hiyori.model3.json
 	ShowAvatarOnStart bool   `json:"show_avatar_on_start"`
 	MemoryLanguage    string `json:"memory_language"` // effective in the kokoro engine (Path C); mem0 has no prompt hook
@@ -33,7 +33,7 @@ func defaultSettings() Settings {
 	return Settings{
 		SelectedCompanion: "",
 		CompanionName:     "",
-		ProducerName:      "",
+		YourName:          "",
 		ReplyLanguage:     "",
 		MirrorToTelegram:  true,
 		AvatarModel:       "hiyori/Hiyori.model3.json",
@@ -132,14 +132,14 @@ func (s *SettingsStore) Update(patch json.RawMessage) (Settings, Applied, error)
 			return s.cur, Applied{}, err
 		}
 	}
-	if s.profileDirPath != "" && (next.ProducerName != s.cur.ProducerName || next.ReplyLanguage != s.cur.ReplyLanguage || next.MemoryLanguage != s.cur.MemoryLanguage || next.EmbedderModel != s.cur.EmbedderModel) {
+	if s.profileDirPath != "" && (next.YourName != s.cur.YourName || next.ReplyLanguage != s.cur.ReplyLanguage || next.MemoryLanguage != s.cur.MemoryLanguage || next.EmbedderModel != s.cur.EmbedderModel) {
 		if err := s.applyKokoro(next); err != nil {
 			return s.cur, Applied{}, err
 		}
 		if err := s.applyUserMD(next); err != nil {
 			return s.cur, Applied{}, err
 		}
-		ap.RestartRequired = true // USER.md and kokoro.json are read at agent start
+		ap.RestartRequired = true // people/你.md and kokoro.json are read at agent start
 	}
 	b, _ := json.MarshalIndent(next, "", "  ")
 	if err := os.WriteFile(s.path(), b, 0o644); err != nil {
@@ -204,7 +204,7 @@ func (s *SettingsStore) applyMem0(v Settings) error {
 }
 
 // applyKokoro writes the prompt-layer values into the bound profile's kokoro.json:
-// producer_name (never the memory subject), memory language, embedder model.
+// your_name (never the memory subject — memories store 你), memory language, embedder model.
 func (s *SettingsStore) applyKokoro(v Settings) error {
 	if s.profileDir() == "" {
 		return nil
@@ -221,7 +221,8 @@ func (s *SettingsStore) applyKokoro(v Settings) error {
 	if err := json.Unmarshal(raw, &m); err != nil {
 		return err
 	}
-	m["producer_name"] = v.ProducerName
+	m["your_name"] = v.YourName
+	delete(m, "producer_name")
 	m["language"] = v.MemoryLanguage
 	if emb, ok := m["embedder"].(map[string]any); ok {
 		emb["model"] = v.EmbedderModel
@@ -230,23 +231,28 @@ func (s *SettingsStore) applyKokoro(v Settings) error {
 	return os.WriteFile(p, out, 0o644)
 }
 
-// applyUserMD keeps one managed line in the profile's memories/USER.md (Hermes injects the
-// file every turn): the Producer's name. Everything else in the file is left alone.
+// applyUserMD keeps two managed lines in the profile's people/你.md (your person file, injected by
+// kokoro after the memory block): your name and the reply language. Everything else in the file is
+// left alone. An older memories/USER.md is carried over once and then removed.
 func (s *SettingsStore) applyUserMD(v Settings) error {
 	if s.profileDir() == "" {
 		return nil
 	}
-	dir := filepath.Join(s.profileDir(), "memories")
+	dir := filepath.Join(s.profileDir(), "people")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	p := filepath.Join(dir, "USER.md")
-	raw, _ := os.ReadFile(p)
-	nameLine := "- 名字：（尚未設定，先叫「製作人」）"
-	if strings.TrimSpace(v.ProducerName) != "" {
-		nameLine = "- 名字：" + strings.TrimSpace(v.ProducerName) + "（請這樣稱呼他）"
+	p := filepath.Join(dir, "你.md")
+	old := filepath.Join(s.profileDir(), "memories", "USER.md")
+	raw, err := os.ReadFile(p)
+	if err != nil {
+		raw, _ = os.ReadFile(old) // first write: carry the old profile over
 	}
-	langLine := "- 回覆語言：跟著製作人（他用什麼語言就用什麼語言回覆）"
+	nameLine := "- 名字：（尚未設定，她叫你「製作人」）"
+	if strings.TrimSpace(v.YourName) != "" {
+		nameLine = "- 名字：" + strings.TrimSpace(v.YourName) + "（請這樣稱呼對方）"
+	}
+	langLine := "- 回覆語言：跟著對方（對方用什麼語言就用什麼語言回覆）"
 	switch v.ReplyLanguage {
 	case "en":
 		langLine = "- 回覆語言：English（請一律用英文回覆）"
@@ -263,7 +269,9 @@ func (s *SettingsStore) applyUserMD(v Settings) error {
 		{[]string{"- 回覆語言："}, langLine},
 	}
 	if len(lines) == 0 || !strings.HasPrefix(lines[0], "# ") {
-		lines = append([]string{"# 製作人"}, lines...)
+		lines = append([]string{"# 你"}, lines...)
+	} else if strings.TrimSpace(lines[0]) == "# 製作人" {
+		lines[0] = "# 你"
 	}
 	for _, m := range managed {
 		done := false
@@ -283,7 +291,11 @@ func (s *SettingsStore) applyUserMD(v Settings) error {
 			lines = append(lines[:1], append([]string{m.line}, lines[1:]...)...)
 		}
 	}
-	return os.WriteFile(p, []byte(strings.TrimRight(strings.Join(lines, "\n"), "\n")+"\n"), 0o644)
+	if err := os.WriteFile(p, []byte(strings.TrimRight(strings.Join(lines, "\n"), "\n")+"\n"), 0o644); err != nil {
+		return err
+	}
+	_ = os.Remove(old)
+	return nil
 }
 
 // setScalar sets root[path...] = value, creating mapping nodes along the way.

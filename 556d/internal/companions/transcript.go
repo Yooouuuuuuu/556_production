@@ -25,10 +25,10 @@ func (m *Manager) Transcript(name string) *Transcript {
 	return &Transcript{path: filepath.Join(m.Dir(name), "state.db")}
 }
 
-// TelegramKey is the gateway's session key for her DM with the Producer.
+// TelegramKey is the gateway's session key for her DM with you.
 func TelegramKey(chatID string) string { return "agent:main:telegram:dm:" + chatID }
 
-// TelegramChat is the Producer's DM with her: the home channel, else the first allowed user.
+// TelegramChat is your DM with her: the home channel, else the first allowed user.
 func TelegramChat(env map[string]string) string {
 	if c := strings.TrimSpace(env["TELEGRAM_HOME_CHANNEL"]); c != "" {
 		return c

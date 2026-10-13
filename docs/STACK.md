@@ -1,15 +1,14 @@
 # STACK — what exactly this project is using
 
 Last verified: 2026-10-01 (0.3.0). Ground-truth inventory; update it when reality changes.
-Reasoning behind each choice: `DECISIONS.md`, `MEMORY-DESIGN.md`, `FRONTEND-DESIGN.md`,
-`PLAN-0.2.0.md`, `PLAN-0.3.0.md`.
+Reasoning behind each choice: `DECISIONS.md` and the part docs (`structure/`, `memory/`, `app/`, `voice/`, `inner-life/`).
 
 ## One app
 
 **556 Production** (`app/`, Electron + React) is the product. Launching it starts and owns the
 whole backend; closing it shuts everything down.
 
-Diagrams (structure, one turn, memory vs history, voice, lifecycle): `docs/DIAGRAMS.md` (D2 sources).
+Diagrams: D2 sources next to each part doc (`structure/`, `memory/`, `voice/`, `inner-life/`).
 
 ```
 556 Production (Electron)          office window: chat + settings · avatar window (toggle) · tray
@@ -77,9 +76,9 @@ instead of spawning if one already serves :55600.
 - **hermes → models**: through the shim (:55601): `<tool_call>` text translation for the Gemini
   proxy, lane fallback chains, 4-attempt retry for emulated backends.
 
-## Memory (kokoro on KeepsakeDB — see MEMORY-DESIGN.md)
-Curated `MEMORY.md`/`USER.md` head + FTS5 sessions + **KeepsakeDB** (`D:\dev\KeepsakeDB`, installed
-into the Hermes venv): one SQLite file per profile, hybrid recall (bge-m3 dense + FTS5 BM25 with
+## Memory (kokoro on KeepsakeDB — see memory/memory.md and inner-life/inner-life.md)
+**KeepsakeDB 0.3.0** (`D:\dev\KeepsakeDB`, editable install in the Hermes venv; Hermes's curated MEMORY.md /
+USER.md head is off, the person file `people/你.md` is injected by kokoro): one SQLite file per profile, hybrid recall (bge-m3 dense + FTS5 BM25 with
 CJK bigrams, RRF k=60), trust labels (high ≥ 0.60 / drop < 0.40), archive-with-reason + consent
 windows, L2 pipeline on `agy/gemini-3.8-flash` writing memories in the configured language
 (zh-TW). Provider: `plugins/kokoro` (prefetch → block, sync_turn → observe on Hermes's memory
@@ -91,7 +90,9 @@ Path A (mem0 + Qdrant) stays on disk as the fallback (`memory.provider: mem0`).
 store read-only with `modernc.org/sqlite` (pure Go) — `GET /api/memory?q=&tag=&archived=1&limit=`,
 `POST /api/memory/delete {ids, reason}` → a row in the store's `commands` table that the owning
 Hermes process executes (status `done` with count, or `queued` until she next runs — she "wakes"
-on the first chat turn of a session). Never writes the memory tables itself.
+on the first chat turn of a session). Never writes the memory tables itself. Every memory a turn writes carries
+`meta.turn_id` / `meta.source` (observe); the psyche engine adds `valence` / `arousal` / `instance_ids` later by turn id
+(`json_patch` on meta only, never a re-embed).
 
 **Settings & the config registry**: non-technical knobs directly; developer toggle shows every knob from
 `GET /api/config` (`internal/api/registry.go`: key, group, type, scope, file+path, effect) and writes them
@@ -115,6 +116,18 @@ and shows Telegram turns in the windows with a badge; and after an app turn 556d
 「你問我：q／我說：a」as plain text to her home channel (`TELEGRAM_HOME_CHANNEL`, else the first allowed
 user) through her own bot token — no LLM; Settings toggle `mirror_to_telegram` (default on).
 
+## Inner life (psyche plugin — see inner-life/inner-life.md)
+`plugins/psyche` (Python; junction `home/profiles/<name>/plugins/psyche`; opted in with `plugins.enabled: [psyche]` in
+her config.yaml — Hermes user plugins are opt-in, a memory provider activates through `memory.provider` instead). Hooks:
+`pre_llm_call` → `{"context": <her-state>…【她現在】…}`, which Hermes appends to the user message right after the
+`<memory-context>` block; `post_llm_call` → turn event + appraisal queued (own thread, never waited for); `on_unload` →
+drain + snapshot. In her profile: `psyche.json` (Big Five, six constants, time constants, impact knobs, `cares_about`;
+written with defaults on first start; Settings edits apply at restart) and `psyche.db` (events, appraisals, instances,
+loops, snapshots, params, owner heartbeat; WAL). Appraisal A runs on the `llm` block of kokoro.json (the memory lane),
+7–30 s per turn on Gemini flash. 556d reads `psyche.db` read-only for `GET /api/psyche` (狀態 tab) and waits for the last
+turn's appraisal before a planned stop. Tests: `plugins/psyche/tests` (pytest from the KeepsakeDB venv) and
+`tests/psyche_eval.py` (LLM eval set against a running character; judge = the same lane).
+
 ## Third-party inventory (what is not ours, and where it lives)
 
 Three kinds. **Vendored code** sits in `vendor/` and is never edited (see `vendor/README.md`).
@@ -132,6 +145,7 @@ not copied into `vendor/`. **Services** are called over the network under their 
 | npm | onnxruntime-web (wasm runtime for the VAD) | MIT | `app/package.json`; built into `app/public/vad/` |
 | Go | modernc.org/sqlite (pure Go), gorilla/websocket, BurntSushi/toml, yaml.v3, x/sys | BSD-3 / BSD-2 / MIT / MIT / BSD-3 | `556d/go.mod` |
 | Python | KeepsakeDB (ours, separate repo) → numpy; optional httpx (pipeline LLM client) | MIT | Hermes venv, `setup-vendor.ps1` |
+| Python | `ddgs` (DuckDuckGo search, keyless) for the 查網路 extension | MIT | Hermes venv, `setup-vendor.ps1` |
 | downloaded | llama.cpp CPU build; bge-m3 Q8_0 GGUF | MIT; MIT (BAAI) | `bin/`, `models/` (ignored) |
 | service | Fish Audio (TTS `/v1/tts`, ASR `/v1/asr`) | Fish Audio terms; key in `home/voice.json` | 設定 → 語音連線 |
 | service | Gemini / Claude through the Producer's proxy; Telegram Bot API | provider terms; her own bot token | shim lanes; her `.env` |

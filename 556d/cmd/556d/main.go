@@ -49,7 +49,7 @@ func main() {
 		})
 	}
 
-	// Companions (home/profiles/<name>) start only when the Producer starts them from the roster;
+	// Companions (home/profiles/<name>) start only when you start them from the roster;
 	// nothing auto-starts (DECISIONS 2026-10-02). -no-hermes is kept for old launchers (no-op).
 	if *noHermes {
 		log.Printf("[556d] -no-hermes is now the default behaviour (companions start from the roster)")

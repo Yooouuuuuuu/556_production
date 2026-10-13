@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.5.0 — 2026-10-07
+
+- **Docs restructure**: `docs/` holds concept documents only, one folder per part (`structure/`, `memory/`, `app/`,
+  `voice/`, `inner-life/`), each a living doc with its D2 graphs beside it (eight graphs, two new: psyche, proactive);
+  `DECISIONS.md` and `STACK.md` at the docs root, `README.md` the map; outdated plans, drafts and notes deleted;
+  working documents (roadmap, test list) are `docs/*.local.md`, ignored.
+
+- **Her inner life, first milestone — stages 0–2 of `docs/inner-life/inner-life.md`** (2026-10-07): a second plugin
+  inside her Hermes process, `plugins/psyche` (opted in with `plugins.enabled: [psyche]`), is the single writer of
+  `psyche.db` in her profile: events, appraisals, instances, loops, snapshots, params. A fixed 1-minute tick with seeded
+  noise (OU exact solution for core affect, PAD pull–push mood, a circadian energy placeholder) makes replay rebuild the
+  same state and turns a stop of any length into the missed ticks run in one go. After each turn, appraisal A (one LLM
+  call on the memory lane, fired at the same moment as kokoro's observe, never waited for) reports what happened as
+  appraisal vectors and open loops; the deterministic impact model B turns them into emotion instances (prototype
+  matching, intensity, half-life, stacking, resolution by apologies and kept promises). Before each reply, `pre_llm_call`
+  injects the 【她現在】 state block (≤ 8 lines, words not numbers, names transitions) right after the memory block.
+  The turn's memories are stamped (KeepsakeDB 0.3.0 `turn_id` / `source`) and annotated afterwards with valence,
+  arousal and instance ids. `people/你.md` replaces `memories/USER.md` (Settings write-through moved, the old file
+  carried over once). New 狀態 tab (`GET /api/psyche`, read-only). Graceful stop also waits for the last turn's
+  appraisal. 20 engine + golden-case tests; LLM eval set (`tests/psyche_eval.py`), 6-turn scenario: expression gap 0.17
+  (0 = reply matches the state), emotion named 1/6 (when asked outright), meta leak 0, assistant mode 0.
+- **new-companion.ps1**: links both plugins, installs `psyche.json` and `people/你.md`, opts the psyche plugin in,
+  writes templates without a BOM (a BOM in kokoro.json broke the memory provider); the script stays ASCII.
+- **製作人 → 你** (2026-10-07): memories are stored with 你 as the subject (her store is migrated on next start)
+  and rendered with her term for you — your name from Settings, else 製作人 — when injected or searched, so
+  the prompt never confuses 你 with herself and renaming never rewrites the store (KeepsakeDB 0.2.1
+  `render_subject`). Settings section 你 / 你的名字 (`your_name`); USER.md header 你; her SOUL keeps 製作人 as
+  the role she uses.
+- **Baseline toolset = memory only**: `kokoro_search` / `kokoro_forget`. `platform_toolsets` written per
+  character for the app route and Telegram; Hermes's built-in memory writer off; kokoro injects USER.md.
+  Her prompt loses the 18 default tool schemas.
+- **Extensions** (`/api/tools`, 設定 → 她會的事): per-character toggles written into her config.yaml and
+  applied by a graceful restart (no hot toggling). First extension: 查網路 (`web`), keyless via Hermes's
+  free-tier ring and the `ddgs` package (added to `setup-vendor.ps1`).
+
 ## 0.4.0 — 2026-10-06
 
 Her own process, one conversation, her memory, her Telegram, her voice. 真音 is the first character.
@@ -67,7 +102,7 @@ Memory engine switch: **kokoro on KeepsakeDB** replaces mem0 + Qdrant.
 - **556d `-no-hermes`** — now the default behaviour (kept as a no-op flag); 556d no longer spawns a
   Hermes at startup.
 - Endurance: 100 rounds 19/20; 1000-round run (483 real rounds before a backend outage) with the
-  exam re-run 20/20 — the Path A correction trap is fixed (see docs/MEMORY-DESIGN.md).
+  exam re-run 20/20 — the Path A correction trap is fixed (see docs/memory/memory.md).
 - Settings: the memory-language note is now true (kokoro honors it). mem0 config stays as fallback.
 
 ## 0.3.0 — 2026-10-01

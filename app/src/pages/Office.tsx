@@ -5,10 +5,11 @@ import { Chat } from './Chat';
 import { Settings } from './Settings';
 import { Memory } from './Memory';
 import { Roster } from './Roster';
+import { State } from './State';
 import { useStore } from '../store';
 
 // Office window: header (status, tabs, avatar toggle) + Chat / Settings.
-type Tab = 'chat' | 'settings' | 'memory' | 'roster';
+type Tab = 'chat' | 'settings' | 'memory' | 'roster' | 'state';
 
 export function Office({ initialTab = 'chat' }: { initialTab?: Tab }) {
   const [tab, setTab] = useState<Tab>(initialTab);
@@ -43,12 +44,13 @@ export function Office({ initialTab = 'chat' }: { initialTab?: Tab }) {
           <button className={`px-3 py-1 rounded ${tab === 'chat' ? 'bg-white/15' : 'hover:bg-white/5'}`} onClick={() => setTab('chat')}>{t('tab.chat')}</button>
           <button className={`px-3 py-1 rounded ${tab === 'roster' ? 'bg-white/15' : 'hover:bg-white/5'}`} onClick={() => setTab('roster')}>{t('tab.roster')}</button>
           <button className={`px-3 py-1 rounded ${tab === 'memory' ? 'bg-white/15' : 'hover:bg-white/5'}`} onClick={() => setTab('memory')}>{t('tab.memory')}</button>
+          <button className={`px-3 py-1 rounded ${tab === 'state' ? 'bg-white/15' : 'hover:bg-white/5'}`} onClick={() => setTab('state')}>{t('tab.state')}</button>
           <button className={`px-3 py-1 rounded ${tab === 'settings' ? 'bg-white/15' : 'hover:bg-white/5'}`} onClick={() => setTab('settings')}>{t('tab.settings')}</button>
           <button className="px-3 py-1 rounded bg-pink-500/30 hover:bg-pink-500/50" onClick={() => window.desktop?.toggleAvatar()}>{t('avatar.toggle')}</button>
         </nav>
       </header>
       <main className="flex-1 overflow-hidden">
-        {tab === 'chat' ? <Chat /> : tab === 'memory' ? <Memory /> : tab === 'roster' ? <Roster /> : <Settings />}
+        {tab === 'chat' ? <Chat /> : tab === 'memory' ? <Memory /> : tab === 'roster' ? <Roster /> : tab === 'state' ? <State /> : <Settings />}
       </main>
     </div>
   );

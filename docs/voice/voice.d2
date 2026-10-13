@@ -1,6 +1,6 @@
 direction: down
 
-title: "Voice — two modes in the chat window (built 2026-10-03)" {
+title: "Voice (v2) — two modes in the chat window; event turns may be spoken too" {
   shape: text
   near: top-center
   style.font-size: 20
@@ -10,12 +10,13 @@ classes: {
   step: {shape: hexagon}
   file: {shape: page}
   ext: {style.fill: "#f3f3f3"; style.stroke: "#999999"}
+  proposed: {style.stroke-dash: 4; style.stroke: "#c2185b"; style.font-color: "#c2185b"}
 }
 
 mode1: "Mode 1 — text chat + press-to-record" {
-  rec: "🎙 press: MediaRecorder (webm/opus) … press again: stop"
+  rec: "🎙 press: record … press again: stop; decoded + resampled to 16 kHz WAV in the browser"
   stt: "POST /api/voice/transcribe -> STT connector" {class: step}
-  box: "text lands in the composer; the Producer sends (or edits) it"
+  box: "text lands in the composer; you send (or edit) it"
   rec -> stt -> box
   box -> normal: "normal text turn (no TTS)"
   normal: "→ /api/chat"
@@ -26,7 +27,7 @@ mode2: "Mode 2 — conversation mode (hands-free): text box LOCKED, strict 1:1 l
   grace: "grace 0.9 s after a cut: voice resumes -> same turn; else the turn is complete" {class: step}
   queue: "FIFO of complete turns (cuts made while she answers wait)"
   stt: "ONE transcription — /api/voice/transcribe" {class: step}
-  chat: "ONE chat turn — /api/chat with X-556-Voice: 1\n(adds the spoken-style hint as an ephemeral system prompt; same session, same memory, same Telegram mirror)" {class: step}
+  chat: "ONE chat turn — /api/chat with X-556-Voice: 1\n(spoken-style hint as a system message in the API request; same session, same memory, same state block, same Telegram send)" {class: step}
   tts: "ONE synthesis — /api/voice/speak: sanitize (no markdown/emoji) -> TTS -> cached /cache/audio/<id>" {class: step}
   play: "ONE playback — speak_audio event: the avatar window plays + lip-syncs (claims 'playing');\nno avatar window -> the office plays" {class: step}
   guard: "echo guard: mic paused while she speaks (speakers)"
@@ -34,8 +35,18 @@ mode2: "Mode 2 — conversation mode (hands-free): text box LOCKED, strict 1:1 l
   play -> guard -> mic: "resume"
 }
 
+event: "Event turns (0.6.0) — she speaks first" {
+  class: proposed
+  row: "her event-turn row arrives through the follower"
+  ovr: "主動 setting: speak proactive messages? (override, default = follow the current mode)" {class: step}
+  row -> ovr
+  ovr -> mode2.tts: "yes -> same synthesis + playback (mic paused meanwhile)"
+  ovr -> text: "no -> text bubble only"
+  text: "chat bubble, source = event"
+}
+
 conn: "connectors (home/voice.json, 設定 → 語音連線)" {
-  fish: "Fish Audio — TTS POST /v1/tts {text, reference_id, format}, header model: s1\nASR POST /v1/asr multipart, header model: transcribe-1" {class: ext}
+  fish: "Fish Audio — TTS POST /v1/tts {text, reference_id, format}, header model (default s1)\nASR POST /v1/asr multipart, header model: transcribe-1" {class: ext}
   oai: "OpenAI-compatible — /audio/speech · /audio/transcriptions" {class: ext}
   hf: "handsfree: threshold · min_silence_ms · pre_roll_s · grace_s · min_turn_s · max_turn_s · echo_guard · spoken_style" {class: file}
 }
@@ -43,3 +54,9 @@ conn: "connectors (home/voice.json, 設定 → 語音連線)" {
 mode1.stt -> conn
 mode2.stt -> conn
 mode2.tts -> conn
+
+later: "later: TTS prosody (pitch, rate) and Live2D parameters driven by the state block (stage 7); STT zh-TW conversion" {
+  shape: text
+  near: bottom-center
+  class: proposed
+}
