@@ -108,7 +108,7 @@ function createTray() {
   tray.setToolTip('556 Production');
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: '開啟 556 Production', click: showOffice },
-    { label: '顯示／隱藏她', click: toggleAvatar },
+    { label: '顯示／隱藏角色', click: toggleAvatar },
     { type: 'separator' },
     { label: '結束', click: () => { quitting = true; app.quit(); } },
   ]));

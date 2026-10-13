@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.7.3 — 2026-10-14
+
+- **The app speaks generally**: no pronoun for the character (她), no role word for you (製作人), no agency
+  framing (事務所, 上班, 成員) anywhere in the windows; the character's name shows where a name belongs.
+- **Settings in two layers.** 設定 holds what is yours and the app's: your name and reply language, the
+  character window on start, the Telegram mirror, the voice connectors, and the backend developer knobs.
+  Everything that belongs to one character moved to that character's page under 名單 (click the name or 設定
+  on its row): name and Live2D model, memory language and context window, abilities, 主動, the channel
+  accounts (Telegram / Discord, no longer hidden behind the developer toggle), and the model / memory-engine
+  knobs behind the toggle. Opening a character's page puts it in the chat window, because 556d edits the
+  character on stage. No backend change.
+
 ## 0.7.2 — 2026-10-14
 
 - Fix: opening 狀態 for a character who had never talked to another character blanked the whole window (it

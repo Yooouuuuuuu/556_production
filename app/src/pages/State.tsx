@@ -231,7 +231,7 @@ export function State() {
                 {(c.messages ?? []).slice(-6).map((m, i) => (
                   <li key={i} className={m.role === 'user' ? 'opacity-70' : ''}>
                     <span className="opacity-50">{m.role === 'user' ? (relay.names?.[c.counterpart] ?? c.counterpart) : v.companion}：</span>
-                    {m.text.startsWith('【事件】') ? <span className="italic opacity-40">（她想開口）</span> : m.text.slice(0, 160)}
+                    {m.text.startsWith('【事件】') ? <span className="italic opacity-40">（想開口）</span> : m.text.slice(0, 160)}
                   </li>
                 ))}
               </ul>

@@ -20,6 +20,10 @@ What landed since:
 - **0.7.0** (2026-10-13): 狀態 adds the relationship table, the hurt ledger, feedback buttons on feelings, and the
   characters' conversations (when 主動 → visibility allows); 設定 → 主動 adds inter-agent on/off, turn cap, visibility.
   The roster already holds several characters; each has her own one conversation with you.
+- **Unreleased** (2026-10-14): wording made general (no 她 / 製作人 / agency words in the windows); settings in two
+  layers — 設定 is yours and the app's (name, reply language, character window on start, Telegram mirror, voice
+  connectors, backend knobs), while a character's own settings (name, model, memory, abilities, 主動, channel
+  accounts, config knobs) open from its row on 名單 and put it in the chat window first.
 - **Coming**: see
   `../inner-life/inner-life.md`.
 - **Parked**: packaging (installer, updater, auto-start), pixel-alpha click-through for the avatar,
