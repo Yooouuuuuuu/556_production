@@ -23,9 +23,8 @@ type Config struct {
 }
 
 type Daemon struct {
-	Port       int    `toml:"port"`
-	Profile    string `toml:"profile"`      // Hermes profile for the chat API ("" = home's default companion)
-	WebChatDir string `toml:"web_chat_dir"` // static web-chat SPA, served at /chat/
+	Port    int    `toml:"port"`
+	Profile string `toml:"profile"` // Hermes profile for the chat API ("" = home's default companion)
 }
 
 type Hermes struct {
@@ -67,12 +66,8 @@ func Load(path string) (*Config, error) {
 		c.Shim.RoutingFile = "shim/routing.json"
 	}
 	c.Shim.RoutingFile = c.resolve(c.Shim.RoutingFile)
-	if c.Daemon.WebChatDir == "" {
-		c.Daemon.WebChatDir = "ui/web-chat"
-	}
-	c.Daemon.WebChatDir = c.resolve(c.Daemon.WebChatDir)
 	if c.Bridge.StaticDir == "" {
-		c.Bridge.StaticDir = "ui/live2d"
+		c.Bridge.StaticDir = "app/dist"
 	}
 	if c.Bridge.AssetsDir == "" {
 		c.Bridge.AssetsDir = "assets/live2d"

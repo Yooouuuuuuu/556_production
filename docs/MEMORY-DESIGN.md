@@ -131,3 +131,14 @@ Realistic final packaging = one installer/launcher with bundled sidecars (roadma
   (`auxiliary.memory_query_rewrite`) + post-moderation visibility — they have neither.
 - Dropped: proxy-side injection (provider prefetch covers it), 30-min markdown mirror (candidate
   digest-cron feature later).
+
+## Language & embedder — user-changeable (decided 2026-09-30)
+
+- `memory.language` per companion (default **zh-TW**; en selectable): the extraction prompt writes
+  facts in this language. Never "mirror the input" — mixed-language stores defeat dedup.
+- `memory.embedder` per install: default **bge-m3** (100+ languages incl. zh/ja/fr/en). **Anyone
+  running a companion in another language must pair it with an embedder that covers that language**
+  — the language knob and the embedder knob travel together. Changing the embedder means
+  re-embedding the store (minutes at companion scale; the migration path A→C is the same tool).
+- Standalone engine plan: see DECISIONS (2026-09-30 after 0.2.0) — separate Python library,
+  layered so the DB core stays lightweight; 556 keeps `kokoro` as the provider name.

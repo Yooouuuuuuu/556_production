@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.3.0 — 2026-10-01
+
+The app. One Windows program, **556 Production**, replaces the transitional Artemis web chat and
+the separate Electron pet.
+
+- **App** (`app/`, Electron + React + TypeScript, zh-TW default): office window with chat and
+  settings; avatar window (transparent, always-on-top, drag-anywhere) toggled by button or tray;
+  minimize → tray; closing the app closes the whole backend.
+- **Backend ownership**: the app spawns `556d -parent-pid`; 556d exits when the app dies; its
+  job object reaps hermes/llama. Verified for graceful quit and force-kill.
+- **556d hub**: chat events for every connected client on `/ws` (`chat.user/delta/complete/error`,
+  `companion.state`), `/api/history`, `/api/settings` with write-through to Hermes config,
+  `/api/companion`, `/api/restart-hermes` (client reconnects, session recreated).
+- **Chat window**: last X turns, hub-driven rendering (a message from any client appears
+  everywhere), streaming, IME-safe Enter. **Settings**: her name, Live2D model, show-on-start,
+  model lane, context turns, memory language, embedder (re-embed warning), restart button.
+- **Avatar**: Live2D stage in React (pixi + cubism4 ESM, Core 4 from 556d), hub bubbles/motions.
+- Retired: `ui/` (SPA, old pet, viewer), `avatar.cmd`/`pet.cmd`, `/chat/`, **`vendor/artemis`**
+  (the Artemis ledger is empty). Diagnostics moved to `tools/`. App icon added.
+
+Known gaps: no installer/packaging (0.4.0); companion switcher UI not built; approval/clarify
+not surfaced (toolset policy); no proactive pushes; memory language effective only with the
+kokoro engine; IME behavior still needs a human check; first companion unnamed.
+
+
 ## 0.2.0 — 2026-09-30
 
 Backend rewrite: five hand-started processes in two runtimes became one Go daemon.

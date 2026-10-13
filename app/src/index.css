@@ -1,0 +1,10 @@
+@import "tailwindcss";
+
+:root {
+  font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+  color-scheme: dark;
+}
+
+/* The avatar window is transparent: only the office route paints a background. */
+html, body, #root { margin: 0; height: 100%; background: transparent; }
+body[data-route="office"] { background: #14141c; color: #e8e8f0; }

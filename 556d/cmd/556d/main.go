@@ -24,8 +24,10 @@ import (
 
 func main() {
 	cfgPath := flag.String("config", "556d.toml", "path to 556d.toml")
+	parentPID := flag.Int("parent-pid", 0, "exit when this process ends (set by the desktop app)")
 	flag.Parse()
 	log.SetFlags(log.Ltime)
+	supervisor.WatchParent(*parentPID)
 
 	cfg, err := config.Load(*cfgPath)
 	if err != nil {
@@ -84,7 +86,7 @@ func main() {
 			log.Printf("[hermes] %v", err)
 		}
 	}()
-	api.New(hc, br, cfg.Daemon.Profile).Register(mux, cfg.Daemon.WebChatDir)
+	api.New(hc, br, sup, cfg.Daemon.Profile, cfg.Hermes.Home).Register(mux)
 	daemonSrv := &http.Server{Addr: fmt.Sprintf("127.0.0.1:%d", cfg.Daemon.Port), Handler: mux}
 	go func() {
 		log.Printf("[daemon] listening on :%d (bridge)", cfg.Daemon.Port)

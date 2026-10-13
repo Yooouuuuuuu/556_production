@@ -294,9 +294,6 @@ func (b *Bridge) static(w http.ResponseWriter, r *http.Request) {
 	case p == "/favicon.ico":
 		w.WriteHeader(204)
 		return
-	case p == "/pixi.min.js":
-		serveFile(w, r, filepath.Join(b.cfg.StaticDir, "node_modules", "pixi.js", "dist", "pixi.min.js"), true)
-		return
 	case p == "/live2dcubismcore.min.js":
 		serveFile(w, r, filepath.Join(b.cfg.VendorDir, "live2dcubismcore.min.js"), true)
 		return

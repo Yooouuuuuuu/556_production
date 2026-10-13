@@ -23,3 +23,14 @@ naming ✅(system)/her-name-later → backend+frontend rewrite discussion → Pa
 Plan of record: docs/PLAN-0.2.0.md. One Go daemon `556d` (supervisor + shim + bridge + UI API)
 beside an untouched Hermes; chat via tui_gateway; existing UIs repointed to the real her;
 ports → 556xx; Artemis-derived backend pieces retired. Frontend unchanged.
+
+## 0.3.0 — frontend: the "556 Production" app ✅ DONE 2026-10-01
+Plan of record: docs/PLAN-0.3.0.md. One Electron+React app (office window: chat + settings; avatar
+window toggled) owning 556d's lifecycle; 556d gains the hub event stream, history and settings APIs;
+Artemis SPA, old pet, and `vendor/artemis` retired at the end.
+
+## Next (after 0.3.0)
+- **0.4.0 packaging** — installer/portable build bundling 556d + hermes venv + models; auto-start,
+  updater, input-reactive animation (the Bongo Cat items).
+- **Memory engine** (separate repo; name TBD; pipeline-in-DB question first) → `plugins/kokoro`.
+- **Her name**. **Companion switcher UI**. **Proactive pushes** (platform adapter). **Voice** last.

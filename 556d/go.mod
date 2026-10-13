@@ -6,4 +6,5 @@ require (
 	github.com/BurntSushi/toml v1.4.0
 	github.com/gorilla/websocket v1.5.3
 	golang.org/x/sys v0.26.0
+	gopkg.in/yaml.v3 v3.0.1
 )

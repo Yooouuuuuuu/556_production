@@ -1,11 +1,11 @@
-# Architecture — what we take from where
+# Architecture — what we took from where (updated 2026-10-01)
 
 The project: a local-first AI companion built ON the Hermes Agent backbone, learning from
 momori777/Artemis (and the surveyed field: Open-LLM-VTuber, Soul of Waifu, z-waif, MyAiFriend).
 
 ## The core swap
 
-Artemis = OpenClaw Gateway + Headroom proxy + llama-server + media services.
+Artemis (our study reference, now deleted from the tree) = OpenClaw Gateway + Headroom proxy + llama-server + media services.
 Here, **Hermes replaces OpenClaw AND most of Headroom**: multi-platform gateway (Telegram/Discord/
 Slack/WhatsApp/Signal/CLI), per-profile characters (SOUL.md + isolated home), curated memory +
 background review, context compression, skills with a real learning loop, cron, subagents.
@@ -38,3 +38,10 @@ The user's **shim** (:18766) replaces Artemis's single-model lock-in with routed
 - `docs\` — decisions, stack inventory, research notes.
 - Future custom code (skills, TTS/image bridges, avatar frontend) — own folders under root,
   installed into `home\` the same way the Wardrobe's Stylist would (copy, not symlink).
+
+## Where it landed (0.3.0)
+One app owns one daemon owns one brain: **556 Production (Electron/React) → 556d (Go: hub, shim,
+bridge, supervisor) → hermes serve (Python, vendored)**. Every client talks only to 556d, which
+broadcasts to all. Artemis's patterns survive as: per-companion memory isolation (Hermes
+profiles), proxy-layer routing (the shim), avatar bridge API (Artemis-compatible control routes),
+trust-labeled retrieval (designed into Path C). See STACK.md for the exact inventory.

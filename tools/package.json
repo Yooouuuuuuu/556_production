@@ -1,0 +1,7 @@
+{
+  "name": "556-tools",
+  "private": true,
+  "description": "Diagnostics: cdp_shot (real-Chrome screenshots), ws_probe / hub_probe (556d WebSocket)",
+  "type": "module",
+  "dependencies": { "ws": "^8.21.0" }
+}

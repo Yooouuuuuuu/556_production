@@ -25,8 +25,10 @@ type Spec struct {
 }
 
 type Supervisor struct {
-	job jobHandle
-	wg  sync.WaitGroup
+	job     jobHandle
+	wg      sync.WaitGroup
+	mu      sync.Mutex
+	running map[string]*exec.Cmd
 }
 
 func New() (*Supervisor, error) {
@@ -34,7 +36,19 @@ func New() (*Supervisor, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Supervisor{job: j}, nil
+	return &Supervisor{job: j, running: map[string]*exec.Cmd{}}, nil
+}
+
+// Restart kills the named child; its run loop brings it back with backoff.
+func (s *Supervisor) Restart(name string) error {
+	s.mu.Lock()
+	cmd := s.running[name]
+	s.mu.Unlock()
+	if cmd == nil || cmd.Process == nil {
+		return fmt.Errorf("%s is not running", name)
+	}
+	log.Printf("[%s] restart requested", name)
+	return cmd.Process.Kill()
 }
 
 // Run starts the spec and keeps it alive until ctx is cancelled.
@@ -78,6 +92,16 @@ func (s *Supervisor) runOnce(ctx context.Context, spec Spec) error {
 		log.Printf("[%s] job assign failed: %v", spec.Name, err)
 	}
 	log.Printf("[%s] started pid %d", spec.Name, cmd.Process.Pid)
+	s.mu.Lock()
+	s.running[spec.Name] = cmd
+	s.mu.Unlock()
+	defer func() {
+		s.mu.Lock()
+		if s.running[spec.Name] == cmd {
+			delete(s.running, spec.Name)
+		}
+		s.mu.Unlock()
+	}()
 
 	done := make(chan error, 1)
 	go func() { done <- cmd.Wait() }()

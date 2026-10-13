@@ -4,15 +4,12 @@ vendor/hermes-agent/
 # reference clone of momori777/Artemis (read-only study copy)
 vendor/artemis/
 
-ui/live2d/node_modules/
-ui/live2d/audio_cache/
 
 # runtime data home (config may hold keys; state/memories are runtime)
 home/
 
 *.log
 __pycache__/
-ui/pet/node_modules/
 models/
 bin/llama-cpu.zip
 bin/
@@ -20,3 +17,9 @@ tests/stress_log.jsonl
 
 556d.exe
 *.log.err
+app/node_modules/
+app/dist/
+app/out/
+app/*.log
+app/*.log.err
+tools/node_modules/

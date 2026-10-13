@@ -1,7 +1,9 @@
 // Package hermes is a JSON-RPC-over-WebSocket client for `hermes serve` (tui_gateway): the same
 // protocol Hermes Desktop uses. Newline-delimited JSON-RPC 2.0 frames; server events arrive as
 // notifications {method:"event", params:{type, session_id, payload}}; streaming deltas may be
-// coalesced several-per-frame, so every inbound message is split on newlines.
+// coalesced several-per-frame, so every inbound message is split on newlines. The client
+// reconnects on loss; Generation() changes on every successful connect so callers know their
+// server-side sessions are gone (tui_gateway sessions are per process).
 package hermes
 
 import (
@@ -9,7 +11,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -39,54 +44,75 @@ type rpcError struct {
 }
 
 type Client struct {
-	url     string
-	mu      sync.Mutex
-	conn    *websocket.Conn
-	nextID  atomic.Int64
-	pending map[int64]chan frame
-	subs    map[string][]chan Event // session_id -> subscribers
-	ready   chan struct{}
+	host, token string
+	port        int
+	ctx         context.Context
+	mu          sync.Mutex
+	conn        *websocket.Conn
+	nextID      atomic.Int64
+	gen         atomic.Int64
+	pending     map[int64]chan frame
+	subs        map[string][]chan Event // session_id -> subscribers
+	ready       chan struct{}
+	readyOnce   *sync.Once
+	http        *http.Client
 }
 
 func New(host string, port int, token string) *Client {
 	return &Client{
-		url:     fmt.Sprintf("ws://%s:%d/api/ws?token=%s", host, port, token),
+		host: host, port: port, token: token,
 		pending: map[int64]chan frame{},
 		subs:    map[string][]chan Event{},
-		ready:   make(chan struct{}),
+		http:    &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
-// Connect dials and starts the reader; it retries until ctx is cancelled.
+func (c *Client) wsURL() string {
+	return fmt.Sprintf("ws://%s:%d/api/ws?token=%s", c.host, c.port, url.QueryEscape(c.token))
+}
+
+// Connect dials (retrying until ctx is cancelled) and keeps reconnecting after any loss.
 func (c *Client) Connect(ctx context.Context) error {
+	c.ctx = ctx
+	return c.connect()
+}
+
+func (c *Client) connect() error {
 	for attempt := 1; ; attempt++ {
-		conn, _, err := websocket.DefaultDialer.DialContext(ctx, c.url, nil)
+		c.mu.Lock()
+		c.ready = make(chan struct{})
+		c.readyOnce = &sync.Once{}
+		ready := c.ready
+		c.mu.Unlock()
+
+		conn, _, err := websocket.DefaultDialer.DialContext(c.ctx, c.wsURL(), nil)
 		if err == nil {
 			c.mu.Lock()
 			c.conn = conn
 			c.mu.Unlock()
 			go c.reader(conn)
 			select {
-			case <-c.ready:
-				log.Printf("[hermes] connected (%s)", c.url[:strings.Index(c.url, "?")])
+			case <-ready:
+				c.gen.Add(1)
+				log.Printf("[hermes] connected (generation %d)", c.gen.Load())
 				return nil
 			case <-time.After(15 * time.Second):
 				conn.Close()
 				err = errors.New("no gateway.ready within 15s")
-			case <-ctx.Done():
+			case <-c.ctx.Done():
 				conn.Close()
-				return ctx.Err()
+				return c.ctx.Err()
 			}
 		}
-		if ctx.Err() != nil {
-			return ctx.Err()
+		if c.ctx.Err() != nil {
+			return c.ctx.Err()
 		}
 		wait := time.Duration(min(attempt, 10)) * time.Second
 		log.Printf("[hermes] connect failed (%v); retry in %s", err, wait)
 		select {
 		case <-time.After(wait):
-		case <-ctx.Done():
-			return ctx.Err()
+		case <-c.ctx.Done():
+			return c.ctx.Err()
 		}
 	}
 }
@@ -95,9 +121,9 @@ func (c *Client) reader(conn *websocket.Conn) {
 	for {
 		_, data, err := conn.ReadMessage()
 		if err != nil {
-			log.Printf("[hermes] connection lost: %v", err)
 			c.mu.Lock()
-			if c.conn == conn {
+			lost := c.conn == conn
+			if lost {
 				c.conn = nil
 			}
 			for id, ch := range c.pending {
@@ -105,6 +131,10 @@ func (c *Client) reader(conn *websocket.Conn) {
 				delete(c.pending, id)
 			}
 			c.mu.Unlock()
+			if lost && c.ctx != nil && c.ctx.Err() == nil {
+				log.Printf("[hermes] connection lost (%v); reconnecting", err)
+				go func() { _ = c.connect() }()
+			}
 			return
 		}
 		for _, line := range strings.Split(string(data), "\n") {
@@ -140,10 +170,11 @@ func (c *Client) handle(f frame) {
 		return
 	}
 	if ev.Type == "gateway.ready" {
-		select {
-		case <-c.ready:
-		default:
-			close(c.ready)
+		c.mu.Lock()
+		once, ready := c.readyOnce, c.ready
+		c.mu.Unlock()
+		if once != nil {
+			once.Do(func() { close(ready) })
 		}
 		return
 	}
@@ -159,6 +190,15 @@ func (c *Client) handle(f frame) {
 	}
 }
 
+// Generation increments on every successful (re)connect.
+func (c *Client) Generation() int64 { return c.gen.Load() }
+
+func (c *Client) Connected() bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.conn != nil
+}
+
 // Call sends a request and waits for its response.
 func (c *Client) Call(ctx context.Context, method string, params any) (json.RawMessage, error) {
 	c.mu.Lock()
@@ -170,8 +210,7 @@ func (c *Client) Call(ctx context.Context, method string, params any) (json.RawM
 	id := c.nextID.Add(1)
 	ch := make(chan frame, 1)
 	c.pending[id] = ch
-	req := map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": params}
-	data, _ := json.Marshal(req)
+	data, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": id, "method": method, "params": params})
 	err := conn.WriteMessage(websocket.TextMessage, append(data, '\n'))
 	c.mu.Unlock()
 	if err != nil {
@@ -210,23 +249,31 @@ func (c *Client) Subscribe(sid string) (<-chan Event, func()) {
 	}
 }
 
+// Session identifies a live agent session: the UI-side id used for RPCs and the durable
+// state.db id used by REST routes (history).
+type Session struct {
+	ID     string
+	Stored string
+}
+
 // CreateSession opens a fresh agent session (profile "" = the home's default companion).
-func (c *Client) CreateSession(ctx context.Context, profile string) (string, error) {
+func (c *Client) CreateSession(ctx context.Context, profile string) (Session, error) {
 	params := map[string]any{"messages": []any{}}
 	if profile != "" {
 		params["profile"] = profile
 	}
 	res, err := c.Call(ctx, "session.create", params)
 	if err != nil {
-		return "", err
+		return Session{}, err
 	}
 	var out struct {
 		SessionID string `json:"session_id"`
+		Stored    string `json:"stored_session_id"`
 	}
 	if err := json.Unmarshal(res, &out); err != nil || out.SessionID == "" {
-		return "", fmt.Errorf("session.create: bad result %s", string(res))
+		return Session{}, fmt.Errorf("session.create: bad result %s", string(res))
 	}
-	return out.SessionID, nil
+	return Session{ID: out.SessionID, Stored: out.Stored}, nil
 }
 
 // Submit sends a user prompt; the reply streams as events on the session.
@@ -235,8 +282,32 @@ func (c *Client) Submit(ctx context.Context, sid, text string) error {
 	return err
 }
 
-func (c *Client) Connected() bool {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	return c.conn != nil
+// History fetches the latest `limit` stored messages of a session via hermes serve's REST API.
+// A session with no persisted rows yet yields an empty list.
+func (c *Client) History(ctx context.Context, stored string, limit int) ([]map[string]any, error) {
+	if stored == "" {
+		return nil, nil
+	}
+	u := fmt.Sprintf("http://%s:%d/api/sessions/%s/messages?limit=%d&order=latest", c.host, c.port, url.PathEscape(stored), limit)
+	req, _ := http.NewRequestWithContext(ctx, "GET", u, nil)
+	req.Header.Set("X-Hermes-Session-Token", c.token)
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == 404 {
+		return nil, nil
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("history: HTTP %d: %.200s", resp.StatusCode, string(body))
+	}
+	var out struct {
+		Messages []map[string]any `json:"messages"`
+	}
+	if err := json.Unmarshal(body, &out); err != nil {
+		return nil, err
+	}
+	return out.Messages, nil
 }
