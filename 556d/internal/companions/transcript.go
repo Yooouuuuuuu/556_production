@@ -113,7 +113,7 @@ func (t *Transcript) AgentConversations(source, prefix string, perConv int) ([]A
 		db.Close()
 		return nil, err
 	}
-	var out []AgentConversation
+	out := []AgentConversation{} // never nil: the renderer indexes it (JSON null blanked the 狀態 page)
 	for rows.Next() {
 		var c AgentConversation
 		var key string
@@ -202,7 +202,7 @@ func (t *Transcript) query(q string, args ...any) ([]rawMessage, error) {
 		return nil, err
 	}
 	defer rs.Close()
-	var out []rawMessage
+	out := []rawMessage{}
 	for rs.Next() {
 		var (
 			m       rawMessage

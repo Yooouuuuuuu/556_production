@@ -221,16 +221,16 @@ export function State() {
         {(snap as any)?.share_backlog?.length ? <div className="text-xs opacity-60 mt-1">{t('state.share')}: {(snap as any).share_backlog.map((s: any) => s.what).join('、')}</div> : null}
       </section>
 
-      {visible && relay && relay.conversations.length > 0 && (
+      {visible && relay && (relay.conversations ?? []).length > 0 && (
         <section>
           <h3 className="text-xs uppercase tracking-wide opacity-60 mb-2">{t('state.relay')}</h3>
-          {relay.conversations.map((c) => (
+          {(relay.conversations ?? []).map((c) => (
             <div key={c.session_id} className="mb-2">
-              <div className="text-xs opacity-60">{t('state.relay_with')} {relay.names[c.counterpart] ?? c.counterpart} · {ago(c.last_ts, now)}</div>
+              <div className="text-xs opacity-60">{t('state.relay_with')} {relay.names?.[c.counterpart] ?? c.counterpart} · {ago(c.last_ts, now)}</div>
               <ul className="text-xs space-y-0.5">
                 {(c.messages ?? []).slice(-6).map((m, i) => (
                   <li key={i} className={m.role === 'user' ? 'opacity-70' : ''}>
-                    <span className="opacity-50">{m.role === 'user' ? (relay.names[c.counterpart] ?? c.counterpart) : v.companion}：</span>
+                    <span className="opacity-50">{m.role === 'user' ? (relay.names?.[c.counterpart] ?? c.counterpart) : v.companion}：</span>
                     {m.text.startsWith('【事件】') ? <span className="italic opacity-40">（她想開口）</span> : m.text.slice(0, 160)}
                   </li>
                 ))}

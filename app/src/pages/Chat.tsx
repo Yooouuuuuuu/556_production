@@ -25,7 +25,7 @@ export function Chat() {
     connect();
     api.voice().then((v) => setVoiceOk({ stt: v.voice.stt.kind !== 'none', tts: v.voice.tts.kind !== 'none' })).catch(() => {});
     api.psycheSettings().then((r) => setProactiveSpeak((r.settings?.proactive?.speak as any) ?? 'follow')).catch(() => {});
-    api.history().then((h) => setHistory(h.messages.map((m, i) => ({ id: `h${i}`, role: m.role, text: m.text, ts: m.ts, source: m.source }))))
+    api.history().then((h) => setHistory((h.messages ?? []).map((m, i) => ({ id: `h${i}`, role: m.role, text: m.text, ts: m.ts, source: m.source }))))
       .catch(() => { /* backend not up yet; the header shows the status */ });
   }, [selected]);
 

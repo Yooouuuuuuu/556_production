@@ -113,7 +113,7 @@ export function Memory() {
               <p className="mt-1 text-xs opacity-60 flex flex-wrap gap-x-3 gap-y-1">
                 <span>#{m.id}</span>
                 <span>{fmtDate(m.created_at)}</span>
-                {m.tags.map((x) => <span key={x} className="px-1.5 rounded bg-white/10">{x}</span>)}
+                {(m.tags ?? []).map((x) => <span key={x} className="px-1.5 rounded bg-white/10">{x}</span>)}
                 {m.superseded && <span className="text-amber-300">{t('memory.state.superseded')}{m.archive_reason ? ` — ${m.archive_reason}` : ''}</span>}
                 {m.archived === 1 && <span className="text-amber-300">{t('memory.state.archived')}{m.archive_reason ? ` — ${m.archive_reason}` : ''}</span>}
                 {queued.has(m.id) && <span className="text-amber-300">{t('memory.queued_badge')}</span>}

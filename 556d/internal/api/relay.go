@@ -235,6 +235,9 @@ func (a *API) relayLogHandler(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"companion": name, "conversations": []any{}, "error": err.Error()})
 		return
 	}
+	if convs == nil {
+		convs = []companions.AgentConversation{}
+	}
 	sort.SliceStable(convs, func(i, j int) bool { return convs[i].LastTS > convs[j].LastTS })
 	names := map[string]string{}
 	for _, c := range convs {

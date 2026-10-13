@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.2 — 2026-10-14
+
+- Fix: opening 狀態 for a character who had never talked to another character blanked the whole window (it
+  looked like a hang). `GET /api/relay/log` answered `conversations: null` (a Go nil slice), the page read its
+  length, and React unmounts everything on an uncaught render error. 556d now always returns lists, the pages
+  guard the arrays they index (relay log, history, memory tags), and a page that throws shows the error in place
+  with a retry button; the header and the other tabs keep working.
+
 ## 0.7.1 — 2026-10-13
 
 - **Your cast lives outside version control**: `characters/<id>/` (SOUL, psyche.json, person files, seed memories,

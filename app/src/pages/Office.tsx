@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Component, useEffect, useState, type ReactNode } from 'react';
 import { t } from '../i18n';
 import { api, BASE as BASE_URL } from '../api';
 import { Chat } from './Chat';
@@ -10,6 +10,28 @@ import { useStore } from '../store';
 
 // Office window: header (status, tabs, avatar toggle) + Chat / Settings.
 type Tab = 'chat' | 'settings' | 'memory' | 'roster' | 'state';
+
+// A page that throws must not take the window with it: React unmounts the whole root on an uncaught
+// render error, which looks like the app hanging (0.7.1: 狀態 on a null list). Show the error in
+// place, keep the header and the other tabs usable; switching tabs or pressing retry clears it.
+class PageBoundary extends Component<{ children: ReactNode; resetKey: string }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error) { console.error('[page]', error); }
+  componentDidUpdate(prev: { resetKey: string }) { if (prev.resetKey !== this.props.resetKey && this.state.error) this.setState({ error: null }); }
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="p-4 text-sm space-y-2">
+          <div className="text-red-300">{t('page.error')}</div>
+          <pre className="text-xs whitespace-pre-wrap opacity-70">{String(this.state.error.stack || this.state.error)}</pre>
+          <button className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-xs" onClick={() => this.setState({ error: null })}>{t('page.retry')}</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 export function Office({ initialTab = 'chat' }: { initialTab?: Tab }) {
   const [tab, setTab] = useState<Tab>(initialTab);
@@ -50,7 +72,9 @@ export function Office({ initialTab = 'chat' }: { initialTab?: Tab }) {
         </nav>
       </header>
       <main className="flex-1 overflow-hidden">
-        {tab === 'chat' ? <Chat /> : tab === 'memory' ? <Memory /> : tab === 'roster' ? <Roster /> : tab === 'state' ? <State /> : <Settings />}
+        <PageBoundary resetKey={tab}>
+          {tab === 'chat' ? <Chat /> : tab === 'memory' ? <Memory /> : tab === 'roster' ? <Roster /> : tab === 'state' ? <State /> : <Settings />}
+        </PageBoundary>
       </main>
     </div>
   );
