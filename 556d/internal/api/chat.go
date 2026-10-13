@@ -106,6 +106,9 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/voice/speak", a.voiceSpeak)      // text -> cached audio + speak_audio event (lipsync)
 	mux.HandleFunc("/api/config", a.configHandler)       // the config registry: every knob, dev panel
 	mux.HandleFunc("/api/shutdown", a.shutdownHandler)   // graceful daemon shutdown (companions finish up first)
+	mux.HandleFunc("/api/relay", a.relayHandler)                  // a character's message for another character: 556d carries the exchange
+	mux.HandleFunc("/api/relay/session", a.relaySessionHandler)   // her session with another character (opened + stamped like yours)
+	mux.HandleFunc("/api/relay/log", a.relayLogHandler)           // their conversations, read-only (狀態 page)
 	mux.HandleFunc("/api/psyche/settings", a.psycheSettingsHandler) // psyche.json: 主動 gates apply at the next tick, the rest at her next start
 	mux.HandleFunc("/api/psyche/command", a.psycheCommandHandler)   // close a loop / add a reminder / add a life event — queued for the engine
 	mux.HandleFunc("/api/psyche", a.psycheHandler)       // 狀態: read-only view of her psyche.db (the engine in her process writes it)

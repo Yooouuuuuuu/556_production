@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { api, PsycheView, PsycheInstance } from '../api';
+import { api, PsycheView, PsycheInstance, RelayConversation } from '../api';
 import { t } from '../i18n';
 
 // 狀態 tab: how she is right now, read from her psyche.db (the engine inside her process writes it;
 // 556d only reads). Words first, numbers small: the same material her state block is made of.
-// The few things you can do here (close a loop, add a reminder or a life event) are commands the
-// engine drains on its next tick — 556d never writes her state itself.
+// The few things you can do here (close a loop, add a reminder or a life event, grade a feeling) are
+// commands the engine drains on its next tick — 556d never writes her state itself.
 
 const EMOTION_ZH: Record<string, string> = {
   joy: '開心', distress: '難過', hope: '期待', fear: '擔心', satisfaction: '滿足', disappointment: '失望',
@@ -19,6 +19,7 @@ const OCTANTS: Record<string, string> = {
 const ACTIVITY_ZH: Record<string, string> = { sleep: '在睡覺', lying: '躺在床上', woken: '被吵醒', work: '在工作', hobby: '在弄自己的事', meal: '在吃飯', rest: '在休息', chat: '在聊天' };
 const NEEDS_ZH: Record<string, string> = { affiliation_person: '想找你', affiliation_general: '想有人陪', competence: '想有進展', autonomy: '想自己決定', certainty: '想知道結果', novelty: '想有新鮮事' };
 const PHASE_ZH: Record<string, string> = { ok: '', protest: '想找你', despair: '悶著', detachment: '疏離' };
+const STRATEGY_ZH: Record<string, string> = { direct: '直說', reserved: '收斂', humor: '玩笑', inverted: '反話', denial: '否認', suppress: '先不提' };
 const word = (x: number) => (x < 0.2 ? '' : x < 0.45 ? '有點' : x < 0.7 ? '蠻' : '很');
 const energyWord = (e: number, a?: string) => (a === 'sleep' ? '在睡覺' : a === 'woken' ? '很睏' : e >= 0.75 ? '精神很好' : e >= 0.55 ? '精神還不錯' : e >= 0.35 ? '有點累' : '很累');
 const intensityNow = (i: PsycheInstance, now: number) => i.intensity0 * Math.pow(0.5, Math.max(0, now - i.born_at) / 3600 / Math.max(1e-6, i.half_life_h));
@@ -30,10 +31,10 @@ const ago = (ts: number, now: number) => {
 function eventText(e: { kind: string; payload: any }): string {
   const p = e.payload ?? {};
   switch (e.kind) {
-    case 'turn': return `💬 ${String(p.user ?? '').slice(0, 80)}`;
+    case 'turn': return `💬 ${p.counterpart && p.counterpart !== '你' ? `[${p.counterpart}] ` : ''}${String(p.user ?? '').slice(0, 80)}`;
     case 'appraisal_applied': return `✦ ${(p.events ?? []).join('、') || '（沒有事件）'}${(p.born ?? []).length ? ` → ${p.born.length} 個情緒` : ''}`;
-    case 'proactive_fired': return `📣 想開口：${p.kind}${p.what ? `（${p.what}）` : ''}`;
-    case 'sent': return `📣 她說了：${String(p.text ?? '').slice(0, 80)}`;
+    case 'proactive_fired': return `📣 想開口${p.counterpart && p.counterpart !== '你' ? `（對 ${p.counterpart}）` : ''}：${p.kind}${p.what ? `（${p.what}）` : ''}`;
+    case 'sent': return `📣 說了：${String(p.text ?? '').slice(0, 80)}`;
     case 'silent': return '📣 想了想，沒有打擾';
     case 'send_failed': return `📣 沒送出去（${p.why ?? ''}）`;
     case 'reply_timeout': return `⏳ 等不到回覆（第 ${p.unanswered} 則）`;
@@ -41,6 +42,7 @@ function eventText(e: { kind: string; payload: any }): string {
     case 'life': return `🍃 ${p.text ?? ''}`;
     case 'rumination': return `🔁 又想起：${EMOTION_ZH[p.type] ?? p.type}`;
     case 'loop_due': return `⏰ 到了：${p.what ?? ''}`;
+    case 'cmd_feedback': return `🎚 你的回饋：${EMOTION_ZH[p.type] ?? p.type} ${p.verdict}`;
     case 'start': return `▶ 開始（補了 ${p.gap_ticks ?? 0} 分鐘）`;
     case 'stop': return '■ 停止';
     default: return e.kind;
@@ -49,6 +51,7 @@ function eventText(e: { kind: string; payload: any }): string {
 
 export function State() {
   const [v, setV] = useState<PsycheView | null>(null);
+  const [relay, setRelay] = useState<{ conversations: RelayConversation[]; names: Record<string, string> } | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now() / 1000);
   const [showBlock, setShowBlock] = useState(false);
@@ -56,14 +59,17 @@ export function State() {
   const [life, setLife] = useState({ text: '', bad: false });
   const [busy, setBusy] = useState(false);
 
-  const load = () => api.psyche().then((r) => { setV(r); setErr(null); setNow(Date.now() / 1000); }).catch((e) => setErr(String(e)));
+  const load = () => {
+    api.psyche().then((r) => { setV(r); setErr(null); setNow(Date.now() / 1000); }).catch((e) => setErr(String(e)));
+    api.relayLog().then(setRelay).catch(() => setRelay(null));
+  };
   useEffect(() => {
     load();
     const id = setInterval(load, 5000);
     return () => clearInterval(id);
   }, []);
 
-  async function command(op: 'close_loop' | 'add_loop' | 'life_event', payload: Record<string, any>) {
+  async function command(op: 'close_loop' | 'add_loop' | 'life_event' | 'feedback', payload: Record<string, any>) {
     setBusy(true);
     try { await api.psycheCommand(op, payload); setTimeout(load, 1500); } catch (e) { setErr(String(e)); } finally { setBusy(false); }
   }
@@ -81,8 +87,14 @@ export function State() {
   const loops = (v.loops ?? []).filter((l) => l.state !== 'closed' && l.state !== 'expired');
   const needs = snap?.needs ?? {};
   const contact = snap?.contact ?? {};
+  const rel = snap?.rel ?? {};
+  const ledger = snap?.ledger ?? {};
+  const others = snap?.others ?? {};
+  const strategy = snap?.last_strategy?.strategy;
   const blockText = snap?.last_block?.text ?? '';
+  const nameOf = (p: string) => (p === '你' ? '你' : relay?.names?.[p] ?? p);
   const card = 'rounded-lg bg-white/5 p-3';
+  const visible = v.inter_agent_visibility !== false;
 
   return (
     <div className="h-full overflow-y-auto p-4 space-y-4 text-sm">
@@ -90,6 +102,7 @@ export function State() {
         <span>{v.running ? t('state.running') : t('state.stopped')}</span>
         {v.snapshot_at ? <span>{t('state.snapshot_at')} {ago(v.snapshot_at, now)}</span> : null}
         {typeof v.checks_total === 'number' && v.checks_total > 0 && <span>· {t('state.checks')} {v.checks_total}</span>}
+        {strategy && <span>· {t('state.strategy')} {STRATEGY_ZH[strategy] ?? strategy}</span>}
       </div>
       <div className="grid grid-cols-3 gap-3">
         <div className={card}>
@@ -111,6 +124,36 @@ export function State() {
           </div>
         </div>
       </div>
+
+      <section>
+        <h3 className="text-xs uppercase tracking-wide opacity-60 mb-2">{t('state.relations')}</h3>
+        {Object.keys(rel).length === 0 ? <div className="opacity-50">{t('state.none')}</div> : (
+          <table className="w-full text-xs">
+            <thead className="opacity-50"><tr><th className="text-left font-normal">{t('state.rel_who')}</th><th className="text-left font-normal">{t('state.rel_how')}</th><th className="text-left font-normal">{t('state.rel_trust')}</th><th className="text-left font-normal">{t('state.rel_attach')}</th><th className="text-left font-normal">{t('state.rel_hours')}</th></tr></thead>
+            <tbody>
+              {Object.entries(rel).map(([p, r]: [string, any]) => (
+                <tr key={p} className="border-t border-white/5">
+                  <td className="py-1">{nameOf(p)}{others[p]?.phase && PHASE_ZH[others[p].phase] ? <span className="opacity-50"> · {PHASE_ZH[others[p].phase]}</span> : null}</td>
+                  <td className="py-1 opacity-80">{r.words}</td>
+                  <td className="py-1"><div className="h-1 w-16 rounded bg-white/10"><div className="h-1 rounded bg-sky-400/70" style={{ width: `${Math.round((r.trust_value ?? 0.5) * 100)}%` }} /></div></td>
+                  <td className="py-1"><div className="h-1 w-16 rounded bg-white/10"><div className="h-1 rounded bg-pink-400/70" style={{ width: `${Math.round((r.attachment ?? 0) * 100)}%` }} /></div></td>
+                  <td className="py-1 opacity-60">{Math.round(r.hours ?? 0)} h · 揭露 {r.disclosure}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+        {Object.entries(ledger).some(([, es]: [string, any]) => (es as any[]).length > 0) && (
+          <div className="mt-2 text-xs">
+            <div className="opacity-60 mb-1">{t('state.ledger')}</div>
+            <ul className="space-y-0.5">
+              {Object.entries(ledger).flatMap(([p, es]: [string, any]) => (es as any[]).map((e) => (
+                <li key={e.id} className="flex gap-2"><span className="shrink-0 opacity-60">{nameOf(p)}</span><span className="flex-1 opacity-80 truncate">{e.cause}</span><span className="opacity-40 shrink-0">迴避 {word(e.avoidance) || '一點'} · 不滿 {word(e.resentment) || '一點'} · {ago(e.at, now)}</span></li>
+              )))}
+            </ul>
+          </div>
+        )}
+      </section>
 
       <section>
         <h3 className="text-xs uppercase tracking-wide opacity-60 mb-2">{t('state.needs')}</h3>
@@ -136,6 +179,11 @@ export function State() {
                 <span className="shrink-0">{word(i.now) || '一點'}{EMOTION_ZH[i.type] ?? i.type}</span>
                 <span className="opacity-70 flex-1">{i.cause}</span>
                 <span className="text-xs opacity-40 shrink-0">{ago(i.born_at, now)}{i.resolved_by ? ` · ${i.resolved_by}` : ''}</span>
+                <span className="text-[10px] shrink-0 flex gap-1 opacity-60">
+                  <button className="hover:opacity-100" title={t('state.fb_too_much')} disabled={busy} onClick={() => command('feedback', { type: i.type, verdict: 'too_much', instance: i.id })}>−</button>
+                  <button className="hover:opacity-100" title={t('state.fb_right')} disabled={busy} onClick={() => command('feedback', { type: i.type, verdict: 'right', instance: i.id })}>✓</button>
+                  <button className="hover:opacity-100" title={t('state.fb_too_little')} disabled={busy} onClick={() => command('feedback', { type: i.type, verdict: 'too_little', instance: i.id })}>+</button>
+                </span>
               </li>
             ))}
           </ul>
@@ -170,8 +218,27 @@ export function State() {
           <button className="px-2 py-1 rounded bg-white/10 hover:bg-white/20 disabled:opacity-30" disabled={busy || !life.text.trim()}
             onClick={() => { command('life_event', { text: life.text.trim(), v: life.bad ? -0.4 : 0.3, R: 0.4, share: true }); setLife({ text: '', bad: false }); }}>{t('state.life_add')}</button>
         </div>
-        {(v.snapshot as any)?.share_backlog?.length ? <div className="text-xs opacity-60 mt-1">{t('state.share')}: {(v.snapshot as any).share_backlog.map((s: any) => s.what).join('、')}</div> : null}
+        {(snap as any)?.share_backlog?.length ? <div className="text-xs opacity-60 mt-1">{t('state.share')}: {(snap as any).share_backlog.map((s: any) => s.what).join('、')}</div> : null}
       </section>
+
+      {visible && relay && relay.conversations.length > 0 && (
+        <section>
+          <h3 className="text-xs uppercase tracking-wide opacity-60 mb-2">{t('state.relay')}</h3>
+          {relay.conversations.map((c) => (
+            <div key={c.session_id} className="mb-2">
+              <div className="text-xs opacity-60">{t('state.relay_with')} {relay.names[c.counterpart] ?? c.counterpart} · {ago(c.last_ts, now)}</div>
+              <ul className="text-xs space-y-0.5">
+                {(c.messages ?? []).slice(-6).map((m, i) => (
+                  <li key={i} className={m.role === 'user' ? 'opacity-70' : ''}>
+                    <span className="opacity-50">{m.role === 'user' ? (relay.names[c.counterpart] ?? c.counterpart) : v.companion}：</span>
+                    {m.text.startsWith('【事件】') ? <span className="italic opacity-40">（她想開口）</span> : m.text.slice(0, 160)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </section>
+      )}
 
       <section>
         <button className="text-xs opacity-60 hover:opacity-100" onClick={() => setShowBlock(!showBlock)}>{showBlock ? '▾' : '▸'} {t('state.block')}</button>

@@ -90,6 +90,50 @@ func (t *Transcript) StampRouting(id, source, key, chatID string) error {
 	return nil
 }
 
+// AgentConversation is her conversation with another character (0.7.0 inter-agent messaging).
+type AgentConversation struct {
+	Counterpart string    `json:"counterpart"`
+	SessionID   string    `json:"session_id"`
+	LastTS      float64   `json:"last_ts"`
+	Messages    []Message `json:"messages"`
+}
+
+// AgentConversations lists the sessions 556d keyed <prefix><name> with their last messages, read-only.
+func (t *Transcript) AgentConversations(source, prefix string, perConv int) ([]AgentConversation, error) {
+	if _, err := os.Stat(t.path); err != nil {
+		return nil, nil
+	}
+	db, err := t.open(true)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := db.Query(`SELECT id, session_key, COALESCE(last_activity_at, started_at, 0) FROM sessions
+		WHERE source = ? AND session_key LIKE ? ORDER BY COALESCE(last_activity_at, started_at) DESC LIMIT 20`, source, prefix+"%")
+	if err != nil {
+		db.Close()
+		return nil, err
+	}
+	var out []AgentConversation
+	for rows.Next() {
+		var c AgentConversation
+		var key string
+		if err := rows.Scan(&c.SessionID, &key, &c.LastTS); err != nil {
+			continue
+		}
+		c.Counterpart = strings.TrimPrefix(key, prefix)
+		out = append(out, c)
+	}
+	rows.Close()
+	db.Close()
+	for i := range out {
+		msgs, err := t.Messages(out[i].SessionID, perConv, "")
+		if err == nil {
+			out[i].Messages = msgs
+		}
+	}
+	return out, nil
+}
+
 // Message is one line of the conversation as the windows show it.
 type Message struct {
 	ID     int64   `json:"id"`

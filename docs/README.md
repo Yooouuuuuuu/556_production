@@ -21,6 +21,9 @@ At the docs root:
 - `STACK.md` — exact inventory of what runs (versions, ports, files, third parties).
 - `CHANGELOG.md` is at the repo root, per version.
 
+`characters/` (repo root) holds the 0.7.0 cast as versioned files — SOUL, psyche.json, person files, seed memories —
+installed into a profile with `install-character.ps1`.
+
 Working documents are local and ignored (`docs/*.local.md`): `ROADMAP.local.md` (what is next and in
 which version) and `TEST-LIST.local.md` (manual test history). Outdated plans and drafts are deleted,
 not kept.

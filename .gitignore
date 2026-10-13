@@ -25,3 +25,4 @@ vendor/hermes-agent/
 app/public/vad/
 556d.new.exe
 docs/*.local.md
+tests/live/out/

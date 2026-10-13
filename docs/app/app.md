@@ -17,7 +17,10 @@ What landed since:
   sliders); 狀態 gains what she is doing, her needs, the separation phase, loop close / add-reminder / add-life-event
   commands, the state block she saw, a fuller timeline; chat shows her event-turn messages with a 她主動 badge and
   speaks them per the override.
-- **Coming**: three chats (0.7.0) — see
+- **0.7.0** (2026-10-13): 狀態 adds the relationship table, the hurt ledger, feedback buttons on feelings, and the
+  characters' conversations (when 主動 → visibility allows); 設定 → 主動 adds inter-agent on/off, turn cap, visibility.
+  The roster already holds several characters; each has her own one conversation with you.
+- **Coming**: see
   `../inner-life/inner-life.md`.
 - **Parked**: packaging (installer, updater, auto-start), pixel-alpha click-through for the avatar,
   emotion → avatar mapping, poke reactions, UI polish.

@@ -30,14 +30,14 @@ REASONS = {
 ERRORISH = ("Model generated invalid tool call", "does not exist. Available tools", "Tool '", "[error", "Error:")
 
 
-def compose(kind: str, *, term: str, what: str, now_text: str, extra: str = "") -> str:
+def compose(kind: str, *, term: str, what: str, now_text: str, extra: str = "", pronoun: str = "她") -> str:
     """A narrator's cue, not an instruction to "send a message" — worded that way, Gemini invents a reply tool."""
-    reason = REASONS.get(kind, "{what}").format(term=term, what=what)
+    reason = REASONS.get(kind, "{what}").format(term=term, what=what).replace("她", pronoun)
     lines = [f"{EVENT_MARK}（旁白，不是{term}說的話）現在是 {now_text}。{reason}。"]
     if extra:
         lines.append(extra)
-    lines.append(f"她會開口對{term}說什麼？請直接以她的口吻寫出那一兩句話，當作這一回合的回覆；這裡沒有任何工具可用，也不需要。"
-                 f"不要提到這段旁白，不要說自己被提醒或被設定；如果依她現在的狀態判斷此刻不該打擾，只回「{SILENCE}」。")
+    lines.append(f"{pronoun}會開口對{term}說什麼？請直接以{pronoun}的口吻寫出那一兩句話，當作這一回合的回覆；這裡沒有任何工具可用，也不需要。"
+                 f"不要提到這段旁白，不要說自己被提醒或被設定；如果依{pronoun}現在的狀態判斷此刻不該打擾，只回「{SILENCE}」。")
     return "\n".join(lines)
 
 
@@ -71,6 +71,34 @@ def live_session_id(state_db: Path) -> Optional[str]:
         return str(r[0]) if r else None
     except Exception:
         return None
+
+
+def counterpart_session(hub: str, companion: str, counterpart: str, timeout: float = 20.0) -> Optional[str]:
+    """Her conversation with another character lives in her own state.db (key 556:agent:<name>); 556d opens
+    and stamps it, like it opens her conversation with you."""
+    if not hub:
+        return None
+    req = urllib.request.Request(hub.rstrip("/") + "/api/relay/session", data=json.dumps({"companion": companion, "counterpart": counterpart}).encode(),
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return (json.loads(r.read().decode()) or {}).get("session_id") or None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def relay(hub: str, sender: str, to: str, text: str, timeout: float = 20.0) -> Optional[str]:
+    """Hand a message she wrote for another character to 556d, which carries the conversation on."""
+    if not hub:
+        return "no hub"
+    req = urllib.request.Request(hub.rstrip("/") + "/api/relay", data=json.dumps({"from": sender, "to": to, "text": text}).encode(),
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            r.read()
+        return None
+    except Exception as e:  # noqa: BLE001
+        return f"{type(e).__name__}: {e}"
 
 
 def send(base: str, key: str, session_id: str, text: str, timeout: float = 180.0) -> Tuple[str, Optional[str]]:

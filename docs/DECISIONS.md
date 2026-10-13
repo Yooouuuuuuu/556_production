@@ -14,6 +14,29 @@ Design: `inner-life/inner-life.md` (its §0 lists every decision applied).
 - 製作人 → 你 (see v1 DECISIONS 2026-10-07): stored subject 你, rendered as her term for you.
 - Time constants keep their research defaults and are overridable in Settings; long-term thresholds are discussed before 0.7.0.
 
+## Built (2026-10-13) — inner life stages 5–6: relationships, hurt / repair, three characters [inner-life] [structure]
+- The counterpart of a turn comes from the session key: her conversation with you (Telegram DM key or
+  `556:app`), or `556:agent:<name>` for another character. Both plugins resolve it from `state.db`; neither talks
+  to the other. Loops, instances, appraisals and relationship state carry the counterpart id, never the display
+  name (rows from before 0.7.0 that hold the display term count as yours).
+- kokoro keeps one store per character and one pipeline per counterpart: memories about another character are
+  written with that character's name as the subject; the store's fixed subject word 你 stays for you.
+- Inter-agent conversations run through 556d, not plugin to plugin: 556d knows every character's API port and key,
+  owns session creation, enforces one conversation per pair at a time and the turn cap, and emits `relay.turn`.
+  The initiator's message is its own event turn (so it is a row in its session with the other); the plugin posts
+  it to `/api/relay`; 556d delivers it as a user turn in the other character's session and carries the reply back.
+- Hurt is proportional to closeness ((0.5 + bond) in the ledger's opening formula) — a stranger's slight barely
+  registers, a friend's lingers two to three days; an apology that owns the fault halves it, a false-belief
+  correction leaves a fifth. Trend forgiveness slope ≈ 0.003/h from agreeableness and commitment (design: linear).
+- Display rules mute what she shows by closeness (0.5 + 0.5·bond): with someone she has just met her feelings
+  stay mostly inside, which is the design's 剛認識時是熱情，熟了才是撒嬌.
+- Attachment strength grows at k_attachment × bond × responsiveness (≈ 0.25 after 90 days of an hour a day) — faster
+  than the literature's two years so it is observable in tests; a knob in `relation`.
+- Your feedback on a feeling adjusts that emotion type's gain by ±5 % (bounded 0.5–2×) through a replayable command;
+  「不該是這種情緒」 is only logged.
+- Provisional names for the cast (小夜 / 千尋 / 悠真); ids are folders, display names are in `companion.json` and the
+  SOUL, so renaming is a copy and an edit.
+
 ## Built (2026-10-08) — inner life stages 3–4: proactive [inner-life]
 - Urges are decided live only and recorded as replayable `proactive_fired` events; replay re-applies the record,
   a fast-forward after a stop decides nothing (no back-fill), a due loop fires at the first live tick. The first live

@@ -52,10 +52,13 @@ export type PsycheEvent = { id: number; at: number; kind: string; counterpart: s
 export type PsycheAppraisal = { id: number; at: number; turn_id: string; platform: string; data: any; error: string | null; ms: number; applied_tick: number | null };
 export type PsycheView = { companion: string; exists: boolean; running?: boolean; snapshot_at?: number;
   snapshot?: { tick: number; t: number; affect: { pos: number; neg: number; ar: number }; mood: number[]; energy: number;
-    activity?: string; needs?: Record<string, number>; contact?: Record<string, any>; sleep?: Record<string, any>; last_block?: { text?: string } };
+    activity?: string; needs?: Record<string, number>; contact?: Record<string, any>; sleep?: Record<string, any>; last_block?: { text?: string; strategy?: string };
+    rel?: Record<string, any>; ledger?: Record<string, any[]>; others?: Record<string, any>; last_strategy?: Record<string, string> };
+  inter_agent_visibility?: boolean;
   instances?: PsycheInstance[]; loops?: PsycheLoop[]; events?: PsycheEvent[]; appraisals?: PsycheAppraisal[];
   checks?: { id: number; at: number; platform: string; hits: Record<string, string[]>; excerpt: string }[]; checks_total?: number };
 export type PsycheSettings = Record<string, any>;
+export type RelayConversation = { counterpart: string; session_id: string; last_ts: number; messages: { role: string; text: string; ts: number }[] };
 
 export const api = {
   // 狀態: her inner state, read-only from psyche.db
@@ -67,7 +70,9 @@ export const api = {
     return r.json() as Promise<{ settings: PsycheSettings; restart_required: boolean }>;
   },
   // a command for the engine (single writer): queued in psyche.db, drained on her next tick
-  psycheCommand: async (op: 'close_loop' | 'add_loop' | 'life_event', payload: Record<string, any>) => {
+  // her conversations with the other characters (read-only; shown when 主動 → inter_agent_visibility)
+  relayLog: () => get<{ companion: string; conversations: RelayConversation[]; names: Record<string, string> }>('/api/relay/log'),
+  psycheCommand: async (op: 'close_loop' | 'add_loop' | 'life_event' | 'feedback', payload: Record<string, any>) => {
     const r = await fetch(BASE + '/api/psyche/command', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ op, payload }) });
     if (!r.ok) throw new Error(await errorOf(r));
     return r.json() as Promise<{ id: number; queued: boolean }>;

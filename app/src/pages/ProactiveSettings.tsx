@@ -38,7 +38,8 @@ export function ProactiveSettings({ onChanged }: { onChanged(): void }) {
     try {
       const patch: PsycheSettings = {
         proactive: { enabled: p.enabled !== false, no_disturb: [[Number(nd[0]), Number(nd[1])]], daily_cap: Number(p.daily_cap ?? 3),
-          usage_threshold_min: Number(p.usage_threshold_min ?? 90), min_gap_min: Number(p.min_gap_min ?? 90), speak: p.speak ?? 'follow' },
+          usage_threshold_min: Number(p.usage_threshold_min ?? 90), min_gap_min: Number(p.min_gap_min ?? 90), speak: p.speak ?? 'follow',
+          inter_agent: p.inter_agent !== false, inter_agent_turn_cap: Number(p.inter_agent_turn_cap ?? 6), inter_agent_visibility: p.inter_agent_visibility !== false },
         life: { busyness_mode: life.busyness_mode ?? 'work' },
         cares_about: s.cares_about ?? [],
         character: ch,
@@ -108,6 +109,11 @@ export function ProactiveSettings({ onChanged }: { onChanged(): void }) {
             <option value="none">{t('proactive.busy_none')}</option>
           </select>
         </div>
+      </div>
+      <div className="grid grid-cols-3 gap-3 items-end">
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={p.inter_agent !== false} onChange={(e) => setP('inter_agent', e.target.checked)} />{t('proactive.inter_agent')}</label>
+        <div><label className={label}>{t('proactive.turn_cap')}</label><input className={field} type="number" min={1} max={30} value={p.inter_agent_turn_cap ?? 6} onChange={(e) => setP('inter_agent_turn_cap', Number(e.target.value))} /></div>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={p.inter_agent_visibility !== false} onChange={(e) => setP('inter_agent_visibility', e.target.checked)} />{t('proactive.visibility')}</label>
       </div>
       <div>
         <label className={label}>{t('proactive.cares')}</label>

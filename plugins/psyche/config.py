@@ -26,6 +26,7 @@ DEFAULTS: Dict[str, Any] = {
         "tsundere_tendency": 0.3,
         "assertiveness": 0.6,
         "chronotype": 0.0,
+        "pronoun": "她",            # 她 | 他 — used in the state block and the event cues
     },
     # What she cares about (preference profile read by appraisal A — not her personality, which is B's).
     "cares_about": [
@@ -91,8 +92,15 @@ DEFAULTS: Dict[str, Any] = {
         "occasion_floor": 0.1,
         "reply_timeout_default_h": 6.0,  # until the latency model has 5 samples
         "speak": "follow",               # app: speak proactive messages? follow (the current voice mode) | always | never
+        "inter_agent": True,             # may she start a conversation with another character
+        "inter_agent_min_gap_min": 240,
+        "inter_agent_turn_cap": 6,       # exchanges per conversation (cost control, not a script)
+        "inter_agent_visibility": True,  # the 狀態 page may show their conversations
     },
     "tom": {"weekly_decay": 0.92},
+    "relation": {"k_bond": 0.004, "k_attachment": 0.0004, "trust_forget_days": 60},
+    # per counterpart priors (id -> fields of relation.fresh): 你, or another character's profile id
+    "relationships": {},
     "llm": None,  # None = the llm block of kokoro.json (same lane as the memory observe)
 }
 
@@ -125,5 +133,5 @@ def load(home: Path, write_defaults: bool = True) -> Dict[str, Any]:
 
 def version(cfg: Dict[str, Any]) -> str:
     """Short hash of the parameters that shape the dynamics (psyche.db params table)."""
-    keep = {k: cfg.get(k) for k in ("character", "time", "impact", "expression", "needs", "life")}
+    keep = {k: cfg.get(k) for k in ("character", "time", "impact", "expression", "needs", "life", "relation", "relationships")}
     return hashlib.sha1(json.dumps(keep, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:12]

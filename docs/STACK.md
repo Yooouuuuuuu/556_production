@@ -133,7 +133,13 @@ id; her answer lands as a normal row; the hooks record `sent` / `silent`. 556d: 
 `source: event` + `sendTelegram` (same path as the app mirror); `GET/PUT /api/psyche/settings` (psyche.json, hot keys
 `proactive`, `life.busyness_mode`, `cares_about`); `POST /api/psyche/command` → `commands` table (close_loop,
 add_loop, life_event). Output checks (checks.py, record only) → `checks` table. Simulator: `tools/psychesim.py`
-(week / day / seeds / replay). Engine modules: life.py (sleep, activities, life events), needs.py, tom.py, urge.py.
+(week / day / seeds / replay). Engine modules: life.py (sleep, activities, life events), needs.py, tom.py, urge.py,
+relation.py (L5 per counterpart, the hurt ledger, the expression strategies).
+**Multi-agent (0.7.0)**: counterparts by session key (`556:agent:<name>`, source `556`); 556d `relay.go`:
+`POST /api/relay/session` (open + stamp), `POST /api/relay {from, to, text}` (one conversation per pair, turn cap from
+the initiator's psyche.json `proactive.inter_agent_turn_cap`, hub event `relay.turn`), `GET /api/relay/log`; her
+plugins reach 556d at `X556_HUB` (spawn env). Characters: `characters/<id>/` (SOUL, companion.json, psyche.json,
+people/, seeds.jsonl), `install-character.ps1`, `tools/seed-memories.py` (store without an owner, embedder up).
 
 ## Third-party inventory (what is not ours, and where it lives)
 

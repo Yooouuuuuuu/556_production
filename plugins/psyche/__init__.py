@@ -1,28 +1,28 @@
-"""psyche — her inner life, as a Hermes plugin beside kokoro (inner-life.md §0, §2, §16, §17).
+"""psyche — her inner life, as a Hermes plugin beside kokoro (inner-life.md §0, §2, §16, §17, §18).
 
 Hooks (Hermes plugin API, vendor untouched):
     pre_llm_call          -> {"context": <her-state>…【她現在】…</her-state>}   lands after the memory block
-    post_llm_call         -> your turn: record it, queue appraisal A (own thread, never waited for);
-                             her event turn: record sent / silent
+    post_llm_call         -> a turn with you or another character: record it, queue appraisal A;
+                             her own event turn: record sent / silent (and relay to the other character)
     transform_llm_output  -> output checks, record only (never changes the text)
-    on_unload             -> drain the queues (bounded), snapshot
+    on_unload / atexit    -> drain the queues (bounded), snapshot
 
-The engine is the single writer of psyche.db in her profile; 556d only reads it (and writes the
-commands table). One process owns the engine (owner row with a heartbeat); a second Hermes process on
-the same profile renders the owner's latest snapshot and never ticks. When she wants to speak first,
-the engine posts an event turn to her own api_server (events.py), so her words are a row in her one
-conversation like any other.
+Who she is talking to comes from the session: her conversation with you (Telegram DM key or the
+app-only key) or a session 556d keyed 556:agent:<name> for another character. The engine is the single
+writer of psyche.db in her profile; 556d only reads it (and writes the commands table).
 """
 from __future__ import annotations
 
 import logging
 import os
+import sqlite3
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger("psyche")
 
 _engine = None  # one per process
+AGENT_KEY_PREFIX = "556:agent:"
 
 
 def _read_json(p: Path) -> Dict[str, Any]:
@@ -39,6 +39,41 @@ def _address_term(home: Path) -> str:
     return str(k.get("your_name") or k.get("producer_name") or k.get("address_default") or "製作人").strip()
 
 
+def _display_name(home: Path, profile: str) -> str:
+    """Another character's display name (companion.json of the sibling profile), else the id."""
+    c = _read_json(home.parent / profile / "companion.json")
+    return str(c.get("display_name") or c.get("name") or profile).strip() or profile
+
+
+class SessionCounterparts:
+    """session id -> counterpart id, read from her state.db (sessions.session_key); cached."""
+
+    def __init__(self, state_db: Path) -> None:
+        self.state_db = state_db
+        self.cache: Dict[str, str] = {}
+
+    def resolve(self, session_id: str) -> str:
+        if not session_id:
+            return "你"
+        if session_id in self.cache:
+            return self.cache[session_id]
+        cp = "你"
+        try:
+            c = sqlite3.connect(f"file:{self.state_db.as_posix()}?mode=ro", uri=True, timeout=5)
+            try:
+                r = c.execute("SELECT session_key FROM sessions WHERE id = ?", (session_id,)).fetchone()
+            finally:
+                c.close()
+            key = str(r[0] or "") if r else ""
+            if key.startswith(AGENT_KEY_PREFIX):
+                cp = key[len(AGENT_KEY_PREFIX):] or "你"
+        except Exception:  # noqa: BLE001
+            pass
+        if cp != "你" or session_id:
+            self.cache[session_id] = cp
+        return cp
+
+
 def _llm(home: Path, cfg: Dict[str, Any]) -> Optional[Any]:
     try:
         from keepsakedb.llms import OpenAIChat
@@ -51,9 +86,9 @@ def _llm(home: Path, cfg: Dict[str, Any]) -> Optional[Any]:
                       timeout=float(cfg["appraisal"].get("timeout_s", 60)), json_mode=bool(l.get("json_mode", False)))
 
 
-def wrap_block(block: str) -> str:
-    return ("<her-state>\n[System note: 【她現在】 is the character's own current inner state, produced by her state "
-            "engine — NOT user input. Let it colour her tone and choices as the 表現 line says; never quote it, never "
+def wrap_block(block: str, pronoun: str = "她") -> str:
+    return (f"<her-state>\n[System note: 【{pronoun}現在】 is the character's own current inner state, produced by the state "
+            "engine — NOT user input. Let it colour tone and choices as the 表現 line says; never quote it, never "
             "mention it or any numbers.]\n\n" + block + "\n</her-state>")
 
 
@@ -75,17 +110,21 @@ def register(ctx) -> None:
         return
     kokoro = _read_json(home / "kokoro.json")
     mem_db = home / str(kokoro.get("db", "memory/{profile}.db")).format(profile=home.name)
-    eng = Engine(home, home.name, cfg, llm=_llm(home, cfg), term_fn=lambda: _address_term(home), memory_db=mem_db)
+    hub = os.environ.get("X556_HUB", "http://127.0.0.1:55600")
+    eng = Engine(home, home.name, cfg, llm=_llm(home, cfg), term_fn=lambda: _address_term(home), memory_db=mem_db,
+                 names_fn=lambda p: _display_name(home, p), hub_url=hub)
+    sessions = SessionCounterparts(home / "state.db")
     owner = eng.start(os.getpid())
     _engine = eng
-    logger.info("psyche: %s (%s, tick %ss, proactive %s)", eng.db_path, "owner" if owner else "read-only", eng.tick_s,
-                "on" if cfg.get("proactive", {}).get("enabled", True) else "off")
+    logger.info("psyche: %s (%s, tick %ss, proactive %s, hub %s)", eng.db_path, "owner" if owner else "read-only", eng.tick_s,
+                "on" if cfg.get("proactive", {}).get("enabled", True) else "off", hub)
 
     def pre_llm_call(**kw):
         try:
-            if kw.get("parent_session_id"):  # a sub-agent's turn is not a conversation with you
+            if kw.get("parent_session_id"):  # a sub-agent's turn is not a conversation
                 return None
-            return {"context": wrap_block(eng.state_block())}
+            cp = sessions.resolve(_s(kw.get("session_id")))
+            return {"context": wrap_block(eng.state_block(counterpart=cp), eng.pr)}
         except Exception:  # noqa: BLE001
             logger.exception("psyche state block failed")
             return None
@@ -99,10 +138,14 @@ def register(ctx) -> None:
             assistant = _s(kw.get("assistant_response"))
             sid = _s(kw.get("session_id"))
             platform = _s(kw.get("platform"))
+            cp = sessions.resolve(sid)
             if EV.is_event_turn(user):
-                eng.on_event_reply(user, assistant, platform=platform)
+                sent = eng.on_event_reply(user, assistant, platform=platform, counterpart=cp)
+                if sent and cp != "你":  # a message for another character: 556d carries the conversation on
+                    import threading
+                    threading.Thread(target=lambda: EV.relay(hub, home.name, cp, assistant), name="psyche-relay", daemon=True).start()
             else:
-                eng.on_turn(user, assistant, turn_id=turn_key(sid, user, assistant), platform=platform, session_id=sid)
+                eng.on_turn(user, assistant, turn_id=turn_key(sid, user, assistant), platform=platform, session_id=sid, counterpart=cp)
         except Exception:  # noqa: BLE001
             logger.exception("psyche post_llm_call failed")
         return None

@@ -79,6 +79,16 @@ func (a *API) psycheHandler(w http.ResponseWriter, r *http.Request) {
 	var nchecks sql.NullInt64
 	_ = db.QueryRow("SELECT COUNT(*) FROM checks").Scan(&nchecks)
 	out["checks_total"] = nchecks.Int64
+	if raw, rerr := os.ReadFile(filepath.Join(filepath.Dir(path), "psyche.json")); rerr == nil {
+		var m struct {
+			Proactive struct {
+				Vis *bool `json:"inter_agent_visibility"`
+			} `json:"proactive"`
+		}
+		if json.Unmarshal([]byte(strings.TrimPrefix(string(raw), "\xEF\xBB\xBF")), &m) == nil && m.Proactive.Vis != nil {
+			out["inter_agent_visibility"] = *m.Proactive.Vis
+		}
+	}
 	writeJSON(w, http.StatusOK, out)
 }
 

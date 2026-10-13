@@ -193,6 +193,7 @@ func (m *Manager) Start(name string) (Info, error) {
 			"API_SERVER_KEY=" + key, // enables Hermes's API server platform (gateway/config_env.py)
 			"API_SERVER_HOST=127.0.0.1",
 			"API_SERVER_PORT=" + fmt.Sprint(port),
+			"X556_HUB=http://127.0.0.1:55600", // her plugins reach 556d here (counterpart sessions, the relay)
 		},
 		Dir:    m.root,
 		Health: fmt.Sprintf("http://127.0.0.1:%d/health", port),
@@ -391,6 +392,14 @@ func (m *Manager) infoLocked(name string) Info {
 
 // ReadCompanionJSON reads <dir>/companion.json as a map (display_name, avatar_model, api_key,
 // app_session_id, …); empty map when absent.
+// DisplayName is companion.json display_name of a profile dir, else the profile id.
+func DisplayName(dir, name string) string {
+	if d, _ := ReadCompanionJSON(dir)["display_name"].(string); strings.TrimSpace(d) != "" {
+		return d
+	}
+	return name
+}
+
 func ReadCompanionJSON(dir string) map[string]any {
 	m := map[string]any{}
 	if raw, err := os.ReadFile(filepath.Join(dir, "companion.json")); err == nil {

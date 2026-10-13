@@ -43,6 +43,8 @@ class KokoroMemoryProvider(MemoryProvider):
         self._home: Optional[Path] = None
         self._store = None
         self._pipeline = None
+        self._pipelines: Dict[str, Any] = {}      # per other character (subject = their name)
+        self._cp_cache: Dict[str, str] = {}       # session id -> counterpart id
         self._agent_context = "primary"
         self._last_count = 0
         self._turn_lock = threading.Lock()   # in-flight observe; shutdown waits for it
@@ -159,6 +161,63 @@ class KokoroMemoryProvider(MemoryProvider):
         term = self._address_term(self._cfg)
         return f"\n\nAbout {term} — the person you are talking to (profile maintained in the app):\n" + text[:2000] if text else ""
 
+    # -- counterparts (0.7.0): her session with you, or a session 556d keyed 556:agent:<name> ---------
+    def _counterpart_of(self, session_id: str) -> str:
+        if not session_id or not self._home:
+            return "你"
+        if session_id in self._cp_cache:
+            return self._cp_cache[session_id]
+        cp = "你"
+        try:
+            import sqlite3
+            c = sqlite3.connect(f"file:{(self._home / 'state.db').as_posix()}?mode=ro", uri=True, timeout=5)
+            try:
+                r = c.execute("SELECT session_key FROM sessions WHERE id = ?", (session_id,)).fetchone()
+            finally:
+                c.close()
+            key = str(r[0] or "") if r else ""
+            if key.startswith("556:agent:"):
+                cp = key[len("556:agent:"):] or "你"
+        except Exception:
+            pass
+        self._cp_cache[session_id] = cp
+        return cp
+
+    def _display_name(self, profile: str) -> str:
+        try:
+            cj = json.loads((self._home.parent / profile / "companion.json").read_text(encoding="utf-8-sig"))
+            return str(cj.get("display_name") or profile)
+        except Exception:
+            return profile
+
+    def _pipeline_for(self, counterpart: str):
+        """Memories about another character are written with that character's name as the subject; the
+        store is shared (one file per character), only the pipeline's subject word differs."""
+        if counterpart == "你" or self._pipeline is None:
+            return self._pipeline
+        pl = self._pipelines.get(counterpart)
+        if pl is None:
+            from keepsakedb.pipeline import Pipeline, PipelineConfig
+            base = self._pipeline.cfg
+            name = self._display_name(counterpart)
+            pl = Pipeline(self._store, self._pipeline.llm, PipelineConfig(
+                language=base.language, max_candidates=base.max_candidates, consent_turns=base.consent_turns, context_k=base.context_k,
+                subject=name, user_name=None, render_subject=None, retries=base.retries, short_layer=base.short_layer,
+                short_k=base.short_k, short_cap=base.short_cap, surface=f"跟{name}的對話"))
+            pl.subject = name  # the store's meta subject is 你; this pipeline speaks about the other character
+            self._pipelines[counterpart] = pl
+        return pl
+
+    def _person_block(self, counterpart: str) -> str:
+        if not self._home or counterpart == "你":
+            return ""
+        try:
+            p = self._home / "people" / f"{counterpart}.md"
+            text = p.read_text(encoding="utf-8").strip() if p.exists() else ""
+        except Exception:
+            return ""
+        return f"\n\nAbout {self._display_name(counterpart)} — the character you are talking to now (her person file):\n" + text[:2000] if text else ""
+
     def _memory_block_text(self) -> str:
         return (self._cfg.get("system_prompt_block") or
                 "Memory about the user is injected per turn as a 'Memory' block: 'Facts (long-term)' with "
@@ -174,9 +233,11 @@ class KokoroMemoryProvider(MemoryProvider):
         self._last_count = 0
         if self._store is None or is_trivial_prompt(query):
             return ""
-        k = self._pipeline.cfg.context_k
+        cp = self._counterpart_of(session_id)
+        pl = self._pipeline_for(cp)
+        k = pl.cfg.context_k
         try:
-            block = self._pipeline.context_for(query, k)
+            block = pl.context_for(query, k) + self._person_block(cp)
         except Exception as exc:  # embedder down: lexical recall still works
             logger.warning("kokoro prefetch fell back to BM25: %s", exc)
             try:
@@ -196,10 +257,12 @@ class KokoroMemoryProvider(MemoryProvider):
             return
         if (user_content or "").lstrip().startswith("【事件】"):
             return  # her own event turn (psyche speaks first): nothing you said, nothing to remember about you
+        cp = self._counterpart_of(session_id)
+        pl = self._pipeline_for(cp)
         with self._turn_lock:
-            res = self._pipeline.observe(user_content, assistant_content,
-                                         turn_id=_turn_key(session_id, user_content, assistant_content),
-                                         source=self._pipeline.subject or None)
+            res = pl.observe(user_content, assistant_content,
+                             turn_id=_turn_key(session_id, user_content, assistant_content),
+                             source=(pl.subject if cp == "你" else self._display_name(cp)) or None)
         if res.error:
             logger.warning("kokoro observe error: %s", res.error)
         elif res.applied:

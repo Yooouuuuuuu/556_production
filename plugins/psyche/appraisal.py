@@ -22,8 +22,8 @@ EVENT_KINDS = [
 ]
 LOOP_ORIGINS = ("counterpart_said", "her_promise", "counterpart_promise")
 
-SYSTEM = """You are the appraisal step of a fictional character's inner life. The character is a woman; the person
-she is talking to is called {term}. You read ONE conversation turn ({term}'s message and her reply) in
+SYSTEM = """You are the appraisal step of a fictional character's inner life. The character is referred to as {pronoun};
+the person {pronoun} is talking to is called {term} (another person, or another character of the same story). You read ONE conversation turn ({term}'s message and her reply) in
 context and report what happened from HER point of view, as data for a deterministic emotion model.
 Rules:
 - Report EVENTS, not her feelings. Do not evaluate the emotion she expressed in her reply; only use her
@@ -57,6 +57,11 @@ Fields per event (numbers in the given ranges):
   appeal: -1..1 like / dislike of a thing or idea mentioned (0 if none)
   q: 0..1 quality of this interaction (deep, attentive = high; one-liners = low)
   loop_id: id of a related open loop, or null
+  she_disclosed: true if {pronoun} opened up about something personal in the reply
+  other_disclosed: true if {term} opened up about something personal
+  ppr: {{"understood": 0..1, "validated": 0..1, "cared": 0..1}} — how {term} responded to what {pronoun} had shared (only when relevant, else null)
+  apology_components: 0..6 when event_kind is apology (expression of regret, explanation, responsibility, repentance, offer of repair, request for forgiveness)
+  other_tired: true if {term} seems exhausted, unwell or overwhelmed right now
 Output JSON only, no prose:
 {{"events": [ ... up to {max_events} ... ],
  "loops": {{"new": [{{"what": "...", "origin": "counterpart_said|her_promise|counterpart_promise",
@@ -108,6 +113,12 @@ def _f(x: Any, lo: float, hi: float, default: float) -> float:
     return lo if v < lo else hi if v > hi else v
 
 
+def _ppr(x: Any) -> Optional[Dict[str, float]]:
+    if not isinstance(x, dict):
+        return None
+    return {k: _f(x.get(k), 0, 1, 0.5) for k in ("understood", "validated", "cared")}
+
+
 def normalize(data: Dict[str, Any], max_events: int = 3) -> Dict[str, Any]:
     """Clamp ranges, drop junk, keep at most max_events — a malformed field becomes neutral, never a
     reaction (§10: 寧可沒反應，不要亂反應)."""
@@ -130,6 +141,9 @@ def normalize(data: Dict[str, Any], max_events: int = 3) -> Dict[str, Any]:
             "other_focus": _f(ev.get("other_focus"), 0, 1, 0.0), "other_v": _f(ev.get("other_v"), -1, 1, 0.0),
             "appeal": _f(ev.get("appeal"), -1, 1, 0.0), "q": _f(ev.get("q"), 0, 1, 0.3),
             "loop_id": (str(ev["loop_id"]) if ev.get("loop_id") else None),
+            "she_disclosed": bool(ev.get("she_disclosed")), "other_disclosed": bool(ev.get("other_disclosed")),
+            "ppr": _ppr(ev.get("ppr")), "apology_components": int(_f(ev.get("apology_components"), 0, 6, 3)),
+            "other_tired": bool(ev.get("other_tired")),
         })
     loops = data.get("loops") or {}
     new = []
@@ -152,9 +166,9 @@ def turn_key(session_id: str, user_text: str, assistant_text: str) -> str:
 
 def run(llm: Any, *, term: str, cares_about: Sequence[str], loops: Sequence[Dict[str, Any]],
         recent: Sequence[Tuple[str, str]], user_text: str, assistant_text: str, today: str,
-        max_events: int = 3, retries: int = 1) -> Tuple[Optional[Dict[str, Any]], str, Optional[str], float]:
+        max_events: int = 3, retries: int = 1, pronoun: str = "她") -> Tuple[Optional[Dict[str, Any]], str, Optional[str], float]:
     """-> (normalized data or None, raw reply, error, ms). Retries once on a bad reply."""
-    system = SYSTEM.format(term=term, today=today, kinds=", ".join(EVENT_KINDS), max_events=max_events)
+    system = SYSTEM.format(term=term, today=today, kinds=", ".join(EVENT_KINDS), max_events=max_events, pronoun=pronoun)
     user = build_user(term, cares_about, loops, recent, user_text, assistant_text)
     t0 = time.perf_counter()
     raw, err = "", None

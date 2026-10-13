@@ -1,7 +1,7 @@
 # Structure — one process per character, 556d around her
 
 Living doc; last verified 2026-10-07 (0.5.0 tools). Graphs in this folder are D2 sources: solid = what runs
-today (0.6.0, incl. proactive), dashed pink = 0.7.0 (three characters) work. Discord and MCP stay dashed. Why things are this way: `../DECISIONS.md`.
+today (0.7.0, incl. the characters' conversations), dashed pink = later work (Discord, MCP). Discord and MCP stay dashed. Why things are this way: `../DECISIONS.md`.
 
 ## 1. The shape — `structure.d2`
 
@@ -34,6 +34,11 @@ today (0.6.0, incl. proactive), dashed pink = 0.7.0 (three characters) work. Dis
   whether they are spoken.
 - A stop right after a reply (section C) waits for the memory pipeline, then (0.5.0) the appraisal queue
   and a snapshot, before the planned-stop marker.
+- Characters talk to each other through 556d (0.7.0): each pair has a session in each character's own `state.db`
+  (key `556:agent:<name>`), opened and stamped by 556d like your conversation. A character's urge toward another
+  produces an event turn in that session; the psyche plugin posts the message to `/api/relay`; 556d delivers it as
+  a user turn on the other side and carries the exchange on until silence or the turn cap. Both sides remember and
+  appraise the other as the counterpart. Never plugin to plugin: 556d knows the ports and keys and owns the pacing.
 
 ## 3. Inside her process — `hermes.d2`
 

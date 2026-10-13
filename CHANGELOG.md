@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.7.0 — 2026-10-13
+
+- **Her inner life, stages 5–6 — relationships, hurt and repair, three characters** (`docs/inner-life/inner-life.md`).
+  Every relationship variable is indexed by the person she is dealing with (you, or another character): warmth and
+  bond (two speeds), closeness hours with Hall's milestones, disclosure depth, attachment strength growing from zero
+  (or from a prior for old acquaintances), the anxiety / avoidance working model, trust as a Beta count of kept and
+  broken promises, commitment, perceived responsiveness. The hurt ledger (TRIM) opens only on a relational
+  devaluation, slides away by trend forgiveness, is cut by an apology that owns the fault and nearly erased by a
+  false-belief correction; its open avoidance gates inverted expression and, after a while, makes her offer the step
+  down herself. The expression layer carries the five strategies (直說 / 收斂 / 玩笑 / 反話 with a required tell /
+  否認), display rules (what she shows = what she feels × expressiveness × closeness), suppression when you look
+  exhausted, assertiveness, and a reply-length hint; the block gains a 對他 line.
+- **Inter-agent messaging** (556d `relay.go`): characters talk to each other through 556d. Each pair has a session
+  in each character's own `state.db` (key `556:agent:<name>`, opened and stamped like your conversation); a
+  character's urge toward another produces an event turn in that session, the psyche plugin hands the message to
+  556d, and 556d carries the exchange turn by turn until silence or the turn cap (per character, default 6). Both
+  sides appraise, remember and update their relationship with the other as the counterpart; kokoro writes those
+  memories with the other's name as the subject and injects the other's person file. `GET /api/relay/log` shows
+  their conversations; the 狀態 page lists them when the character's 主動 → visibility allows.
+- **Three characters with full backgrounds** under `characters/` (provisional names): 小夜 (sayo, just met),
+  千尋 (chihiro) and 悠真 (yuma, the couple; your old acquaintances). Each has a SOUL with background, a
+  psyche.json with personality, schedule, small life events and relationship priors per counterpart, person files
+  for you and each other, and seed memories (`tools/seed-memories.py`). `install-character.ps1 <id>` makes the
+  profile. 真音 stays as the test agent.
+- **狀態**: relationship table (closeness words, trust, attachment, hours, disclosure), the hurt ledger, feedback
+  buttons on each feeling (太多 / 剛好 / 太少 → ±5 % on that emotion's gain, bounded, replayable), the characters'
+  conversations. **設定 → 主動**: inter-agent on/off, turn cap, visibility.
+- Engine tests 38 (new: 失約 3 次, 失約後道歉, 誤會後更正, 90 天, 黏人度掃描, 傲嬌度掃描, 三人一個月, feedback).
+
 ## 0.6.0 — 2026-10-08
 
 - **Her inner life, stages 3–4 — she speaks first** (`docs/inner-life/inner-life.md`). The psyche plugin now carries

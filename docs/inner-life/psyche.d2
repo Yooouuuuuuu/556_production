@@ -15,7 +15,7 @@ classes: {
 }
 
 legend: |md
-  0.5.0 and 0.6.0 are built (inner-life.md); 0.7.0 = relationships, hurt/repair, three characters. **purple dashed** = the three lines the first overview missed.
+  0.5.0–0.7.0 are built (inner-life.md); stage 7 (TTS / Live2D from the state, nostalgia, mood-congruent recall) is later. **purple dashed** = the three lines the first overview missed.
   Versions: 0.5.0 = state block milestone (L0–L3, A, B) · 0.6.0 = time skeleton, needs, proactive · 0.7.0 = relationships, hurt/repair, three characters
 | {near: top-left}
 
@@ -69,7 +69,7 @@ hermes: "Hermes (vendor, unchanged)" {
 
 d: "556d — hub, read-only here" {
   ro: "reads psyche.db for the 狀態 page; writes psyche.json from Settings (restart applies)"
-  msg: "inter-agent messaging — message_person(p, text) between characters (0.7.0)" {class: later}
+  msg: "inter-agent messaging — message_person(p, text) between characters (0.7.0)"
 }
 
 inputs.turns -> engine.aq
@@ -93,7 +93,7 @@ outlets.event -> hermes.llm: "she writes it or stays quiet"
 hermes.llm -> hermes.hook: "reply text"
 hermes.hook -> db: "check results recorded as events"
 d.ro -> db
-d.msg -> inputs.turns: "0.7.0" {class: later}
+d.msg -> inputs.turns: "0.7.0"
 
 hermes.hist -> hermes.llm: "DARK LINE 1 — history's tone inertia reaches the next reply without the engine;\nthe state block names the transition to override it" {class: dark}
 hermes.llm -> engine.aq: "DARK LINE 2 — every LLM call (reply, observe, A, compression) goes through the shim: one observation point for all platforms" {class: dark}

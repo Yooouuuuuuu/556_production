@@ -38,6 +38,7 @@ from . import events as EV
 from . import life as L
 from . import model
 from . import needs as N
+from . import relation as RL
 from . import tom as T
 from . import urge as U
 
@@ -70,20 +71,25 @@ CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
 
 FADE = 0.02           # an instance below this intensity is dead
 OWNER_STALE_S = 20.0
-REPLAY_KINDS = ("turn", "sent", "silent", "send_failed", "proactive_fired", "cmd_close_loop", "cmd_add_loop", "cmd_life_event")
+REPLAY_KINDS = ("turn", "sent", "silent", "send_failed", "proactive_fired", "cmd_close_loop", "cmd_add_loop", "cmd_life_event", "cmd_feedback")
+MAIN = "你"  # the counterpart id of the person at the keyboard; other counterparts are character ids
 PENDING_TTL_S = 3600.0
 
 
 class Engine:
     def __init__(self, home: Path, character_id: str, cfg: Dict[str, Any], *, db_path: Optional[Path] = None,
                  now_fn: Callable[[], float] = time.time, llm: Any = None, term_fn: Optional[Callable[[], str]] = None,
-                 memory_db: Optional[Path] = None, state_db: Optional[Path] = None) -> None:
+                 memory_db: Optional[Path] = None, state_db: Optional[Path] = None,
+                 names_fn: Optional[Callable[[str], str]] = None, hub_url: str = "") -> None:
         self.home = Path(home)
         self.char = character_id
         self.cfg = cfg
         self.now_fn = now_fn
         self.llm = llm
         self.term_fn = term_fn or (lambda: "製作人")
+        self.names_fn = names_fn or (lambda p: p)   # display name of another character
+        self.hub_url = hub_url                       # 556d, for counterpart sessions and the relay
+        self.pr = str(cfg["character"].get("pronoun", "她"))
         self.memory_db = memory_db
         self.state_db = state_db or (self.home / "state.db")
         self.tick_s = int(cfg["time"]["tick_s"])
@@ -130,6 +136,44 @@ class Engine:
         self.share_backlog: List[Dict[str, Any]] = []
         self.projects: List[Dict[str, Any]] = [dict(p) for p in cfg.get("life", {}).get("projects", [])]
         self.day: Dict[str, Any] = {"date": None, "hour": None, "weekday": None, "event": None}
+        self.rel: Dict[str, Dict[str, Any]] = {}        # L5 per counterpart
+        self.ledger: Dict[str, List[Dict[str, Any]]] = {}  # L6 per counterpart
+        self.others: Dict[str, Dict[str, Any]] = {}     # other characters: contact, pm, need
+        self.gain_adj: Dict[str, float] = {}            # your feedback: per emotion type, 0.5–2×
+        self.last_strategy: Dict[str, str] = {}
+        self._turn_minutes: Dict[str, float] = {}       # minutes of conversation the last turn with p represented
+
+    # ------------------------------------------------------------------ counterparts
+    def _name(self, p: str) -> str:
+        return self.term_fn() if p == MAIN else self.names_fn(p)
+
+    def _rel(self, p: str) -> Dict[str, Any]:
+        if p not in self.rel:
+            self.rel[p] = RL.fresh(self.cfg.get("relationships", {}).get(p, {}), self.cfg["character"])
+            self.ledger.setdefault(p, [])
+        return self.rel[p]
+
+    def _other(self, p: str) -> Dict[str, Any]:
+        if p not in self.others:
+            self.others[p] = {"contact": {"last_turn_at": None, "last_sent_at": None, "awaiting_since": None, "unanswered": 0,
+                                          "phase": "ok", "pending": None, "answered_14d": [1.0] * 4}, "pm": T.fresh(), "need": 0.0}
+        return self.others[p]
+
+    def _contact_of(self, p: str) -> Dict[str, Any]:
+        return self.contact if p == MAIN else self._other(p)["contact"]
+
+    def _pm_of(self, p: str) -> Dict[str, Any]:
+        return self.pm if p == MAIN else self._other(p)["pm"]
+
+    def _need_of(self, p: str) -> float:
+        return self.needs["affiliation_person"] if p == MAIN else float(self._other(p)["need"])
+
+    def _loop_cp(self, l: Dict[str, Any]) -> str:
+        cp = l.get("counterpart") or MAIN
+        return cp if cp == MAIN or cp in self.others else MAIN
+
+    def counterparts(self) -> List[str]:
+        return [MAIN] + [p for p in self.others if p != MAIN]
 
     # ------------------------------------------------------------------ helpers
     def _migrate(self) -> None:
@@ -189,7 +233,8 @@ class Engine:
                 "stack_counts": dict(self.stack_counts), "last_block": self.last_block, "sleep": dict(self.sleep),
                 "fatigue": self.fatigue, "activity": self.activity, "needs": dict(self.needs), "contact": dict(self.contact),
                 "pm": {k: (list(v) if isinstance(v, list) else v) for k, v in self.pm.items()},
-                "share_backlog": list(self.share_backlog), "projects": [dict(p) for p in self.projects], "day": dict(self.day)}
+                "share_backlog": list(self.share_backlog), "projects": [dict(p) for p in self.projects], "day": dict(self.day),
+                "rel": self.rel, "ledger": self.ledger, "others": self.others, "gain_adj": dict(self.gain_adj), "last_strategy": dict(self.last_strategy)}
 
     def _restore(self, s: Dict[str, Any]) -> None:
         self.tick = int(s["tick"])
@@ -212,6 +257,11 @@ class Engine:
         if s.get("projects"):
             self.projects = [dict(p) for p in s["projects"]]
         self.day = {**self.day, **s.get("day", {})}
+        self.rel = {p: {**RL.fresh(self.cfg.get("relationships", {}).get(p, {}), self.cfg["character"]), **r} for p, r in s.get("rel", {}).items()}
+        self.ledger = {p: list(v) for p, v in s.get("ledger", {}).items()}
+        self.others = {p: v for p, v in s.get("others", {}).items()}
+        self.gain_adj = dict(s.get("gain_adj", {}))
+        self.last_strategy = dict(s.get("last_strategy", {}))
 
     def snapshot(self) -> None:
         with self.lock:
@@ -367,10 +417,12 @@ class Engine:
             self.contact.update({"turns_today": 0, "minutes_today": 0.0, "proactive_today": 0})
             day_tick0 = self.tick_of(datetime(d.year, d.month, d.day, tzinfo=self.tz).timestamp())
             self.day["event"] = L.plan_day_event(self._rng(k, "day"), life, float(self.sleep.get("debt", 0.0)), day_tick0, self.tick_s)
-            T.weekly_decay(self.pm, d.strftime("%G-%V"), float(self.cfg.get("tom", {}).get("weekly_decay", 0.92)))
+            for pm_ in [self.pm] + [o["pm"] for o in self.others.values()]:
+                T.weekly_decay(pm_, d.strftime("%G-%V"), float(self.cfg.get("tom", {}).get("weekly_decay", 0.92)))
         if self.day.get("hour") != d.hour:
             if self.day.get("hour") is not None:
-                T.hour_boundary(self.pm, int(self.day.get("weekday", weekday)), float(self.day["hour"]), running)
+                for pm_ in [self.pm] + [o["pm"] for o in self.others.values()]:
+                    T.hour_boundary(pm_, int(self.day.get("weekday", weekday)), float(self.day["hour"]), running)
             self.day["hour"], self.day["weekday"] = d.hour, weekday
         chatting = self._chatting(t)
         # --- L1: sleep, fatigue, activity, energy
@@ -396,6 +448,30 @@ class Engine:
         lt = self.contact.get("last_turn_at")
         hours_since = (t - lt) / 3600.0 if lt is not None else -1.0
         self.contact["phase"] = N.phase(hours_since, self.cfg.get("needs", {}), self.clinginess_eff, 0.5 * float(ch["big5"].get("neuroticism", 0.4)))
+        # --- the other characters: their gap grows when they are usually around and quiet; L5 / L6 tick for everyone
+        k_aff = float(self.cfg.get("needs", {}).get("k_aff", 0.08))
+        for p, o in self.others.items():
+            c = o["contact"]
+            lt_ = c.get("last_turn_at")
+            chatting_p = lt_ is not None and (t - lt_) < L.CHAT_WINDOW_MIN * 60
+            att = self._rel(p)["attachment"]
+            if chatting_p:
+                o["need"] = max(0.0, float(o["need"]) - 0.5 * dt_h)
+            else:
+                o["need"] = min(1.0, float(o["need"]) + k_aff * T.p_expected(o["pm"], weekday, hour) * (0.3 + 0.7 * att) * dt_h)
+            hs = (t - lt_) / 3600.0 if lt_ is not None else -1.0
+            c["phase"] = N.phase(hs, self.cfg.get("needs", {}), float(ch.get("clinginess_cap", 0.5)) * att, 0.5 * float(ch["big5"].get("neuroticism", 0.4)))
+            aw_ = c.get("awaiting_since")
+            if aw_ is not None and (t - aw_) / 3600.0 > T.latency_p90_h(o["pm"], 6.0):
+                c["awaiting_since"], c["unanswered"] = None, int(c.get("unanswered", 0)) + 1
+            pend_ = c.get("pending")
+            if pend_ and t - float(pend_.get("at", t)) > PENDING_TTL_S:
+                c["pending"] = None
+        rcfg = self.cfg.get("relation", {})
+        for p in list(self.rel):
+            RL.tick(self.rel[p], dt_h, rcfg)
+            RL.ledger_tick(self.ledger.setdefault(p, []), dt_h, agreeableness=float(ch["big5"].get("agreeableness", 0.6)),
+                           commitment=self.rel[p]["commitment"], t=t)
         # --- her life: the day's small event, project progress during work
         de = self.day.get("event")
         if de and int(de["tick"]) == k and self.activity not in ("sleep", "lying", "woken"):
@@ -520,8 +596,8 @@ class Engine:
         if float(e.get("R", 0.3)) >= 0.3:
             self.needs["novelty"] = max(0.0, self.needs["novelty"] - 0.3)
 
-    def _born_from(self, ev: Dict[str, Any], k: int, t: float, aid: Optional[int], tag: str) -> List[str]:
-        term = self.term_fn()
+    def _born_from(self, ev: Dict[str, Any], k: int, t: float, aid: Optional[int], tag: str, counterpart: str = MAIN) -> List[str]:
+        term = self._name(counterpart)
         imp = self.cfg["impact"]
         ev = dict(ev)
         ev["counterpart"] = term
@@ -533,8 +609,9 @@ class Engine:
         debt = float(self.sleep.get("debt", 0.0))
         mods = {"all": (1.0 - 0.15 * self.fatigue), "neg": 1.0 + 0.2 * debt, "pos": 1.0 - 0.1 * debt}
         new = model.appraise_to_instances(ev, self.derived, imp, act, self.stack_counts, mood_valence=self.mood[0],
-                                          bond=float(imp.get("bond_default", 0.5)), modulators=mods)
+                                          bond=self._rel(counterpart)["bond"], modulators=mods)
         for i, inst in enumerate(new):
+            inst["intensity0"] = round(min(1.0, inst["intensity0"] * float(self.gain_adj.get(inst["type"], 1.0))), 4)
             iid = f"em_{k}_{tag}_{i}"
             rec = {"id": iid, "born_at": t, "born_tick": k, "type": inst["type"], "target": term, "cause": inst["cause"],
                    "appraisal_id": aid, "intensity0": inst["intensity0"], "half_life_h": inst["half_life_h"],
@@ -551,57 +628,108 @@ class Engine:
 
     # ------------------------------------------------------------------ the urge
     def _urge(self, k: int, t: float, hour: float, chatting: bool, running: bool, rng: random.Random) -> None:
+        """Every counterpart is a candidate: you (gates as §16) and the other characters (their own contact
+        state). A due reminder or her own promise to you fires on time; otherwise the strongest λ wins."""
         pc = self.cfg.get("proactive", {})
-        if not self.live or self.contact.get("pending"):
+        if not self.live:
             return  # urges are decided live only; replay re-applies the recorded decision, a stop back-fills nothing
-        due = [l for l in self.loops.values() if l["state"] == "due"]
-        due_reminder = any(l.get("origin") in ("counterpart_said", "her_promise") for l in due)
-        ok, why = U.gates(cfg=pc, hour=hour, activity=self.activity, chatting=chatting, proactive_today=int(self.contact["proactive_today"]),
-                          minutes_today=float(self.contact["minutes_today"]), last_sent_at=self.contact.get("last_sent_at"), t=t,
-                          farewell_until=self.contact.get("farewell_until"), running=running, due_reminder=due_reminder)
-        if not ok:
-            return
-        care = [l for l in self.loops.values() if l["state"] in ("waiting",) and l.get("origin") == "counterpart_said" and l.get("cue_time")
-                and self._parse_cue(l["cue_time"]) is not None and 0 <= (self._parse_cue(l["cue_time"]) - t) <= 2 * 3600]  # type: ignore[operator]
-        hurt = sum(i["intensity"] for i in self.active(t) if i["type"] == "hurt")
         ch = self.cfg["character"]
         anx = 0.5 * float(ch["big5"].get("neuroticism", 0.4))
         avo = 0.5 * (1.0 - float(ch["big5"].get("agreeableness", 0.6)))
-        W = U.willingness(needs=self.needs, phase=self.contact["phase"], share_backlog=self.share_backlog, hurt=hurt, anxiety=anx,
-                          avoidance=avo, clinginess_eff=self.clinginess_eff)
-        O, kind, payload = U.occasion(due_loops=due, share_backlog=self.share_backlog, care_loops=care, phase=self.contact["phase"],
-                                      needs=self.needs, floor=float(pc.get("occasion_floor", 0.1)))
-        if kind in ("reminder", "return_promise") and payload is not None:
-            fire = True
-        else:
-            d_ = self.local(t)
-            p_hat = T.p_expected(self.pm, d_.weekday(), hour)
-            rate = sum(self.contact.get("answered_14d", [1.0])) / max(1, len(self.contact.get("answered_14d", [1.0])))
-            unans = int(self.contact.get("unanswered", 0)) + (1 if self.contact.get("awaiting_since") is not None else 0)
-            D = U.damping(unans, rate)
-            lam = W * O * p_hat * D * float(pc.get("urge_gain", 2.5))
-            fire = rng.random() < U.fire_probability(lam, self.tick_s / 3600.0)
+        d_ = self.local(t)
+        act = self.active(t)
+        cands: List[Tuple[float, str, str, str, Optional[Dict[str, Any]], float, float]] = []  # (lam, p, kind, what, payload, W, O)
+        for p in self.counterparts():
+            c = self._contact_of(p)
+            if c.get("pending"):
+                continue
+            term = self._name(p)
+            due = [l for l in self.loops.values() if l["state"] == "due" and self._loop_cp(l) == p]
+            due_reminder = any(l.get("origin") in ("counterpart_said", "her_promise") for l in due)
+            if p == MAIN:
+                ok, _why = U.gates(cfg=pc, hour=hour, activity=self.activity, chatting=chatting, proactive_today=int(self.contact["proactive_today"]),
+                                   minutes_today=float(self.contact["minutes_today"]), last_sent_at=c.get("last_sent_at"), t=t,
+                                   farewell_until=self.contact.get("farewell_until"), running=running, due_reminder=due_reminder)
+            else:
+                ok = (pc.get("enabled", True) and pc.get("inter_agent", True) and running and self.activity not in ("sleep", "lying", "woken")
+                      and not chatting and int(self.contact["proactive_today"]) < int(pc.get("daily_cap", 3))
+                      and (c.get("last_sent_at") is None or (t - c["last_sent_at"]) >= float(pc.get("inter_agent_min_gap_min", 240)) * 60))
+            if not ok:
+                continue
+            care = [l for l in self.loops.values() if l["state"] == "waiting" and l.get("origin") == "counterpart_said" and self._loop_cp(l) == p
+                    and l.get("cue_time") and self._parse_cue(l["cue_time"]) is not None and 0 <= (self._parse_cue(l["cue_time"]) - t) <= 2 * 3600]  # type: ignore[operator]
+            hurt = sum(i["intensity"] for i in act if i["type"] == "hurt" and i.get("target") == term)
+            rel = self._rel(p)
+            needs_p = dict(self.needs)
+            needs_p["affiliation_person"] = self._need_of(p)
+            W = U.willingness(needs=needs_p, phase=c.get("phase", "ok"), share_backlog=self.share_backlog, hurt=hurt, anxiety=anx,
+                              avoidance=avo, clinginess_eff=float(ch.get("clinginess_cap", 0.5)) * (rel["attachment"] if p != MAIN else float(self.cfg.get("needs", {}).get("attachment_strength", 0.4))))
+            olive = RL.olive_branch_due(self.ledger.get(p, []), t=t, last_contact=c.get("last_turn_at"),
+                                        clinginess_eff=self.clinginess_eff, avoidance=rel["avoidance"])
+            if olive is not None:
+                O, kind, payload = 0.9, "olive_branch", {"what": olive["cause"], "entry": olive["id"]}
+            else:
+                O, kind, payload = U.occasion(due_loops=due, share_backlog=self.share_backlog, care_loops=care, phase=c.get("phase", "ok"),
+                                              needs=needs_p, floor=float(pc.get("occasion_floor", 0.1)))
+            if kind in ("reminder", "return_promise") and payload is not None:
+                lam = float("inf")
+            else:
+                p_hat = T.p_expected(self._pm_of(p), d_.weekday(), hour)
+                rate = sum(c.get("answered_14d", [1.0])) / max(1, len(c.get("answered_14d", [1.0])))
+                unans = int(c.get("unanswered", 0)) + (1 if c.get("awaiting_since") is not None else 0)
+                lam = W * O * p_hat * U.damping(unans, rate) * float(pc.get("urge_gain", 2.5))
+            what = str(payload.get("what", "")) if payload is not None else ""
+            cands.append((lam, p, kind, what, payload, W, O))
+        if not cands:
+            return
+        cands.sort(key=lambda x: -x[0])
+        lam, p, kind, what, payload, W, O = cands[0]
+        fire = lam == float("inf") or rng.random() < U.fire_probability(lam, self.tick_s / 3600.0)
         if not fire:
             return
-        what = str(payload.get("what", "")) if payload is not None else ""
         loop_id = payload.get("id") if (payload is not None and kind in ("reminder", "return_promise", "care")) else None
-        eid = self._event("proactive_fired", {"kind": kind, "what": what, "loop": loop_id, "W": round(W, 3), "O": round(O, 3)}, t, dedup=f"urge:{k}")
+        entry = payload.get("entry") if (payload is not None and kind == "olive_branch") else None
+        eid = self._event("proactive_fired", {"kind": kind, "what": what, "loop": loop_id, "entry": entry, "counterpart": p,
+                                              "W": round(W, 3), "O": round(O, 3)}, t, counterpart=p, dedup=f"urge:{k}")
         if eid is None:
             return
         row = self.conn.execute("SELECT id, at, kind, payload, applied_tick, counterpart FROM events WHERE id=?", (eid,)).fetchone()
         self._apply_event_row(row, k)
-        self._send_q.put({"kind": kind, "what": what, "at": t})
+        self._send_q.put({"kind": kind, "what": what, "at": t, "counterpart": p})
 
     # ------------------------------------------------------------------ B: apply an appraisal
     def _apply_appraisal(self, row: Any, k: int) -> None:
         aid, _at, data_s, counterpart, turn_id = row[0], row[1], row[2], row[3], row[4]
         t = self.time_of(k)
         data = json.loads(data_s)
-        term = counterpart or self.term_fn()
+        p = counterpart or MAIN
+        if p not in (MAIN,) and p not in self.others and p == self.term_fn():
+            p = MAIN  # rows written before 0.7.0 stored the display term
+        term = self._name(p)
+        rel = self._rel(p)
+        led = self.ledger.setdefault(p, [])
+        ch = self.cfg["character"]
         born: List[str] = []
         for n, ev in enumerate(data.get("events", [])):
-            born += self._born_from(ev, k, t, aid, f"{aid}_{n}")
-            N.satisfy(self.needs, q=float(ev.get("q", 0.3)), event_kind=ev.get("event_kind", "other"), other_focus=float(ev.get("other_focus", 0.0)))
+            new_ids = self._born_from(ev, k, t, aid, f"{aid}_{n}", counterpart=p)
+            born += new_ids
+            kind = ev.get("event_kind", "other")
+            if p == MAIN:
+                N.satisfy(self.needs, q=float(ev.get("q", 0.3)), event_kind=kind, other_focus=float(ev.get("other_focus", 0.0)))
+            else:
+                self._other(p)["need"] = max(0.0, float(self._other(p)["need"]) - 0.6 * float(ev.get("q", 0.3)))
+            RL.turn(rel, q=float(ev.get("q", 0.3)), minutes=float(self._turn_minutes.get(p, 1.5)) if n == 0 else 0.0, event_kind=kind, ppr=ev.get("ppr"),
+                    she_disclosed=bool(ev.get("she_disclosed")), other_disclosed=bool(ev.get("other_disclosed")), t=t)
+            if ev.get("other_tired"):
+                rel["tired_until"] = t + 3 * 3600
+            for iid in new_ids:
+                inst = self.instances[iid]
+                if inst["type"] == "hurt":
+                    led.append(RL.open_entry(cause=inst["cause"], severity=float(ev.get("R", 0.5)) * abs(float(ev.get("v", 0.0))),
+                                             intent=float(ev.get("intent", 0.3)), forbearance=self.derived["forbearance"], anxiety=rel["anxiety"],
+                                             bond=rel["bond"], t=t, eid=iid))
+            if kind in ("apology", "false_belief_corrected"):
+                RL.ledger_repair(led, kind, int(ev.get("apology_components", 3)), t)
         loops = data.get("loops") or {}
         for i, l in enumerate(loops.get("new") or []):
             lid = f"ol_{k}_{aid}_{i}"
@@ -609,10 +737,10 @@ class Engine:
             if not cue and l.get("origin") == "her_promise":   # 「等我一下」: due when the current block ends, else in 30 min
                 cue = self.local(t + 1800).strftime("%Y-%m-%dT%H:%M")
             rec = {"id": lid, "what": l["what"], "origin": l.get("origin", "counterpart_said"), "cue_time": cue,
-                   "importance": float(l.get("importance", 0.5)), "state": "waiting", "created_at": t, "closed_at": None, "counterpart": term}
+                   "importance": float(l.get("importance", 0.5)), "state": "waiting", "created_at": t, "closed_at": None, "counterpart": p}
             self.loops[lid] = rec
             self.conn.execute("INSERT OR REPLACE INTO loops(id, what, origin, cue_time, importance, state, created_at, counterpart) "
-                              "VALUES (?,?,?,?,?,?,?,?)", (lid, rec["what"], rec["origin"], cue, rec["importance"], "waiting", t, term))
+                              "VALUES (?,?,?,?,?,?,?,?)", (lid, rec["what"], rec["origin"], cue, rec["importance"], "waiting", t, p))
         for lid in loops.get("closed") or []:
             if lid in self.loops and self.loops[lid]["state"] not in ("closed", "expired"):
                 self.loops[lid]["state"], self.loops[lid]["closed_at"] = "closed", t
@@ -646,22 +774,36 @@ class Engine:
         eid, _at, kind, payload_s, _applied, _cp = row[0], row[1], row[2], row[3], row[4], row[5]
         t = self.time_of(k)
         p = json.loads(payload_s or "{}")
+        cp = p.get("counterpart") or MAIN
         if kind == "turn":
             if not p.get("event"):
-                self._contact_turn(t, k, p)
+                if cp == MAIN:
+                    self._contact_turn(t, k, p)
+                else:
+                    self._contact_turn_other(cp, t, k)
+        elif kind == "cmd_feedback":
+            typ, verdict = str(p.get("type") or ""), str(p.get("verdict") or "")
+            if typ:
+                g = float(self.gain_adj.get(typ, 1.0)) * (1.05 if verdict == "too_little" else 0.95 if verdict == "too_much" else 1.0)
+                self.gain_adj[typ] = round(max(0.5, min(2.0, g)), 4)
         elif kind == "proactive_fired":
             fk, what, lid = p.get("kind"), str(p.get("what") or ""), p.get("loop")
+            if p.get("entry"):
+                for e in self.ledger.get(cp, []):
+                    if e["id"] == p["entry"]:
+                        e["olive_offered"] = True
             if lid and lid in self.loops and fk in ("reminder", "return_promise"):
                 self.loops[lid]["state"] = "asked"
                 self.conn.execute("UPDATE loops SET state='asked' WHERE id=?", (lid,))
             if fk == "share":
                 self.share_backlog = [s for s in self.share_backlog if s.get("what") != what]
             self.contact["proactive_today"] = int(self.contact["proactive_today"]) + 1
-            self.contact["pending"] = {"kind": fk, "what": what, "at": t, "tick": k}
+            self._contact_of(cp)["pending"] = {"kind": fk, "what": what, "at": t, "tick": k}
         elif kind == "sent":
-            self.contact["last_sent_at"], self.contact["awaiting_since"], self.contact["pending"] = t, t, None
+            c = self._contact_of(cp)
+            c["last_sent_at"], c["awaiting_since"], c["pending"] = t, t, None
         elif kind in ("silent", "send_failed"):
-            self.contact["pending"] = None
+            self._contact_of(cp)["pending"] = None
             if kind == "silent":
                 self.contact["proactive_today"] = max(0, int(self.contact["proactive_today"]) - 1)
         elif kind == "cmd_close_loop":
@@ -672,7 +814,7 @@ class Engine:
         elif kind == "cmd_add_loop":
             lid = f"ol_{k}_cmd_{eid}"
             rec = {"id": lid, "what": str(p.get("what", ""))[:120], "origin": "counterpart_said", "cue_time": p.get("cue_time"),
-                   "importance": float(p.get("importance", 0.7)), "state": "waiting", "created_at": t, "closed_at": None, "counterpart": self.term_fn()}
+                   "importance": float(p.get("importance", 0.7)), "state": "waiting", "created_at": t, "closed_at": None, "counterpart": MAIN}
             self.loops[lid] = rec
             self.conn.execute("INSERT OR REPLACE INTO loops(id, what, origin, cue_time, importance, state, created_at, counterpart) VALUES (?,?,?,?,?,?,?,?)",
                               (lid, rec["what"], rec["origin"], rec["cue_time"], rec["importance"], "waiting", t, rec["counterpart"]))
@@ -687,6 +829,7 @@ class Engine:
         lt = self.contact.get("last_turn_at")
         gap_min = (t - lt) / 60.0 if lt is not None else 99.0
         self.contact["minutes_today"] = float(self.contact["minutes_today"]) + (gap_min if gap_min <= L.CHAT_WINDOW_MIN else 1.5)
+        self._turn_minutes[MAIN] = gap_min if gap_min <= L.CHAT_WINDOW_MIN else 1.5
         self.contact["turns_today"] = int(self.contact["turns_today"]) + 1
         self.contact["last_turn_at"] = t
         aw = self.contact.get("awaiting_since")
@@ -705,6 +848,21 @@ class Engine:
                     self._born_direct("joy", 0.15 * cl, f"半夜被{self.term_fn()}的訊息叫醒，但是他來找她", k, t)
                 else:
                     self._born_direct("distress", 0.12, f"半夜被{self.term_fn()}的訊息吵醒", k, t)
+
+    def _contact_turn_other(self, p: str, t: float, k: int) -> None:
+        o = self._other(p)
+        c = o["contact"]
+        d = self.local(t)
+        lt_ = c.get("last_turn_at")
+        gap = (t - lt_) / 60.0 if lt_ is not None else 99.0
+        self._turn_minutes[p] = gap if gap <= L.CHAT_WINDOW_MIN else 1.5
+        c["last_turn_at"] = t
+        if c.get("awaiting_since") is not None:
+            T.add_latency(o["pm"], (t - c["awaiting_since"]) / 3600.0)
+            c["answered_14d"] = (c.get("answered_14d", []) + [1.0])[-14:]
+            c["awaiting_since"] = None
+        c["unanswered"] = 0
+        T.saw_turn(o["pm"], d.weekday(), d.hour + d.minute / 60.0)
 
     def _annotate_memory(self, turn_id: str, events: List[Dict[str, Any]], born: List[str]) -> None:
         try:
@@ -772,29 +930,33 @@ class Engine:
             if self.live:
                 self.snapshot()  # the 狀態 page reads the latest snapshot
 
-    def on_turn(self, user_text: str, assistant_text: str, *, turn_id: str, platform: str, session_id: str) -> None:
-        """A finished turn of yours: a replayable turn event (contact, presence, waking), the
-        recent-turns ring, and appraisal A queued."""
-        term = self.term_fn()
-        if session_id and session_id != self.session_id:
+    def on_turn(self, user_text: str, assistant_text: str, *, turn_id: str, platform: str, session_id: str, counterpart: str = MAIN) -> None:
+        """A finished turn (yours, or another character's): a replayable turn event (contact, presence,
+        waking), the recent-turns ring, and appraisal A queued."""
+        term = self._name(counterpart)
+        if counterpart == MAIN and session_id and session_id != self.session_id:
             self.session_id = session_id
             self._meta("session_id", session_id)
-        self._record_and_apply("turn", {"turn_id": turn_id, "platform": platform, "session": session_id[:24],
-                                        "user": user_text[:500], "assistant": assistant_text[:500]}, counterpart=term)
+        if counterpart != MAIN:
+            self._other(counterpart)
+        self._record_and_apply("turn", {"turn_id": turn_id, "platform": platform, "session": session_id[:24], "counterpart": counterpart,
+                                        "user": user_text[:500], "assistant": assistant_text[:500]}, counterpart=counterpart)
         if self.owner and self.llm is not None:
             self._q.put({"user": user_text, "assistant": assistant_text, "turn_id": turn_id, "platform": platform,
-                         "recent": list(self.recent), "term": term, "at": self.now_fn()})
+                         "recent": list(self.recent), "term": term, "counterpart": counterpart, "at": self.now_fn()})
         self.recent = (self.recent + [(user_text, assistant_text)])[-int(self.cfg["appraisal"]["recent_turns"]):]
 
-    def on_event_reply(self, event_text: str, reply: str, *, platform: str) -> None:
-        """Her answer to an event turn: she spoke (sent) or decided not to (silent)."""
-        term = self.term_fn()
-        pend = self.contact.get("pending") or {}
+    def on_event_reply(self, event_text: str, reply: str, *, platform: str, counterpart: str = MAIN) -> bool:
+        """Her answer to an event turn: she spoke (sent) or decided not to (silent). Returns True when a
+        message was sent (the plugin relays it to another character through 556d)."""
+        pend = self._contact_of(counterpart).get("pending") or {}
         if EV.is_silence(reply):
-            self._record_and_apply("silent", {"kind": pend.get("kind"), "what": pend.get("what")}, counterpart=term)
-        else:
-            self._record_and_apply("sent", {"kind": pend.get("kind"), "what": pend.get("what"), "text": reply[:500], "platform": platform}, counterpart=term)
-            self.recent = (self.recent + [("（她主動傳的）", reply)])[-int(self.cfg["appraisal"]["recent_turns"]):]
+            self._record_and_apply("silent", {"kind": pend.get("kind"), "what": pend.get("what"), "counterpart": counterpart}, counterpart=counterpart)
+            return False
+        self._record_and_apply("sent", {"kind": pend.get("kind"), "what": pend.get("what"), "text": reply[:500], "platform": platform,
+                                        "counterpart": counterpart}, counterpart=counterpart)
+        self.recent = (self.recent + [(f"（{self.pr}主動傳的）", reply)])[-int(self.cfg["appraisal"]["recent_turns"]):]
+        return True
 
     def record_check(self, text: str, platform: str) -> Dict[str, List[str]]:
         hits = CK.run(text)
@@ -813,7 +975,7 @@ class Engine:
         for cid, op, payload_s in rows:
             try:
                 p = json.loads(payload_s or "{}")
-                kind = {"close_loop": "cmd_close_loop", "add_loop": "cmd_add_loop", "life_event": "cmd_life_event"}.get(op)
+                kind = {"close_loop": "cmd_close_loop", "add_loop": "cmd_add_loop", "life_event": "cmd_life_event", "feedback": "cmd_feedback"}.get(op)
                 if kind:
                     self._record_and_apply(kind, p)
                     res = "done"
@@ -855,8 +1017,8 @@ class Engine:
                 ac = self.cfg["appraisal"]
                 data, raw, err, ms = A.run(self.llm, term=job["term"], cares_about=self.cfg.get("cares_about", []), loops=loops,
                                            recent=job["recent"], user_text=job["user"], assistant_text=job["assistant"], today=today,
-                                           max_events=int(ac["max_events"]), retries=int(ac["retries"]))
-                self.record_appraisal(data, raw=raw, error=err, ms=ms, turn_id=job["turn_id"], counterpart=job["term"],
+                                           max_events=int(ac["max_events"]), retries=int(ac["retries"]), pronoun=self.pr)
+                self.record_appraisal(data, raw=raw, error=err, ms=ms, turn_id=job["turn_id"], counterpart=job.get("counterpart", MAIN),
                                       platform=job["platform"], at=job["at"])
                 if err:
                     logger.warning("psyche appraisal failed: %s", err)
@@ -875,18 +1037,22 @@ class Engine:
                 continue
             try:
                 base, key = EV.api_base()
-                sid = self.session_id or EV.live_session_id(self.state_db)
+                cp = job.get("counterpart", MAIN)
+                if cp == MAIN:
+                    sid = self.session_id or EV.live_session_id(self.state_db)
+                else:
+                    sid = EV.counterpart_session(self.hub_url, self.char, cp)
                 if not base or not sid:
-                    logger.warning("psyche: cannot send an event turn (api %r, session %r)", base, sid)
-                    self._record_and_apply("send_failed", {"why": "no api or session", **{k: job[k] for k in ("kind", "what")}})
+                    logger.warning("psyche: cannot send an event turn (api %r, session %r, to %s)", base, sid, cp)
+                    self._record_and_apply("send_failed", {"why": "no api or session", "kind": job["kind"], "what": job["what"], "counterpart": cp}, counterpart=cp)
                     continue
                 now_text = self.local(self.now_fn()).strftime("%Y-%m-%d %H:%M（%a）")
-                text = EV.compose(job["kind"], term=self.term_fn(), what=job["what"], now_text=now_text)
-                logger.info("psyche: event turn (%s) -> her API", job["kind"])
+                text = EV.compose(job["kind"], term=self._name(cp), what=job["what"], now_text=now_text, pronoun=self.pr)
+                logger.info("psyche: event turn (%s) -> %s", job["kind"], "her API" if cp == MAIN else f"{cp} via her API")
                 _reply, err = EV.send(base, key, sid, text)
                 if err:
                     logger.warning("psyche: event turn failed: %s", err)
-                    self._record_and_apply("send_failed", {"why": err[:200], "kind": job["kind"], "what": job["what"]})
+                    self._record_and_apply("send_failed", {"why": err[:200], "kind": job["kind"], "what": job["what"], "counterpart": cp}, counterpart=cp)
                 # a successful send is recorded by the post_llm_call hook (sent / silent)
             except Exception:  # noqa: BLE001
                 logger.exception("psyche send worker error")
@@ -941,9 +1107,12 @@ class Engine:
                 logger.exception("psyche stop snapshot failed")
 
     # ------------------------------------------------------------------ expression layer: the state block
-    def state_block(self, *, t: Optional[float] = None, term: Optional[str] = None) -> str:
+    def state_block(self, *, t: Optional[float] = None, term: Optional[str] = None, counterpart: str = MAIN) -> str:
+        """【她現在】 for a turn with `counterpart` — at most max_lines lines, words not numbers; feelings
+        about this person first; the 表現 line carries the strategy (§15); a transition is named when
+        the dominant feeling changed since the last block, so the history's tone inertia does not win."""
         t = self.now_fn() if t is None else t
-        term = term or self.term_fn()
+        term = term or self._name(counterpart)
         with self.lock:
             if self.owner:
                 self.step_to(t)
@@ -954,55 +1123,71 @@ class Engine:
             ch = self.cfg["character"]
             ex = self.cfg["expression"]
             thr = float(ex["expression_threshold"])
-            act = [i for i in self.active(t) if i["intensity"] >= thr]
+            rel = self._rel(counterpart)
+            led = self.ledger.get(counterpart, [])
+            gate = RL.hurt_gate(led)
+            tired = bool(rel.get("tired_until")) and t < float(rel.get("tired_until") or 0)
+            expr = float(ch.get("expressiveness", 0.6))
+            act_all = self.active(t)
+            mine = [i for i in act_all if i.get("target") in (term, "") or i.get("target") is None]
+            others_ = [i for i in act_all if i not in mine]
+            def shown(i):
+                return RL.expressed_level(i["intensity"], expressiveness=expr, bond=rel["bond"], suppressed=(tired and i["type"] in model.NEGATIVE))
+            act = [i for i in mine if shown(i) >= thr] + [i for i in others_ if shown(i) >= thr * 1.5]
             act_zh = L.ACTIVITIES.get(self.activity, L.ACTIVITIES["rest"])[4]
             if self.activity == "chat":
                 act_zh = "在跟" + term + "聊天"
-            lines = ["【她現在】", f"在做：{act_zh}，{L.energy_word(self.energy, self.activity)}"]
+            lines = [f"【{self.pr}現在】", f"在做：{act_zh}，{L.energy_word(self.energy, self.activity)}"]
             _, oct_zh, strength = model.octant(self.mood)
             mood_word = f"{model.intensity_word(strength)}{oct_zh}" if strength >= 0.2 else "平靜"
             feelings = []
             for i in act[:2]:
-                w = model.intensity_word(i["intensity"])
-                zh = model.EMOTION_ZH.get(i["type"], i["type"]).replace("對方", term)
+                w = model.intensity_word(shown(i))
+                zh = model.EMOTION_ZH.get(i["type"], i["type"]).replace("對方", i.get("target") or term)
                 cause = (i.get("cause") or "").strip()
                 feelings.append(f"{w}{zh}" + (f"（{cause}）" if cause else ""))
             lines.append("心情：" + (f"整體{mood_word}；" if feelings else f"整體{mood_word}") + "、".join(feelings))
-            heart = N.words(self.needs, self.contact.get("phase", "ok"), term)
+            heart = N.words(dict(self.needs, affiliation_person=self._need_of(counterpart)), self._contact_of(counterpart).get("phase", "ok"), term)
             if heart:
                 lines.append("心裡：" + heart)
-            how = ["直說" if float(ch.get("expressiveness", 0.6)) >= 0.5 else "收斂，點到為止"]
+            dominant = act[0] if act else None
+            name, how = RL.strategy(dominant, character=ch, rel=rel, gate=gate, other_tired=tired, rng_u=self._rng(self.tick, "expr").random(),
+                                    negative_types=model.NEGATIVE, shown=act[:2])
+            self.last_strategy[counterpart] = name
             if self.activity == "woken":
                 how.append("很睏，回一兩句就好")
-            elif self.energy < 0.35 or self.fatigue > 0.6:
+            elif self.energy < 0.35 or self.fatigue > 0.6 or rel["avoidance"] > 0.6:
                 how.append("話少一點")
+            elif self.affect["ar"] > 0.75:
+                how.append("可以多說一點")
             if self.activity == "work":
-                how.append("手上在忙，可以回短一點或說等她一下，忙完會回來找他")
+                how.append(f"手上在忙，可以回短一點或說等{self.pr}一下，忙完會回來找他")
             if len(act) >= 2 and ((act[0]["type"] in model.POSITIVE) != (act[1]["type"] in model.POSITIVE)):
                 how.append("兩種情緒並存時先回應對方說的，再帶到自己的")
-            vulnerable = {"liking", "longing", "gratitude"}
-            if float(ch.get("tsundere_tendency", 0.3)) >= 0.5 and any(i["type"] in vulnerable for i in act):
-                how.append("真心話可以用反話帶過，但要留破綻")
-            if float(ch.get("humor_coping", 0.5)) >= 0.6 and any(i["type"] in model.NEGATIVE for i in act):
-                how.append("不開心的事可以用玩笑帶過")
             fw = self.contact.get("farewell_until")
-            if fw is not None and t < fw:
+            if counterpart == MAIN and fw is not None and t < fw:
                 how.append("剛道過別：溫和接受，可以說一次捨不得，不挽留")
             lines.append("表現：" + "；".join(how))
-            waiting = [l for l in self.loops.values() if l["state"] in ("waiting", "due", "asked")]
+            rel_line = RL.closeness_words(rel, term)
+            open_hurt = [e for e in led if e.get("resolved_at") is None]
+            if open_hurt and gate >= 0.15:
+                rel_line += f"；心裡還記著一筆（{open_hurt[-1]['cause'][:30]}）"
+            if rel["hours"] > 0 or rel["bond"] > 0 or counterpart != MAIN:
+                lines.append(f"對{term}：{rel_line}")
+            waiting = [l for l in self.loops.values() if l["state"] in ("waiting", "due", "asked") and self._loop_cp(l) == counterpart]
             waiting.sort(key=lambda l: (l["state"] != "due", -float(l.get("importance", 0.5))))
             if waiting:
                 lines.append("掛念：" + "、".join((l["what"] + ("（到了）" if l["state"] == "due" else "")) for l in waiting[:2]))
-            dominant = act[0]["type"] if act else None
+            dom_type = dominant["type"] if dominant else None
             prev = self.last_block.get("dominant")
             prev_word = self.last_block.get("word")
-            if prev and prev != dominant:
-                now_word = (model.intensity_word(act[0]["intensity"]) + model.EMOTION_ZH[act[0]["type"]]) if act else "已經平復了"
+            if prev and prev != dom_type and self.last_block.get("counterpart", MAIN) == counterpart:
+                now_word = (model.intensity_word(shown(dominant)) + model.EMOTION_ZH[dom_type]) if dominant else "已經平復了"
                 lines.append(f"轉變：剛才{prev_word}，現在{now_word}")
             lines.append("原則：情緒是底色，內容以對方的話題為主；不提沒做過的事；有自己的看法，不用附和")
-            text = "\n".join(lines[: int(ex.get("max_lines", 8))])
-            self.last_block = {"dominant": dominant, "word": (model.intensity_word(act[0]["intensity"]) + model.EMOTION_ZH[act[0]["type"]]) if act else "平靜",
-                               "at": t, "mood": mood_word, "text": text}
+            text = "\n".join(lines[: int(ex.get("max_lines", 9))])
+            self.last_block = {"dominant": dom_type, "word": (model.intensity_word(shown(dominant)) + model.EMOTION_ZH[dom_type]) if dominant else "平靜",
+                               "at": t, "mood": mood_word, "text": text, "counterpart": counterpart, "strategy": name}
             if self.live:
                 self.snapshot()
             return text
@@ -1019,4 +1204,8 @@ class Engine:
                     "p_expected": T.p_expected(self.pm, d.weekday(), d.hour + d.minute / 60.0),
                     "instances": [{k: v for k, v in i.items() if k != "pad"} for i in self.active(t)],
                     "loops": [l for l in self.loops.values() if l["state"] not in ("closed", "expired")],
-                    "share_backlog": list(self.share_backlog), "block": self.last_block.get("text", "")}
+                    "share_backlog": list(self.share_backlog), "block": self.last_block.get("text", ""),
+                    "rel": {p: {**r, "trust_value": RL.trust_value(r), "words": RL.closeness_words(r, self._name(p))} for p, r in self.rel.items()},
+                    "ledger": {p: [e for e in v if e.get("resolved_at") is None] for p, v in self.ledger.items()},
+                    "others": {p: {"need": o["need"], "phase": o["contact"].get("phase"), "last_turn_at": o["contact"].get("last_turn_at")} for p, o in self.others.items()},
+                    "gain_adj": dict(self.gain_adj), "strategy": dict(self.last_strategy)}
