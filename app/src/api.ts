@@ -9,6 +9,9 @@ async function get<T>(path: string): Promise<T> {
 
 export type Settings = {
   companion_name: string;
+  producer_name: string;
+  reply_language: string;
+  mirror_to_telegram: boolean;
   avatar_model: string;
   show_avatar_on_start: boolean;
   memory_language: string;
@@ -17,26 +20,108 @@ export type Settings = {
   embedder_model: string;
 };
 
+export type MemoryItem = {
+  id: number; text: string; tags: string[]; archived: number; superseded: boolean;
+  archive_reason: string | null; created_at: number; updated_at: number; layer: 'long' | 'short';
+};
+export type MemoryStats = {
+  memories: number; short: number; archived: number; superseded: number; tags: number;
+  owner_alive: boolean; pending_commands: number; file_bytes: number; path: string;
+};
+export type MemoryTag = { tag: string; count: number };
+export type VoiceProvider = { kind: string; base_url: string; api_key?: string; api_key_set?: boolean; model: string; voice?: string; format?: string; language?: string };
+export type VoiceHandsFree = { threshold: number; min_silence_ms: number; pre_roll_s: number; grace_s: number; min_turn_s: number; max_turn_s: number; echo_guard: boolean; spoken_style: string };
+export type VoiceConfig = { tts: VoiceProvider; stt: VoiceProvider; handsfree?: VoiceHandsFree };
+export type Knob = { key: string; group: string; label: string; help: string; type: string; options?: string[]; scope: string; dev: boolean; effect: string; value: any; set?: boolean };
+export type CompanionInfo = {
+  name: string; display_name: string; avatar_model: string; active: boolean; hermes_connected: boolean;
+  stopping: boolean; api_port: number; channels: string[]; gateway: boolean; dir: string;
+};
+
+// Error text of a failed response: the hub's {"error"} JSON, else the raw body (an old daemon
+// answers unknown routes with Go's plain "404 page not found").
+async function errorOf(r: Response): Promise<string> {
+  const body = await r.text();
+  try { return JSON.parse(body).error || `HTTP ${r.status}`; } catch { return `HTTP ${r.status}: ${body.slice(0, 120).trim()}`; }
+}
+
 export const api = {
-  companion: () => get<{ name: string; profile: string; avatar_model_url: string; hermes_connected: boolean }>('/api/companion'),
-  history: (limit?: number) => get<{ turns: number; messages: { role: 'user' | 'assistant'; text: string; ts?: number }[] }>(`/api/history${limit ? `?limit=${limit}` : ''}`),
+  memory: (p: { q?: string; tag?: string; archived?: boolean; limit?: number; layer?: 'long' | 'short' } = {}) => {
+    const qs = new URLSearchParams();
+    if (p.layer) qs.set('layer', p.layer);
+    if (p.q) qs.set('q', p.q);
+    if (p.tag) qs.set('tag', p.tag);
+    if (p.archived) qs.set('archived', '1');
+    if (p.limit) qs.set('limit', String(p.limit));
+    const s = qs.toString();
+    return get<{ exists: boolean; stats?: MemoryStats; tags?: MemoryTag[]; memories: MemoryItem[] }>(`/api/memory${s ? `?${s}` : ''}`);
+  },
+  // delete-only by design: goes through the KeepsakeDB command queue to the owning Hermes process
+  deleteMemory: async (ids: number[], reason: string) => {
+    const r = await fetch(BASE + '/api/memory/delete', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ ids, reason }) });
+    if (!r.ok) throw new Error(await errorOf(r));
+    return r.json() as Promise<{ status: 'done' | 'queued' | 'error'; count: number; command_id: number }>;
+  },
+  companion: () => get<{ name: string; profile: string; active: boolean; avatar_model_url: string; hermes_connected: boolean; channels?: string[] }>('/api/companion'),
+  companions: () => get<{ companions: CompanionInfo[]; selected: string }>('/api/companions'),
+  companionAction: async (name: string, action: 'start' | 'stop') => {
+    const r = await fetch(`${BASE}/api/companions/${encodeURIComponent(name)}/${action}`, { method: 'POST' });
+    if (!r.ok) throw new Error(await errorOf(r));
+    return r.json() as Promise<{ companion: CompanionInfo }>;
+  },
+  select: async (name: string) => {
+    const r = await fetch(BASE + '/api/selected', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name }) });
+    if (!r.ok) throw new Error(await errorOf(r));
+    return r.json() as Promise<{ selected: string; companion: CompanionInfo }>;
+  },
+  history: (limit?: number) => get<{ turns: number; messages: { role: 'user' | 'assistant'; text: string; ts?: number; source?: string }[] }>(`/api/history${limit ? `?limit=${limit}` : ''}`),
   settings: () => get<{ settings: Settings }>('/api/settings'),
   updateSettings: async (patch: Partial<Settings>) => {
     const r = await fetch(BASE + '/api/settings', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) });
-    if (!r.ok) throw new Error((await r.json()).error || `HTTP ${r.status}`);
+    if (!r.ok) throw new Error(await errorOf(r));
     return r.json() as Promise<{ settings: Settings; restart_required: boolean; reembed_required: boolean }>;
   },
   restartHermes: () => fetch(BASE + '/api/restart-hermes', { method: 'POST' }),
+  voice: () => get<{ voice: VoiceConfig; kinds: string[] }>('/api/voice'),
+  config: () => get<{ knobs: Knob[]; companion: string }>('/api/config'),
+  updateConfig: async (patch: Record<string, any>) => {
+    const r = await fetch(BASE + '/api/config', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) });
+    if (!r.ok) throw new Error(await errorOf(r));
+    return r.json() as Promise<{ effects: Record<string, boolean>; errors: string[] }>;
+  },
+  updateVoice: async (patch: Partial<VoiceConfig>) => {
+    const r = await fetch(BASE + '/api/voice', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) });
+    if (!r.ok) throw new Error(await errorOf(r));
+    return r.json() as Promise<{ voice: VoiceConfig }>;
+  },
+  testVoice: async (text?: string) => {
+    const r = await fetch(BASE + '/api/voice/test', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }) });
+    if (!r.ok) throw new Error(await errorOf(r));
+    return r.json() as Promise<{ tts: { ok: boolean; ms?: number; bytes?: number; error?: string; audio_data_url?: string }; stt: { ok: boolean; ms?: number; text?: string; error?: string } }>;
+  },
   models: () => get<{ models: { name: string; models: string[] }[] }>('/api/models'),
   // Fire-and-forget send: the reply arrives through the hub WebSocket, never through this response.
-  send: async (text: string, client: string) => {
+  send: async (text: string, client: string, voice = false) => {
     const r = await fetch(BASE + '/api/chat', {
       method: 'POST',
-      headers: { 'content-type': 'application/json', 'X-556-Client': client },
+      headers: { 'content-type': 'application/json', 'X-556-Client': client, ...(voice ? { 'X-556-Voice': '1' } : {}) },
       body: JSON.stringify({ model: '556', stream: false, messages: [{ role: 'user', content: text }] }),
     });
     if (!r.ok) throw new Error(`send: HTTP ${r.status}`);
   },
+  // voice modes: one recorded turn -> text; one reply -> cached audio (+ speak_audio for the avatar)
+  transcribe: async (blob: Blob, lang?: string) => {
+    const r = await fetch(BASE + '/api/voice/transcribe' + (lang ? `?lang=${encodeURIComponent(lang)}` : ''), { method: 'POST', headers: { 'content-type': blob.type || 'audio/webm' }, body: blob });
+    if (!r.ok) throw new Error(await errorOf(r));
+    return r.json() as Promise<{ text: string; ms: number }>;
+  },
+  speak: async (text: string) => {
+    const r = await fetch(BASE + '/api/voice/speak', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }) });
+    if (!r.ok) throw new Error(await errorOf(r));
+    return r.json() as Promise<{ audio_url: string; text: string; ms: number; bytes: number }>;
+  },
+  speakEnd: () => fetch(BASE + '/api/voice/speak', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'end' }) }).then(() => undefined),
+  speakPlaying: () => fetch(BASE + '/api/voice/speak', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'playing' }) }).then(() => undefined),
 };
 
 // Exposed by electron/preload.ts

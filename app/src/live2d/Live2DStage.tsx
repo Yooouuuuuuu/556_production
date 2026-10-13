@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { BASE } from '../api';
 import { useStore } from '../store';
+import { api } from '../api';
 
 // Live2D stage: pixi + pixi-live2d-display in a transparent canvas. Port of the Artemis viewer's
 // essentials: load the model served by 556d, fit it bottom-center, idle motions, tap motions,
@@ -71,6 +72,23 @@ export function Live2DStage({ modelUrl }: { modelUrl: string }) {
       if (app) { app.destroy(true, { children: true }); }
     };
   }, [modelUrl]);
+
+  // hub → speak_audio: play the reply through the model (lip-sync). This window claims playback so
+  // the office stays silent; onFinish ends the event for everyone.
+  const speaking = useStore((s) => s.speaking);
+  useEffect(() => {
+    const m = modelRef.current;
+    if (!m) return;
+    if (!speaking) { try { m.stopSpeaking(); } catch { /* idle */ } return; }
+    if (speaking.playing) return;
+    try {
+      void api.speakPlaying();
+      m.speak(speaking.url, { volume: 1, crossOrigin: 'anonymous', onFinish: () => void api.speakEnd(), onError: () => void api.speakEnd() });
+    } catch (e) {
+      console.warn('[live2d] speak', e);
+      void api.speakEnd();
+    }
+  }, [speaking?.n]);
 
   // hub → motion (e.g. /api/motion?name=TapBody or emotion events)
   useEffect(() => {

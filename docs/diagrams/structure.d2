@@ -1,0 +1,84 @@
+direction: down
+
+title: "556 Production — structure: one process per character, every surface is a peer" {
+  shape: text
+  near: top-center
+  style.font-size: 20
+}
+
+classes: {
+  proposed: {
+    style.stroke-dash: 4
+    style.stroke: "#c2185b"
+    style.font-color: "#c2185b"
+  }
+  external: {
+    style.fill: "#f3f3f3"
+    style.stroke: "#999999"
+  }
+  file: {
+    shape: page
+  }
+}
+
+producer: "製作人 (Producer)" {shape: person}
+
+app: "556 Production app (Electron)" {
+  office: "office window" {
+    chat: "聊天 — the one conversation, source badges"
+    roster: "名單 — start / stop / switch"
+    memory: "記憶 — view + delete (long layer)"
+    settings: "設定 — two tiers"
+  }
+  avatar: "avatar window (Live2D) — follows the chat window"
+}
+
+daemon: "556d (Go, :55600) — hub, never a chat participant" {
+  hub: "hub API + /ws events"
+  mgr: "companions manager — start (opens her ONE session) / stop (graceful)"
+  transcript: "Transcript — her state.db, read-only"
+  follower: "follower — channel turns -> windows (2 s poll)"
+  mirror: "Telegram mirror — app turns -> DM, plain text, no LLM"
+  memapi: "memory page API — her store, delete via command queue"
+  sup: "supervisor — job object, planned-stop marker"
+  shim: "model shim :55601 (lanes)"
+  embedder: "bge-m3 llama-server :55602 (shared)"
+}
+
+mane: "真音 — ONE process: hermes gateway run (HERMES_HOME = home/profiles/mane)" {
+  api: "API server platform\n/v1/chat/completions · /api/sessions"
+  tg: "Telegram adapter — her own bot"
+  dc: "Discord adapter (later)" {class: proposed}
+  mcp: "MCP bindings (later, strictly hers)" {class: proposed}
+  agent: "AIAgent — SOUL, tools, compression"
+  kokoro: "kokoro plugin (MemoryProvider)"
+  state: "state.db — THE one session + its messages = HISTORY" {class: file}
+  store: "memory/mane.db — KeepsakeDB = MEMORY\nlong layer (facts) · short layer (dated notes)" {class: file}
+  cfg: "SOUL.md · config.yaml · kokoro.json · .env (her accounts)" {class: file}
+}
+
+telegram: "Telegram servers" {class: external}
+llm: "Gemini / Claude proxy :18765" {class: external}
+
+producer -> app.office.chat: "types"
+producer -> telegram: "DM to her bot"
+app.office -> daemon.hub: "HTTP + WebSocket"
+app.avatar -> daemon.hub: "/ws bubbles"
+daemon.hub -> mane.api: "one non-stream request per turn\nX-Hermes-Session-Id = her conversation"
+telegram -> mane.tg: "polling"
+mane.api -> mane.agent
+mane.tg -> mane.agent
+mane.dc -> mane.agent {class: proposed}
+mane.mcp -> mane.agent {class: proposed}
+mane.agent -> mane.state: "load history · append the turn"
+mane.agent -> mane.kokoro: "prefetch · sync_turn"
+mane.kokoro -> mane.store: "search · observe"
+mane.kokoro -> daemon.embedder: "embeddings"
+mane.agent -> daemon.shim: "chat completions"
+daemon.shim -> llm
+daemon.transcript -> mane.state: "read-only: history, live tail;\nat start: open + stamp her one session if none is live"
+daemon.follower -> daemon.hub: "Telegram turns as chat events (badge)"
+daemon.mirror -> telegram: "sendMessage 「你問我 q / 我說 a」"
+daemon.memapi -> mane.store: "read-only + delete commands"
+daemon.mgr -> daemon.sup: "spawn · planned stop"
+daemon.sup -> mane: "process"

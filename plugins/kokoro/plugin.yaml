@@ -1,0 +1,5 @@
+name: kokoro
+version: 0.1.0
+description: "kokoro — 556 Production's memory on KeepsakeDB: hybrid recall (dense + BM25, RRF), trust labels, archive-with-consent, LLM pipeline in the configured memory language."
+pip_dependencies:
+  - keepsakedb

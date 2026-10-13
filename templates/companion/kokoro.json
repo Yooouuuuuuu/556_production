@@ -1,0 +1,33 @@
+{
+  "backup_dir": "backups",
+  "consent_turns": 100,
+  "context_k": 5,
+  "db": "memory/{profile}.db",
+  "drop": 0.4,
+  "embedder": {
+    "base_url": "http://127.0.0.1:55602/v1",
+    "dims": 1024,
+    "model": "bge-m3"
+  },
+  "high": 0.6,
+  "language": "zh-TW",
+  "llm": {
+    "api_key": "local-proxy-no-key",
+    "base_url": "http://127.0.0.1:18765/v1",
+    "model": "agy/gemini-3.8-flash",
+    "timeout": 60
+  },
+  "log": "logs/keepsake.jsonl",
+  "log_pipeline": true,
+  "log_searches": true,
+  "max_candidates": 8,
+  "oversample": 3,
+  "producer_name": "",
+  "rrf_k": 60,
+  "subject": "製作人",
+  "tokenizer": "bigram",
+  "tools": true,
+  "short_layer": true,
+  "short_k": 5,
+  "short_cap": 1000
+}

@@ -18,5 +18,6 @@ export function App() {
   const route = useRoute();
   useEffect(() => { document.body.dataset.route = route === 'avatar' ? 'avatar' : 'office'; }, [route]);
   if (route === 'avatar') return <Avatar />;
-  return <Office initialTab={route === 'settings' ? 'settings' : 'chat'} />;
+  const tab = route === 'settings' ? 'settings' : route === 'memory' ? 'memory' : route === 'roster' ? 'roster' : 'chat';
+  return <Office initialTab={tab} />;
 }

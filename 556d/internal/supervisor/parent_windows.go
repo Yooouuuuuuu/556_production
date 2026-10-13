@@ -9,10 +9,10 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// WatchParent exits the daemon when the given parent process ends. The app that spawns 556d
-// passes its own pid, so a crashed or force-killed app never leaves the backend behind (the job
-// object then reaps hermes/llama in turn).
-func WatchParent(pid int) {
+// WatchParent runs onExit when the given parent process ends. The app that spawns 556d passes
+// its own pid, so a crashed or force-killed app never leaves the backend behind: onExit starts
+// the daemon's shutdown (companions finish up, then the job object reaps the rest).
+func WatchParent(pid int, onExit func()) {
 	if pid <= 0 {
 		return
 	}
@@ -24,6 +24,10 @@ func WatchParent(pid int) {
 	go func() {
 		_, _ = windows.WaitForSingleObject(h, windows.INFINITE)
 		log.Printf("[parent] pid %d exited; shutting down", pid)
+		if onExit != nil {
+			onExit()
+			return
+		}
 		os.Exit(0) // job object (kill-on-close) terminates the children
 	}()
 }

@@ -1,6 +1,7 @@
 // Owns the 556d backend: spawn it from the repo root (dev) or resources (packaged), wait for
-// health, and kill it on quit. If a 556d is already serving :55600 (started by hand), attach
-// to it instead and leave it running on quit.
+// health, and on quit ask it to shut down (companions finish up so no memory write is lost),
+// killing only if it does not exit in time. If a 556d is already serving :55600 (started by
+// hand), attach to it instead and leave it running on quit.
 import { spawn, ChildProcess } from 'node:child_process';
 import path from 'node:path';
 import { app } from 'electron';
@@ -50,10 +51,21 @@ export class Backend {
     throw new Error('556d did not become healthy within 30s');
   }
 
-  stop(): void {
-    if (this.child && !this.attached) {
-      this.child.kill();
-      this.child = null;
+  /** Graceful: POST /api/shutdown, wait for the process to exit (companions drain ≤ 60 s + kill), then kill as a last resort. */
+  async stop(): Promise<void> {
+    const child = this.child;
+    if (!child || this.attached) return;
+    this.child = null;
+    const exited = new Promise<void>((res) => { if (child.exitCode !== null) res(); else child.once('exit', () => res()); });
+    try {
+      await fetch('http://127.0.0.1:55600/api/shutdown', { method: 'POST', signal: AbortSignal.timeout(3000) });
+    } catch {
+      /* not answering: kill below */
+    }
+    const clean = await Promise.race([exited.then(() => true), new Promise<boolean>((r) => setTimeout(() => r(false), 80_000))]);
+    if (!clean) {
+      console.log('[backend] 556d did not exit in time; killing');
+      child.kill();
     }
   }
 }

@@ -1,25 +1,26 @@
-# vendored engine copy — provenance recorded in docs/STACK.md (upstream commit 7166071f)
-vendor/hermes-agent/
 
 # reference clone of momori777/Artemis (read-only study copy)
-vendor/artemis/
-
-
 # runtime data home (config may hold keys; state/memories are runtime)
-home/
-
+# vendored engine copy — provenance recorded in docs/STACK.md (upstream commit 7166071f)
 *.log
-__pycache__/
-models/
-bin/llama-cpu.zip
-bin/
-tests/stress_log.jsonl
-
-556d.exe
 *.log.err
-app/node_modules/
-app/dist/
-app/out/
+556d.exe
+__pycache__/
 app/*.log
 app/*.log.err
+app/*.png
+app/dist/
+app/node_modules/
+app/out/
+bin/
+bin/llama-cpu.zip
+home/
+models/
+tests/stress_*.jsonl
+tests/stress_*.log
+tests/stress_log.jsonl
 tools/node_modules/
+vendor/artemis/
+vendor/hermes-agent/
+app/public/vad/
+556d.new.exe

@@ -1,0 +1,60 @@
+shape: sequence_diagram
+
+title: "One turn — the app and Telegram are peers of the same conversation" {
+  shape: text
+  near: top-center
+  style.font-size: 20
+}
+
+producer: "製作人"
+app: "app window"
+d: "556d"
+api: "her API server"
+tg: "her Telegram adapter"
+agent: "AIAgent"
+state: "state.db (history)"
+kokoro: "kokoro -> KeepsakeDB"
+llm: "LLM (shim lane)"
+telegram: "Telegram"
+
+"A — turn from the app": {
+  producer -> app: "question"
+  app -> d: "POST /api/chat"
+  d -> state: "her ONE session (opened at start, telegram dm key)"
+  d -> api: "/v1/chat/completions, non-stream\nX-Hermes-Session-Id"
+  api -> state: "load history (every surface)"
+  api -> agent: "run turn"
+  agent -> kokoro: "prefetch(question)"
+  kokoro -> kokoro: "1 embedding; long + short searched at once (bigger first), hybrid top 5 each"
+  kokoro -> agent: "Long-term memory block"
+  agent -> llm: "SOUL + history + memory + question"
+  llm -> agent: "reply"
+  agent -> state: "append user + assistant rows"
+  api -> d: "final text"
+  d -> app: "chat.delta + chat.complete (hub)"
+  d -> telegram: "mirror 「你問我 q / 我說 a」 — no LLM"
+  agent -> kokoro: "sync_turn (background, serialized)"
+  kokoro -> llm: "observe: ONE call -> ops (long) + note (short)"
+  kokoro -> kokoro: "write the store"
+}
+
+"B — turn from Telegram": {
+  producer -> telegram: "message to her bot"
+  telegram -> tg: "update"
+  tg -> state: "same session (agent:main:telegram:dm:<id>)"
+  tg -> agent: "run turn — history includes the app turns"
+  agent -> kokoro: "prefetch · sync_turn (as above)"
+  agent -> llm: "…"
+  llm -> agent: "reply"
+  agent -> state: "append rows (platform_message_id set)"
+  tg -> telegram: "reply"
+  d -> state: "follower: new rows since cursor? (every 2 s)"
+  d -> app: "chat.user + chat.complete, source = telegram (badge)"
+}
+
+"C — stop right after a reply": {
+  app -> d: "stop (roster) or quit (POST /api/shutdown)"
+  d -> state: "newest user message time"
+  d -> kokoro: "pipeline_log caught up? wait <= 30 s"
+  d -> agent: "planned-stop marker -> drain -> exit 0 (kill after 60 s)"
+}

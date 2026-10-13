@@ -41,7 +41,8 @@ The user's **shim** (:18766) replaces Artemis's single-model lock-in with routed
 
 ## Where it landed (0.3.0)
 One app owns one daemon owns one brain: **556 Production (Electron/React) → 556d (Go: hub, shim,
-bridge, supervisor) → hermes serve (Python, vendored)**. Every client talks only to 556d, which
-broadcasts to all. Artemis's patterns survive as: per-companion memory isolation (Hermes
+bridge, supervisor) → one `hermes gateway run` per active character (Python, vendored)**: her
+API server is the app's route, her channel adapters are Telegram's — the app and the channels are
+peers calling the same process (2026-10-02). Every window talks only to 556d, which broadcasts to all. Artemis's patterns survive as: per-companion memory isolation (Hermes
 profiles), proxy-layer routing (the shim), avatar bridge API (Artemis-compatible control routes),
 trust-labeled retrieval (designed into Path C). See STACK.md for the exact inventory.

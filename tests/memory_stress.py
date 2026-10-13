@@ -111,7 +111,8 @@ def log(rec: dict):
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
 
-def main(n_rounds: int):
+def main(n_rounds: int, start: int = 1):
+    """start: resume the SAME seeded plan from this round (after a backend outage)."""
     rng = random.Random(42)
     # Build the round plan: all facts early-ish, corrections after their targets,
     # noise interleaved (~35%), repeat/pad with noise+chitchat variants to n_rounds.
@@ -133,8 +134,10 @@ def main(n_rounds: int):
             plan.append(("noise", rng.choice(NOISE) + " " + rng.choice(["", "對了你還好嗎", "嘿嘿", "跟你聊天真開心"])) )
     plan = plan[:n_rounds]
 
-    print(f"=== phase 1: {len(plan)} rounds ===", flush=True)
+    print(f"=== phase 1: {len(plan)} rounds (from round {start}) ===", flush=True)
     for i, (kind, msg) in enumerate(plan, 1):
+        if i < start:
+            continue
         reply, secs = ask(msg)
         log({"phase": "chat", "round": i, "kind": kind, "msg": msg,
              "reply": reply[:400], "secs": round(secs, 1)})
@@ -161,4 +164,6 @@ def main(n_rounds: int):
 
 
 if __name__ == "__main__":
-    main(int(sys.argv[1]) if len(sys.argv) > 1 else 100)
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    start = next((int(a.split("=", 1)[1]) for a in sys.argv[1:] if a.startswith("--start=")), 1)
+    main(int(args[0]) if args else 100, start)

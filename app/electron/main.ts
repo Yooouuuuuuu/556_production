@@ -10,6 +10,7 @@ let office: BrowserWindow | null = null;
 let avatar: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let quitting = false;
+let stopping = false;
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 function pageURL(route: string): string {
@@ -35,7 +36,8 @@ async function boot() {
   try {
     const r = await fetch('http://127.0.0.1:55600/api/settings');
     const j = await r.json();
-    if (j?.settings?.show_avatar_on_start) showAvatar();
+    // the avatar window always exists (hidden unless the setting says show): it is her voice too
+    showAvatar(!!j?.settings?.show_avatar_on_start);
   } catch {
     /* backend not up yet: the office window shows the status */
   }
@@ -67,9 +69,9 @@ function showOffice() {
   office!.focus();
 }
 
-function showAvatar() {
+function showAvatar(visible = true) {
   if (avatar) {
-    avatar.show();
+    if (visible) avatar.show();
     return;
   }
   const { workArea } = screen.getPrimaryDisplay();
@@ -78,6 +80,7 @@ function showAvatar() {
     height: 640,
     x: workArea.x + workArea.width - 440,
     y: workArea.y + workArea.height - 660,
+    show: visible,
     transparent: true,
     frame: false,
     alwaysOnTop: true,
@@ -125,5 +128,13 @@ ipcMain.on('avatar:drag-start', (_e, off: { x: number; y: number }) => {
 ipcMain.on('avatar:drag-end', () => { if (dragTimer) { clearInterval(dragTimer); dragTimer = null; } });
 ipcMain.on('avatar:toggle', toggleAvatar);
 
-app.on('will-quit', () => backend.stop());
+// Quit waits for the backend: 556d asks every active companion to finish up (her in-flight memory
+// write lands), then exits; only then does the app go. Typically a few seconds.
+app.on('will-quit', (e) => {
+  if (stopping) return;
+  stopping = true;
+  e.preventDefault();
+  tray?.setToolTip('556 Production — 收尾中…');
+  backend.stop().finally(() => app.exit(0));
+});
 app.on('window-all-closed', () => { if (quitting) app.quit(); });

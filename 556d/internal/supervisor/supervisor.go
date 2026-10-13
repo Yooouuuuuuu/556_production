@@ -1,7 +1,8 @@
-// Package supervisor starts and watches the sidecar processes 556d owns (hermes serve,
-// the embedder, later TTS/image services). Children are placed in a kill-on-close job so
-// they die with the daemon; a crashed child restarts with backoff; readiness is observed
-// through an HTTP health URL.
+// Package supervisor starts and watches the processes 556d owns (each companion's hermes
+// gateway, the embedder, later TTS/image services). Children are placed in a kill-on-close job
+// so they die with the daemon; a crashed child restarts with backoff; readiness is observed
+// through an HTTP health URL. A spec may provide a graceful Stop (ask the child to finish on
+// its own) with a Grace period before the kill — a companion's in-flight memory write lands.
 package supervisor
 
 import (
@@ -22,13 +23,23 @@ type Spec struct {
 	Env    []string // extra KEY=VALUE entries appended to the daemon's environment
 	Dir    string
 	Health string // GET URL expected to return 2xx when ready; "" = no probe
+	// Stop asks the child to exit by itself (e.g. Hermes's planned-stop marker). When it returns
+	// true the supervisor waits up to Grace for the exit before killing; nil/false = kill at once.
+	Stop  func(cmd *exec.Cmd) bool
+	Grace time.Duration
+}
+
+type child struct {
+	cmd    *exec.Cmd
+	spec   Spec
+	exited chan struct{} // closed once the process has exited
 }
 
 type Supervisor struct {
 	job     jobHandle
 	wg      sync.WaitGroup
 	mu      sync.Mutex
-	running map[string]*exec.Cmd
+	running map[string]*child
 }
 
 func New() (*Supervisor, error) {
@@ -36,25 +47,44 @@ func New() (*Supervisor, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Supervisor{job: j, running: map[string]*exec.Cmd{}}, nil
+	return &Supervisor{job: j, running: map[string]*child{}}, nil
 }
 
-// Restart kills the named child; its run loop brings it back with backoff.
+// Restart ends the named child (gracefully when its spec allows); its run loop brings it back.
 func (s *Supervisor) Restart(name string) error {
 	s.mu.Lock()
-	cmd := s.running[name]
+	c := s.running[name]
 	s.mu.Unlock()
-	if cmd == nil || cmd.Process == nil {
+	if c == nil || c.cmd.Process == nil {
 		return fmt.Errorf("%s is not running", name)
 	}
 	log.Printf("[%s] restart requested", name)
-	return cmd.Process.Kill()
+	go s.terminate(c, "restart")
+	return nil
 }
 
-// Run starts the spec and keeps it alive until ctx is cancelled.
-func (s *Supervisor) Run(ctx context.Context, spec Spec) {
+// terminate ends a child: the graceful request first when the spec has one, a kill after Grace.
+func (s *Supervisor) terminate(c *child, why string) {
+	if c.spec.Stop != nil && c.spec.Grace > 0 && c.spec.Stop(c.cmd) {
+		log.Printf("[%s] %s: asked to finish up (up to %s)", c.spec.Name, why, c.spec.Grace)
+		select {
+		case <-c.exited:
+			return
+		case <-time.After(c.spec.Grace):
+			log.Printf("[%s] still running after %s; killing", c.spec.Name, c.spec.Grace)
+		}
+	}
+	_ = c.cmd.Process.Kill()
+	<-c.exited
+}
+
+// Run starts the spec and keeps it alive until ctx is cancelled. The returned channel closes
+// once the child has exited for good (after a graceful stop or the kill).
+func (s *Supervisor) Run(ctx context.Context, spec Spec) <-chan struct{} {
+	finished := make(chan struct{})
 	s.wg.Add(1)
 	go func() {
+		defer close(finished)
 		defer s.wg.Done()
 		backoff := time.Second
 		for {
@@ -77,6 +107,7 @@ func (s *Supervisor) Run(ctx context.Context, spec Spec) {
 			}
 		}
 	}()
+	return finished
 }
 
 func (s *Supervisor) runOnce(ctx context.Context, spec Spec) error {
@@ -92,19 +123,24 @@ func (s *Supervisor) runOnce(ctx context.Context, spec Spec) error {
 		log.Printf("[%s] job assign failed: %v", spec.Name, err)
 	}
 	log.Printf("[%s] started pid %d", spec.Name, cmd.Process.Pid)
+	c := &child{cmd: cmd, spec: spec, exited: make(chan struct{})}
 	s.mu.Lock()
-	s.running[spec.Name] = cmd
+	s.running[spec.Name] = c
 	s.mu.Unlock()
 	defer func() {
 		s.mu.Lock()
-		if s.running[spec.Name] == cmd {
+		if s.running[spec.Name] == c {
 			delete(s.running, spec.Name)
 		}
 		s.mu.Unlock()
 	}()
 
 	done := make(chan error, 1)
-	go func() { done <- cmd.Wait() }()
+	go func() {
+		err := cmd.Wait()
+		done <- err
+		close(c.exited)
+	}()
 
 	if spec.Health != "" {
 		go probe(ctx, spec)
@@ -113,8 +149,7 @@ func (s *Supervisor) runOnce(ctx context.Context, spec Spec) error {
 	case err := <-done:
 		return err
 	case <-ctx.Done():
-		_ = cmd.Process.Kill()
-		<-done
+		s.terminate(c, "stop")
 		return ctx.Err()
 	}
 }

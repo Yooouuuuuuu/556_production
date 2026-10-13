@@ -1,18 +1,20 @@
 {
   "name": "556-production",
   "productName": "556 Production",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "556 Production - the agency where hearts are made",
   "private": true,
   "main": "out/main.js",
   "scripts": {
     "build:main": "esbuild electron/main.ts electron/preload.ts --bundle --platform=node --format=cjs --external:electron --outdir=out",
-    "build:renderer": "vite build",
+    "build:renderer": "node scripts/copy-vad.mjs && vite build",
     "build": "npm run build:main && npm run build:renderer",
     "start": "npm run build && electron .",
     "dev": "npm run build:main && node scripts/dev.mjs"
   },
   "dependencies": {
+    "@ricky0123/vad-web": "^0.0.31",
+    "onnxruntime-web": "^1.30.0",
     "pixi-live2d-display-lipsyncpatch": "^0.5.0-ls-8",
     "pixi.js": "^7.4.2",
     "react": "^18.3.1",

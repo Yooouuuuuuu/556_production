@@ -6,7 +6,7 @@ import { Live2DStage } from '../live2d/Live2DStage';
 // Avatar window: transparent, the companion bottom-center, speech bubble above her head.
 export function Avatar() {
   const [modelUrl, setModelUrl] = useState<string | null>(null);
-  const { bubble, connect } = useStore();
+  const { bubble, connect, avatarUrl } = useStore();
 
   useEffect(() => {
     connect();
@@ -22,6 +22,9 @@ export function Avatar() {
     load();
     return () => { alive = false; };
   }, []);
+
+  // the avatar follows the chat window: a roster switch changes her model
+  useEffect(() => { if (avatarUrl) setModelUrl(avatarUrl); }, [avatarUrl]);
 
   return (
     <div className="relative w-full h-full select-none">

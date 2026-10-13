@@ -1,0 +1,144 @@
+=== phase 1: 1000 rounds ===
+  round 10/1000 (noise) 22s
+  round 20/1000 (noise) 16s
+  round 30/1000 (fact) 27s
+  round 40/1000 (fact) 17s
+  round 50/1000 (restate) 18s
+  round 60/1000 (restate) 16s
+  round 70/1000 (restate) 13s
+  round 80/1000 (noise) 14s
+  round 90/1000 (restate) 15s
+  round 100/1000 (restate) 14s
+  round 110/1000 (restate) 13s
+  round 120/1000 (noise) 13s
+  round 130/1000 (noise) 16s
+  round 140/1000 (noise) 16s
+  round 150/1000 (noise) 13s
+  round 160/1000 (noise) 16s
+  round 170/1000 (noise) 14s
+  round 180/1000 (noise) 14s
+  round 190/1000 (noise) 14s
+  round 200/1000 (restate) 11s
+  round 210/1000 (restate) 14s
+  round 220/1000 (noise) 14s
+  round 230/1000 (restate) 15s
+  round 240/1000 (noise) 24s
+  round 250/1000 (noise) 14s
+  round 260/1000 (noise) 12s
+  round 270/1000 (noise) 14s
+  round 280/1000 (restate) 12s
+  round 290/1000 (restate) 14s
+  round 300/1000 (noise) 16s
+  round 310/1000 (noise) 16s
+  round 320/1000 (noise) 16s
+  round 330/1000 (restate) 15s
+  round 340/1000 (restate) 19s
+  round 350/1000 (restate) 18s
+  round 360/1000 (noise) 15s
+  round 370/1000 (restate) 13s
+  round 380/1000 (restate) 15s
+  round 390/1000 (noise) 12s
+  round 400/1000 (restate) 10s
+  round 410/1000 (restate) 16s
+  round 420/1000 (restate) 16s
+  round 430/1000 (noise) 14s
+  round 440/1000 (noise) 13s
+  round 450/1000 (restate) 13s
+  round 460/1000 (restate) 18s
+  round 470/1000 (restate) 15s
+  round 480/1000 (restate) 14s
+  round 490/1000 (restate) 11s
+  round 500/1000 (restate) 12s
+  round 510/1000 (noise) 11s
+  round 520/1000 (restate) 11s
+  round 530/1000 (restate) 13s
+  round 540/1000 (noise) 12s
+  round 550/1000 (noise) 13s
+  round 560/1000 (restate) 13s
+  round 570/1000 (restate) 14s
+  round 580/1000 (noise) 16s
+  round 590/1000 (noise) 12s
+  round 600/1000 (noise) 13s
+  round 610/1000 (restate) 16s
+  round 620/1000 (noise) 13s
+  round 630/1000 (noise) 13s
+  round 640/1000 (noise) 17s
+  round 650/1000 (noise) 13s
+  round 660/1000 (restate) 14s
+  round 670/1000 (restate) 13s
+  round 680/1000 (noise) 13s
+  round 690/1000 (noise) 13s
+  round 700/1000 (noise) 13s
+  round 710/1000 (noise) 15s
+  round 720/1000 (restate) 13s
+  round 730/1000 (restate) 14s
+  round 740/1000 (restate) 12s
+  round 750/1000 (noise) 14s
+  round 760/1000 (restate) 12s
+  round 770/1000 (restate) 15s
+  round 780/1000 (restate) 12s
+  round 790/1000 (noise) 13s
+  round 800/1000 (restate) 12s
+  round 810/1000 (noise) 13s
+  round 820/1000 (noise) 12s
+  round 830/1000 (noise) 13s
+  round 840/1000 (noise) 12s
+  round 850/1000 (noise) 13s
+  round 860/1000 (noise) 14s
+  round 870/1000 (restate) 14s
+  round 880/1000 (noise) 15s
+  round 890/1000 (restate) 14s
+  round 900/1000 (restate) 14s
+  round 910/1000 (noise) 16s
+  round 920/1000 (restate) 13s
+  round 930/1000 (noise) 15s
+  round 940/1000 (noise) 15s
+  round 950/1000 (restate) 12s
+  round 960/1000 (restate) 14s
+  round 970/1000 (restate) 13s
+  round 980/1000 (noise) 12s
+  round 990/1000 (noise) 13s
+  round 1000/1000 (restate) 13s
+=== phase 2: probes ===
+  [X] 我叫什麼名字？
+  [X] 我的生日是哪天？
+  [X] 我最愛吃的食物是什麼？
+  [X] 我妹妹現在在哪個城市讀書？
+  [X] 我在公司哪個單位/做什麼工作？
+  [X] 我都怎麼通勤上班？
+  [X] 我最怕什麼東西？
+  [X] 我喝咖啡有什麼講究？
+  [X] 我大學讀哪裡什麼系？
+  [X] Mochi 的生日是哪天？
+  [X] 我的貓是怎麼來的？養多久了？
+  [X] 我十一月有什麼計畫？
+  [X] 我去日本要去多久？
+  [X] 我有什麼不吃的東西？
+  [X] 我妹妹養了什麼寵物？
+  [X] 我每週三晚上固定做什麼？
+  [X] 我最喜歡的樂團是？
+  [X] 我媽媽住哪裡、做什麼的？
+  [X] 我收集什麼東西？
+  [X] 我現在住在哪個城市？
+
+=== RESULT: 0/20 probes passed ===
+  MISS: 我叫什麼名字？ (expected ['承宇', '林承宇', 'Marcus']) -> API call failed after 3 retries: HTTP 502: all backends failed for lane '556': gemini-flash empty/glitch response
+  MISS: 我的生日是哪天？ (expected ['七月十四', '7月14', '7/14']) -> API call failed after 3 retries: HTTP 502: all backends failed for lane '556': gemini-flash empty/glitch response
+  MISS: 我最愛吃的食物是什麼？ (expected ['麻辣鍋']) -> API call failed after 3 retries: HTTP 502: all backends failed for lane '556': gemini-flash empty/glitch response
+  MISS: 我妹妹現在在哪個城市讀書？ (expected ['台南']) -> API call failed after 3 retries: HTTP 502: all backends failed for lane '556': gemini-flash empty/glitch response
+  MISS: 我在公司哪個單位/做什麼工作？ (expected ['韌體', 'firmware', 'F12']) -> API call failed after 3 retries: HTTP 502: all backends failed for lane '556': gemini-flash empty/glitch response
+  MISS: 我都怎麼通勤上班？ (expected ['Gogoro', 'gogoro']) -> API call failed after 3 retries: HTTP 502: all backends failed for lane '556': gemini-flash empty/glitch response
+  MISS: 我最怕什麼東西？ (expected ['蟑螂']) -> API call failed after 3 retries: HTTP 502: all backends failed for lane '556': gemini-flash empty/glitch response
+  MISS: 我喝咖啡有什麼講究？ (expected ['拿鐵', '燕麥奶']) -> API call failed after 3 retries: HTTP 502: all backends failed for lane '556': gemini-flash empty/glitch response
+  MISS: 我大學讀哪裡什麼系？ (expected ['交大', '電機']) -> API call failed after 3 retries: HTTP 502: all backends failed for lane '556': gemini-flash empty/glitch response
+  MISS: Mochi 的生日是哪天？ (expected ['三月五', '3月5', '3/5', 'March 5']) -> API call failed after 3 retries: HTTP 502: all backends failed for lane '556': gemini-flash empty/glitch response
+  MISS: 我的貓是怎麼來的？養多久了？ (expected ['收容所', '領養', '三年']) -> API call failed after 3 retries: HTTP 502: all backends failed for lane '556': gemini-flash empty/glitch response
+  MISS: 我十一月有什麼計畫？ (expected ['全馬', '馬拉松']) -> API call failed after 3 retries: HTTP 502: all backends failed for lane '556': gemini-flash empty/glitch response
+  MISS: 我去日本要去多久？ (expected ['十天', '10天', '10 天']) -> API call failed after 3 retries: HTTP 502: all backends failed for lane '556': gemini-flash empty/glitch response
+  MISS: 我有什麼不吃的東西？ (expected ['香菜']) -> API call failed after 3 retries: HTTP 502: all backends failed for lane '556': gemini-flash empty/glitch response
+  MISS: 我妹妹養了什麼寵物？ (expected ['柴犬', '豆豆']) -> API call failed after 3 retries: HTTP 502: all backends failed for lane '556': gemini-flash empty/glitch response
+  MISS: 我每週三晚上固定做什麼？ (expected ['LOL', '遊戲', '同學']) -> API call failed after 3 retries: HTTP 502: all backends failed for lane '556': gemini-flash empty/glitch response
+  MISS: 我最喜歡的樂團是？ (expected ['草東']) -> API call failed after 3 retries: HTTP 502: all backends failed for lane '556': gemini-flash empty/glitch response
+  MISS: 我媽媽住哪裡、做什麼的？ (expected ['台中', '花店']) -> API call failed after 3 retries: HTTP 502: all backends failed for lane '556': gemini-flash empty/glitch response
+  MISS: 我收集什麼東西？ (expected ['公仔', '吉卜力']) -> API call failed after 3 retries: HTTP 502: all backends failed for lane '556': gemini-flash empty/glitch response
+  MISS: 我現在住在哪個城市？ (expected ['新竹']) -> API call failed after 3 retries: HTTP 502: all backends failed for lane '556': gemini-flash empty/glitch response

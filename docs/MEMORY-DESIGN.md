@@ -58,6 +58,88 @@ stayed one entry); latency stable, no degradation, no crashes across 1000 sessio
 4. Episodic small talk gets stored but auto-DATED (bad day, traffic) — arguably companion-good;
    consider a decay/archival policy rather than blocking.
 
+## Path K — kokoro on KeepsakeDB — IMPLEMENTED 2026-10-02 (Path C realized as its own repo)
+
+The target engine exists: **KeepsakeDB** (`D:\dev\KeepsakeDB`, 0.1.x) and the Hermes provider
+**`plugins/kokoro`** (linked into `home/plugins/kokoro`; `memory.provider: kokoro`; config
+`home/kokoro.json`). What runs per turn:
+
+- **prefetch** → `Pipeline.context_for(user_text)`: hybrid recall (bge-m3 dense + FTS5 BM25 with
+  CJK bigrams, RRF k=60, over-fetch 15), trust labels (`[high]` ≥ 0.60, dropped < 0.40 unless BM25
+  matched), archived topics as meta-info only unless a consent window is open; superseded facts
+  never surface. Embedder down → BM25-only fallback. Recall indicator 💗 Kokoro.
+- **sync_turn** (on Hermes's serialized memory worker) → `Pipeline.observe`: one
+  `agy/gemini-3.8-flash` JSON pass over the turn + the 8 most similar memories + the tag groups →
+  add / update / supersede / archive / unarchive / consent / noop, memories written in **zh-TW**,
+  tags as English slugs. Shutdown waits for an in-flight observe so one-shot runs never lose a write.
+- **tools**: `kokoro_search`, `kokoro_forget` (hard delete on explicit request only).
+- **store**: `home/memory/<profile>.db` — history, search_log, pipeline_log, command queue; owner
+  heartbeat + `data_version` reload; daily snapshot to `home/backups/` (Anki-style rotation).
+- **inspect**: `D:\dev\KeepsakeDB\.venv\Scripts\keepsake --db home\memory\default.db stats|list|log|plog|search Q --explain`.
+- 556d gained `-no-hermes` (shim + embedder + API only) so CLI harnesses can run without a second
+  Hermes process owning the store.
+
+Smoke (2026-10-02): 「跟你說，我叫林承宇…我最喜歡吃麻辣鍋」→ two memories `姓名是林承宇，稱呼為承宇即可。`
+(identity) and `最喜歡吃麻辣鍋。` (food); next fresh session 「我最愛吃的食物是什麼？」→ 「你最愛吃的食物是
+麻辣鍋。」 with the memory injected at cosine 0.62 `[high]`. Turn cost ≈ 24 s one-shot (model via shim +
+≈ 7 s observe + startup); recall itself ≈ 2 ms + one embedding call.
+
+**Endurance test (tests/memory_stress.py, fresh session every round) — 100 rounds, 2026-10-02:
+19/20** (Path A: 20/20). 18.2 s per round mean, no timeouts; 33 active memories + 3 superseded,
+12 tag groups, ~45 restatements deduped to zero duplicates; 119 pipeline runs (33 add,
+3 supersede, 0 skipped, 1 LLM error), observe ≈ 7.4 s. The miss: the model returned empty
+content on the probe (proxy hiccup, not recall). Found and fixed before the 1000-round run: the
+Path A temporal-conflict trap reproduced — after 半馬→全馬 was superseded correctly, a
+reminder-style restatement 「再跟你說一次喔…報了半馬」 was treated as a new correction and superseded
+it back (the first restatement 「我有提過嗎？…」 was correctly noop). Prompt rule added: a
+reminder/repeat never overrides a recorded correction. Calibration data (580 context rows):
+injected `[high]` hits are restatement-level matches (dense 0.60–0.93, p50 0.83); ordinary
+correct recalls sit at 0.44–0.55 (p50 0.48); 0.38–0.40 hits survived only via BM25. Thresholds
+0.60 / 0.40 kept. Logs: `tests/stress_log_kokoro_100.jsonl`, store snapshot `home/backups_run100/`.
+**1000-round run (2026-10-02 02:50–06:58, 14.6 s/round)**: rounds 1–483 ran for real; at 04:56 the
+user's Gemini proxy (:18765) started returning empty responses and stayed down, so rounds 484–1000
+and the exam got "HTTP 502: all backends failed" replies (exam 0/20 = backend, not recall). What the
+483 real rounds prove: all 30 facts stored (33 active memories), every correction resolved the right
+way (sister → 台南, Japan 10 days, firmware, Mochi 3/5, **半馬 → 全馬 held through ~200 reminder-style
+restatements** — the Path A trap is fixed), zero duplicates, 483 pipeline runs (33 add, 2 supersede,
+0 skipped), observe ≈ 6.3 s; a 556d restart mid-run (tool time cap) cost one 52 s round and nothing
+else. Calibration on 4 776 injected rows: `[high]` 0.61–0.95 (p50 0.87), plain 0.46–0.55 (p50 0.50),
+15 hits rescued by BM25 below 0.40. **Exam re-run at 07:10 when the backend returned
+(`tests/memory_probe.py`, fresh session per probe, store as left by the 483 real rounds): 20/20**,
+including the marathon probe (全馬) that Path A missed at 1000 rounds. A full 1000-round re-run
+under a stable backend remains the clean number. Logs: `tests/stress_log.jsonl`.
+
+**Clean 1000-round run (2026-10-02 10:21–15:19, fresh store, 19 s/round)**: rounds 1–932 real; the
+Gemini lane hit its limit at round 933 (second outage of the day) and the harness was stopped
+(`--start=N` added for resumes). Store at 932: 32 memories, 2 superseded, **932 pipeline runs for
+932 rounds (no lost observe)**, marathon correction held (全馬 active, 半馬 superseded) through ~400
+restatements, zero duplicates. **Direct engine exam** (`tests/memory_recall_check.py`: the 20 probes
+through KeepsakeDB's own recall, no chat model): **18/20 in the injected block, 18/20 in top-5**.
+The two misses are explained: (1) 「我去日本要去多久？」 — the trip's only mention got an **empty
+LLM reply in the L2 observe** (the run's single pipeline error), so the fact was never stored →
+KeepsakeDB pipeline now retries once on an empty / non-JSON reply (0.1.x); (2) 「我現在住在哪個城市？」
+— inferential (新竹 is only implied by F12 / 新竹馬拉松 / 十八尖山); the chat model answered it in both
+model-based exams. Verdict: the memory check is closed — engine recall is at the ceiling of what was
+stored, writes are lossless, corrections hold; the remaining variance is the backend. Snapshots:
+`home/backups_run932/`; logs `tests/stress_run_kokoro_1000b.log`, `tests/stress_log.jsonl`.
+
+### Two layers (2026-10-03, KeepsakeDB 0.2.0)
+`memories.layer`: **long** = tagged facts with trust labels, supersede/archive (unchanged); **short** =
+dated notes, one per turn worth recalling, no tags, surface in meta, ring-capped (`short_cap` 1000).
+Written by the same observe call (`ops` + `note`). Read by `search_layers`: one embedding, layers
+searched concurrently (bigger first, each on its own read connection), hybrid top 5 each, injected as
+`Facts (long-term)` / `Notes (recent, dated)`. Her system prompt carries the priority rule: the
+conversation is ground truth, then newest wins across layers, fact beats note on a tie. Knobs:
+`short_layer`, `short_k`, `short_cap` (kokoro.json, dev registry). The memory page shows long by
+default, short behind a toggle.
+
+### History is not memory (2026-10-02)
+A 'recent-exchange layer' that recorded every turn in the store (for cross-surface continuity) lived
+for a few hours and was removed: it put trivia into 記憶 and confused two different things. The
+last X turns are conversation history — verbatim, in Hermes's session store (`state.db`, survives
+restarts, compressed never deleted), shared by every surface because the app continues the same
+session. Memory is what the pipeline decides to keep. KeepsakeDB 0.1.3.
+
 ## Path C (TARGET): own hybrid engine, learned from Milvus (Apache-2.0, open source)
 
 Custom Hermes `MemoryProvider` (4 hooks: sync_turn / prefetch / on_session_end / on_pre_compress):
@@ -111,8 +193,12 @@ Group mechanics enable topic-level operations. **Archive design (FINAL shape, us
 
 ## Rejected / parked
 
-- **Milvus Lite**: no sparse/BM25/hybrid (Standalone-only), native Windows unsupported (py3.10-only
-  CI). Weakest expression of the Milvus preference.
+- **Milvus Lite**: CORRECTED 2026-10-01 — the 2.4.x note above was outdated. Milvus Lite 3.x is a
+  pure-Python rewrite with BM25 + sparse index + hybrid_search (RRF/weighted) and a Windows wheel.
+  It still falls short for a memory store: BM25 statistics are segment-local (flush every 10k
+  rows; an acknowledged TODO in its source), scoring is a Python loop rebuilt per query, one
+  process per data dir. Full analysis + benchmark vs our SQLite engine: KeepsakeDB
+  (`D:\dev\KeepsakeDB\docs\RESEARCH-milvus.md`, `BENCHMARK.md`).
 - **Milvus Standalone now**: Docker service — conflicts with the single-exe end goal; revisit only
   at C's outgrow point.
 - **Ollama**: separate app install; same single-exe conflict.
@@ -140,5 +226,5 @@ Realistic final packaging = one installer/launcher with bundled sidecars (roadma
   running a companion in another language must pair it with an embedder that covers that language**
   — the language knob and the embedder knob travel together. Changing the embedder means
   re-embedding the store (minutes at companion scale; the migration path A→C is the same tool).
-- Standalone engine plan: see DECISIONS (2026-09-30 after 0.2.0) — separate Python library,
-  layered so the DB core stays lightweight; 556 keeps `kokoro` as the provider name.
+- Standalone engine: **KeepsakeDB** (`D:\dev\KeepsakeDB`, created 2026-10-01) — layered L1 store /
+  L2 pipeline (unpluggable) / L3 integration; 556 keeps `kokoro` as the Hermes provider name.

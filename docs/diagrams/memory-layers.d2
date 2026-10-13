@@ -1,0 +1,81 @@
+direction: right
+
+title: "History vs memory — three layers, one priority rule" {
+  shape: text
+  near: top-center
+  style.font-size: 20
+}
+
+classes: {
+  proposed: {
+    style.stroke-dash: 4
+    style.stroke: "#c2185b"
+    style.font-color: "#c2185b"
+  }
+  file: {
+    shape: page
+  }
+  step: {
+    shape: hexagon
+  }
+}
+
+turn: "a turn, from any surface" {shape: oval}
+
+history: "HISTORY — Hermes session store (state.db)" {
+  class: file
+  desc: |md
+    - exactly ONE session per character, shared by app / Telegram / later surfaces
+    - opened by the manual start from the roster; never opened by a message
+    - verbatim; survives restarts; auto-reset off
+    - compression summarizes the middle, keeps first 3 + last 20 messages
+    - the app window shows the last X turns (a display setting)
+  |
+}
+
+short: "SHORT-TERM — KeepsakeDB layer \"short\"" {
+  desc: |md
+    - one LLM-written line per turn that would matter next week
+    - no tags; 556d stamps date + surface
+    - ring of ~1000, oldest dropped, no TTL
+    - 記憶 shows it only behind a toggle (近期紀錄)
+    - purpose: a second chance when the long fact was missed or mis-written
+    - searched exactly like long: hybrid, top 5, same embedding
+  |
+}
+
+long: "LONG-TERM — KeepsakeDB layer \"long\"" {
+  desc: |md
+    - facts with tags, trust labels [high] / plain
+    - add / update / supersede / archive (+ consent windows)
+    - subject = 製作人, language = memory setting
+    - what 記憶 shows by default
+  |
+}
+
+observe: "observe — ONE LLM call after the reply (background)\nreturns at most two strings" {class: step}
+read: "prefetch — ONE embedding, then both layers searched AT ONCE:\nthe bigger layer starts first (own read connection), the smaller follows immediately,\nnothing waits but the final join · hybrid (dense + BM25, RRF), top 5 each" {class: step}
+
+prompt: "her prompt for this turn" {
+  rule: |md
+    **When layers disagree**
+    1. history is ground truth
+    2. otherwise the newest entry wins, whatever the layer
+    3. long breaks ties
+    (the pipeline then supersedes the stale long fact)
+  |
+}
+
+turn -> history: "appended by Hermes, always"
+turn -> observe: "user + assistant text"
+observe -> short: "string 1 — \"note\": the episode, or null"
+observe -> long: "string 2 — ops with tags, or noop"
+long -> read: "top 5, hybrid"
+short -> read: "top 5, hybrid (same embedding)"
+read -> prompt: "Long-term memory block"
+history -> prompt: "recent turns (Hermes)"
+
+onefile: "one SQLite file per character (memory/<name>.db): one owner, one backup rotation;\nlayers = a column, like Milvus collections inside one database" {
+  shape: text
+  near: bottom-center
+}

@@ -24,14 +24,12 @@ type Config struct {
 
 type Daemon struct {
 	Port    int    `toml:"port"`
-	Profile string `toml:"profile"` // Hermes profile for the chat API ("" = home's default companion)
+	Profile string `toml:"profile"` // companion the windows open on when nothing is selected yet (nothing auto-starts)
 }
 
 type Hermes struct {
-	Home  string `toml:"home"`
-	Exe   string `toml:"exe"`
-	Port  int    `toml:"port"`
-	Token string `toml:"token"` // empty = generated per start
+	Home string `toml:"home"` // profiles live under <home>/profiles/<name>
+	Exe  string `toml:"exe"`  // hermes.exe of the vendored venv; each companion runs `hermes gateway run`
 }
 
 type Embedder struct {
@@ -44,7 +42,7 @@ type Embedder struct {
 func Load(path string) (*Config, error) {
 	c := &Config{
 		Daemon:   Daemon{Port: 55600},
-		Hermes:   Hermes{Home: "home", Exe: "vendor/hermes-agent/.venv/Scripts/hermes.exe", Port: 55610},
+		Hermes:   Hermes{Home: "home", Exe: "vendor/hermes-agent/.venv/Scripts/hermes.exe"},
 		Embedder: Embedder{Enabled: true, Exe: "bin/llama/llama-server.exe", Model: "models/bge-m3-Q8_0.gguf", Port: 18768},
 	}
 	if _, err := toml.DecodeFile(path, c); err != nil {

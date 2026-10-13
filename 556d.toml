@@ -2,12 +2,13 @@
 
 [daemon]
 port = 55600
+profile = "mane"   # the companion the windows open on when nothing is selected yet (nothing auto-starts)
 
 [hermes]
 home = "home"
 exe  = "vendor/hermes-agent/.venv/Scripts/hermes.exe"
-port = 55610
-# token = ""   # empty = a fresh session token is generated on each start
+# each companion is ONE process: her `hermes gateway run` (API server for the app + her channels);
+# the API port is picked per start, or set API_SERVER_PORT in her .env
 
 [embedder]
 enabled = true

@@ -1,0 +1,34 @@
+direction: down
+
+title: "Lifecycle — nothing auto-starts, every stop is graceful" {
+  shape: text
+  near: top-center
+  style.font-size: 20
+}
+
+start: "roster ▶ start — manual; the only way she comes up (several may be active)" {shape: oval}
+spawn: "supervisor spawns `hermes gateway run`\nAPI_SERVER_KEY / HOST / PORT in her env; job object"
+ready: "/health 2xx (~5 s) -> 上線中; Telegram connected"
+open: "556d opens her ONE conversation if none is live:\nPOST /api/sessions + Telegram routing stamp\n(never opened by a message, from any surface)"
+turns: "app and Telegram turns — one conversation"
+
+stopreq: "stop requested: roster ■ · app quit (POST /api/shutdown) · app died (parent watcher)" {shape: oval}
+idle: "wait <= 30 s until pipeline_log has caught up with the newest user message\n(Hermes queues the observe a few seconds after the reply)"
+marker: "write .gateway-planned-stop.json\n(target = her Python pid from gateway.pid)"
+drain: "gateway watcher (0.5 s) -> drain: finish the turn,\nkokoro waits for an in-flight observe, exit 0\nno 「Gateway shutting down」 ping (restart notice off)"
+kill: "no exit after 60 s -> kill"
+gone: "process gone (typically 2–13 s) -> 收尾中 ends -> roster shows inactive"
+appexit: "app quit path: 556d exits by itself -> app.exit()"
+
+start -> spawn
+spawn -> ready
+ready -> open
+open -> turns
+turns -> stopreq
+stopreq -> idle
+idle -> marker
+marker -> drain
+drain -> gone
+marker -> kill: "grace expired" {style.stroke-dash: 3}
+kill -> gone
+gone -> appexit {style.stroke-dash: 3}

@@ -9,30 +9,41 @@ Reasoning behind each choice: `DECISIONS.md`, `MEMORY-DESIGN.md`, `FRONTEND-DESI
 **556 Production** (`app/`, Electron + React) is the product. Launching it starts and owns the
 whole backend; closing it shuts everything down.
 
+Diagrams (structure, one turn, memory vs history, voice, lifecycle): `docs/DIAGRAMS.md` (D2 sources).
+
 ```
 556 Production (Electron)          office window: chat + settings · avatar window (toggle) · tray
   └─ spawns 556d.exe -parent-pid   (Go)  :55600  hub: chat API + events on /ws + avatar bridge + static
         ├─ shim               :55601  OpenAI-compatible model router (lanes → Gemini proxy)
-        ├─ hermes serve       :55610  the brain (Python, vendored) — SOUL + memory + tools
-        └─ llama-server       :55602  bge-m3 embedder on CPU (memory Path A)
+        ├─ llama-server       :55602  bge-m3 embedder on CPU (KeepsakeDB dense leg), shared
+        └─ per ACTIVE companion (started from the roster, never automatically) — ONE process:
+              └─ hermes gateway run  :dynamic  her brain (HERMES_HOME = home/profiles/<name>): SOUL + kokoro memory
+                                               + tools; inside it the OpenAI-compatible API server (the app's
+                                               route) and her channel adapters (Telegram / Discord from her .env)
 External, untouched: Gemini proxy :18765 (user's), production shim :18766 (user's D:\Hermes).
 ```
 
-Ownership chain: the app kills 556d on quit; 556d watches the app's pid and exits if the app
-dies; 556d's Windows job object (kill-on-close) reaps hermes/llama. Verified for graceful quit
-and force-kill. 556d attaches instead of spawning if one already serves :55600.
+Ownership chain: on quit the app calls `POST /api/shutdown` and waits; 556d asks every active
+companion to finish up (Hermes planned-stop marker → her gateway drains, kokoro lands the in-flight
+memory observe, exit 0), kills after a 60 s grace, then exits; the app kills 556d only if it does
+not come down in time. 556d watches the app's pid and runs the same shutdown if the app dies; the
+Windows job object (kill-on-close) is the backstop for everything else. Roster **stop** is the same
+graceful path for one companion and returns when she is gone (「收尾中…」 meanwhile). 556d attaches
+instead of spawning if one already serves :55600.
 
 ## Layout
 
 | Path | What | Ours? |
 |---|---|---|
 | `app/` | the app: `electron/` (main, preload, backend lifecycle), `src/` (React: Office/Chat/Settings/Avatar, `live2d/Live2DStage`, `store` = hub WebSocket state, `api`, `i18n` zh-TW default), `assets/` icons, `scripts/` (dev runner, `cdp_capture.mjs`) | ours |
+| `app/public/vad/` | build output: Silero VAD models + audio worklet (from `@ricky0123/vad-web`) and ONNX Runtime wasm (from `onnxruntime-web`), copied by `scripts/copy-vad.mjs`, served by 556d at `/vad/` (ignored) | generated |
 | `556d/` | Go daemon: `internal/{config,supervisor,shim,bridge,hermes,api}`; config `556d.toml` | ours |
 | `vendor/hermes-agent/` | Hermes Agent v0.21.0, upstream `7166071f`; venv `.venv` (py3.11/uv). Ignored; `setup-vendor.ps1` restores it | **never edited** |
 | `vendor/live2d/` | Cubism Core **4** (`live2dcubismcore.min.js`) | never edited |
 | `assets/live2d/hiyori/` | official free Hiyori model (Cubism-4-era assets, SDK tag 4-r.7) | third-party data |
-| `plugins/` | Python that plugs INTO Hermes (kokoro memory provider, platform adapter — planned) | ours |
-| `home/` | HERMES_HOME: `config.yaml` (model → shim :55601 lane `auto/556`, `memory.provider: mem0`), `mem0.json`, `settings.json` (app settings), `mem0_qdrant/`, `audio_cache/`, sessions | runtime (ignored) |
+| `plugins/` | Python that plugs INTO Hermes: `kokoro/` memory provider on KeepsakeDB (live; linked into `home/plugins/`), platform adapter — planned | ours |
+| `home/` | HERMES_HOME of the agency shell (profile `default`): `config.yaml` (model → shim :55601 lane `auto/556`, `memory.provider: kokoro`), `kokoro.json`, `settings.json`, `plugins/kokoro` (junction), `memory/default.db` (the test stores), legacy `mem0.json` + `mem0_qdrant/` (Path A fallback), sessions | runtime (ignored) |
+| `home/profiles/mane/` | **真音's HERMES_HOME** (Hermes profile `mane`, created with `hermes profile create mane --clone`): her `SOUL.md`, `memories/USER.md` (the Producer's name lives here), `config.yaml`, `kokoro.json` (`subject: 製作人`, `producer_name`), `plugins/kokoro` (junction), `memory/mane.db`, `backups/`, `logs/`; later her `.env` (Telegram/Discord tokens) | runtime (ignored) |
 | `shim/routing.json` | lanes → backends (hot-reload): `556`→gemini-flash, `pro`→gemini, `code`→claude | ours |
 | `tools/` | diagnostics: `cdp_shot.mjs` (real-Chrome screenshot), `ws_probe.mjs`, `hub_probe.mjs` | ours |
 | `models/`, `bin/` | bge-m3 Q8_0 GGUF; llama.cpp CPU build (ignored, downloaded) | downloaded |
@@ -54,19 +65,79 @@ and force-kill. 556d attaches instead of spawning if one already serves :55600.
   `GET /api/companion`, `GET /api/models`, `POST /api/restart-hermes`, static (`/` = the app
   bundle, `/hiyori/...` models, `/live2dcubismcore.min.js`). OpenAI-compatible
   `/v1/chat/completions` (streaming) for third-party clients.
-- **556d ↔ hermes serve**: JSON-RPC over WebSocket (`/api/ws?token=`), `session.create` /
-  `prompt.submit`, `message.delta` stream; history via REST `/api/sessions/{id}/messages`.
-  One persistent session per companion; client system prompts ignored (SOUL owns persona);
-  turns serialized. Approvals/clarify not surfaced — companion toolset policy avoids them.
+- **556d ↔ her gateway** (`internal/hermesapi`): the gateway's API server platform, enabled per start
+  through `API_SERVER_KEY/HOST/PORT` in her environment (key generated once into her `companion.json`,
+  port free at start; her `.env` can pin both). One non-stream `POST /v1/chat/completions` per turn with
+  `X-Hermes-Session-Id` = **her one conversation** (the Telegram DM session; `POST /api/sessions` +
+  a routing stamp when the app speaks first; companions without a channel use key `556:app`), health via
+  `/health`. History and the live tail are read from her `state.db` (read-only, `companions.Transcript`),
+  each message tagged app / telegram by Hermes's `platform_message_id`. The app is one client of her,
+  same level as Telegram; turns serialized per companion in 556d. Client system prompts are not sent
+  (SOUL owns persona). Approvals/clarify not surfaced — companion toolset policy avoids them.
 - **hermes → models**: through the shim (:55601): `<tool_call>` text translation for the Gemini
   proxy, lane fallback chains, 4-attempt retry for emulated backends.
 
-## Memory (Path A live — see MEMORY-DESIGN.md)
-Curated `MEMORY.md`/`USER.md` head + FTS5 sessions + **mem0 + embedded Qdrant** (per-profile,
-user_id `556-user`), extraction on `agyapi/gemini-3.8-flash`, embeddings from the bge-m3 sidecar.
-1000-round test: 19–20/20 recall. Settings: memory language (stored; effective with the kokoro
-engine — mem0 has no prompt hook), embedder (re-embed on change). Path C / C2 are the designed
-successors.
+## Memory (kokoro on KeepsakeDB — see MEMORY-DESIGN.md)
+Curated `MEMORY.md`/`USER.md` head + FTS5 sessions + **KeepsakeDB** (`D:\dev\KeepsakeDB`, installed
+into the Hermes venv): one SQLite file per profile, hybrid recall (bge-m3 dense + FTS5 BM25 with
+CJK bigrams, RRF k=60), trust labels (high ≥ 0.60 / drop < 0.40), archive-with-reason + consent
+windows, L2 pipeline on `agy/gemini-3.8-flash` writing memories in the configured language
+(zh-TW). Provider: `plugins/kokoro` (prefetch → block, sync_turn → observe on Hermes's memory
+worker, tools `kokoro_search` / `kokoro_forget`). Logs: history / search_log / pipeline_log in the
+store, `logs/keepsake.jsonl` operational (muted in `hermes -z`). Snapshots daily to `home/backups/`.
+Inspect: `D:\dev\KeepsakeDB\.venv\Scripts\keepsake --db home\memory\default.db stats|list|log`.
+Path A (mem0 + Qdrant) stays on disk as the fallback (`memory.provider: mem0`).
+**Memory page** (office window tab `記憶`, route `#/memory`): view + delete only. 556d opens the
+store read-only with `modernc.org/sqlite` (pure Go) — `GET /api/memory?q=&tag=&archived=1&limit=`,
+`POST /api/memory/delete {ids, reason}` → a row in the store's `commands` table that the owning
+Hermes process executes (status `done` with count, or `queued` until she next runs — she "wakes"
+on the first chat turn of a session). Never writes the memory tables itself.
+
+**Settings & the config registry**: non-technical knobs directly; developer toggle shows every knob from
+`GET /api/config` (`internal/api/registry.go`: key, group, type, scope, file+path, effect) and writes them
+with `PUT /api/config` into her `config.yaml` / `kokoro.json` / `.env` or the agency's `556d.toml` /
+`shim/routing.json`; effects tell the UI what to restart. Secrets are masked and kept when left empty.
+
+**Roster / lifecycle** (office tab 名單, route `#/roster`): `GET /api/companions` (every
+`home/profiles/<name>` with a config.yaml: display name from `companion.json`, channels detected from
+`.env`, active state, API port), `POST /api/companions/{name}/start|stop`, `GET/PUT /api/selected`.
+`companions.Manager` (Go) owns exactly one `hermes gateway run` per active companion under the
+supervisor's job object; stop cancels her context; app close stops all.
+Chat, history, memory and the companion part of Settings act on the selected companion; hub events
+(`chat.*`, `companion.state`, `message`) carry `companion`, plus `companion.selected` and
+`companion.lifecycle`. Verified 2026-10-02 (one-process route): start → gateway ready with API server
+in 7 s + Telegram connected → app turn through `/v1/chat/completions` → history by session id →
+stop → zero Hermes processes.
+
+**One conversation, two mirrors** (2026-10-02): app and Telegram share one Hermes session (above), so
+history is cross-surface by construction and memory stays memory. 556d follows the session (2 s poll)
+and shows Telegram turns in the windows with a badge; and after an app turn 556d sends
+「你問我：q／我說：a」as plain text to her home channel (`TELEGRAM_HOME_CHANNEL`, else the first allowed
+user) through her own bot token — no LLM; Settings toggle `mirror_to_telegram` (default on).
+
+## Third-party inventory (what is not ours, and where it lives)
+
+Three kinds. **Vendored code** sits in `vendor/` and is never edited (see `vendor/README.md`).
+**Package dependencies** are declared in a manifest and restored by the package manager; they are
+not copied into `vendor/`. **Services** are called over the network under their own terms.
+
+| Kind | Piece | License / terms | Declared in |
+|---|---|---|---|
+| vendored | Hermes Agent v0.21.0 (`7166071f`) | MIT (Nous Research) | `vendor/hermes-agent/`, `setup-vendor.ps1` |
+| vendored | Live2D Cubism Core 4 | Live2D proprietary redistributable | `vendor/live2d/` |
+| data | Hiyori model (SDK 4-r.7) | Live2D Free Material License | `assets/live2d/hiyori/` |
+| npm | react, react-dom, zustand, pixi.js 7 | MIT | `app/package.json` |
+| npm | pixi-live2d-display-lipsyncpatch | MIT | `app/package.json` |
+| npm | `@ricky0123/vad-web` (bundles the Silero VAD ONNX models — MIT, snakers4/silero-vad — and the audio worklet) | ISC | `app/package.json`; built into `app/public/vad/` |
+| npm | onnxruntime-web (wasm runtime for the VAD) | MIT | `app/package.json`; built into `app/public/vad/` |
+| Go | modernc.org/sqlite (pure Go), gorilla/websocket, BurntSushi/toml, yaml.v3, x/sys | BSD-3 / BSD-2 / MIT / MIT / BSD-3 | `556d/go.mod` |
+| Python | KeepsakeDB (ours, separate repo) → numpy; optional httpx (pipeline LLM client) | MIT | Hermes venv, `setup-vendor.ps1` |
+| downloaded | llama.cpp CPU build; bge-m3 Q8_0 GGUF | MIT; MIT (BAAI) | `bin/`, `models/` (ignored) |
+| service | Fish Audio (TTS `/v1/tts`, ASR `/v1/asr`) | Fish Audio terms; key in `home/voice.json` | 設定 → 語音連線 |
+| service | Gemini / Claude through the Producer's proxy; Telegram Bot API | provider terms; her own bot token | shim lanes; her `.env` |
+
+Not used (considered and dropped): sherpa-onnx local STT and the MOSS-TTS server from the earlier
+voice agent — 556 uses cloud STT/TTS connectors instead; mem0 + Qdrant (replaced by KeepsakeDB).
 
 ## Avatar
 `Live2DStage` (pixi 7 + pixi-live2d-display-lipsyncpatch `cubism4` ESM; Core 4 fetched from

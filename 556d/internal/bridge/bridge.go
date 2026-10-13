@@ -9,7 +9,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -199,25 +198,40 @@ func (b *Bridge) speakAudio(w http.ResponseWriter, r *http.Request) {
 // cacheAudio copies a local audio file into the cache under a random name and prunes old
 // entries (max 50 files / 30 minutes), like the Node bridge.
 func (b *Bridge) cacheAudio(src string) (string, error) {
-	in, err := os.Open(src)
+	data, err := os.ReadFile(src)
 	if err != nil {
 		return "", err
 	}
-	defer in.Close()
+	return b.CacheAudio(data, strings.TrimPrefix(strings.ToLower(filepath.Ext(src)), "."))
+}
+
+// CacheAudio stores synthesized audio for the windows (/cache/audio/<name>) and prunes old entries.
+func (b *Bridge) CacheAudio(data []byte, ext string) (string, error) {
 	buf := make([]byte, 16)
 	_, _ = rand.Read(buf)
-	name := hex.EncodeToString(buf) + strings.ToLower(filepath.Ext(src))
-	out, err := os.Create(filepath.Join(b.cfg.AudioCache, name))
-	if err != nil {
-		return "", err
+	if ext == "" {
+		ext = "mp3"
 	}
-	defer out.Close()
-	if _, err := io.Copy(out, in); err != nil {
+	name := hex.EncodeToString(buf) + "." + ext
+	if !audioNameRE.MatchString(name) {
+		return "", fmt.Errorf("unsupported audio type %q", ext)
+	}
+	if err := os.WriteFile(filepath.Join(b.cfg.AudioCache, name), data, 0o644); err != nil {
 		return "", err
 	}
 	b.pruneAudio()
 	return name, nil
 }
+
+// Broadcast an avatar speak event: the Live2D window lip-syncs to the cached audio.
+func (b *Bridge) SpeakAudio(audioURL, text string) {
+	b.Broadcast(map[string]any{"type": "speak_audio", "action": "start", "audio_url": audioURL, "text": text})
+}
+
+func (b *Bridge) SpeakEnd() { b.Broadcast(map[string]any{"type": "speak_audio", "action": "end"}) }
+
+// SpeakPlaying: the avatar window claims playback (the office then stays silent).
+func (b *Bridge) SpeakPlaying() { b.Broadcast(map[string]any{"type": "speak_audio", "action": "playing"}) }
 
 func (b *Bridge) pruneAudio() {
 	entries, err := os.ReadDir(b.cfg.AudioCache)
@@ -251,6 +265,9 @@ func (b *Bridge) pruneAudio() {
 }
 
 func (b *Bridge) serveAudio(w http.ResponseWriter, r *http.Request) {
+	if cors(w, r) { // the windows load from file:// — media + wasm fetches need CORS
+		return
+	}
 	name := strings.TrimPrefix(r.URL.Path, "/cache/audio/")
 	if !audioNameRE.MatchString(name) {
 		http.Error(w, "Forbidden", 403)
@@ -296,6 +313,10 @@ func (b *Bridge) static(w http.ResponseWriter, r *http.Request) {
 		return
 	case p == "/live2dcubismcore.min.js":
 		serveFile(w, r, filepath.Join(b.cfg.VendorDir, "live2dcubismcore.min.js"), true)
+		return
+	}
+	if strings.HasPrefix(p, "/api/") || strings.HasPrefix(p, "/v1/") { // an unknown API route answers JSON, never the SPA or Go's text 404
+		writeJSON(w, 404, map[string]any{"error": "unknown endpoint " + p + " (daemon build older than the app?)"})
 		return
 	}
 	if p == "/" {

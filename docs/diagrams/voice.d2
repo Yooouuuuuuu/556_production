@@ -1,0 +1,45 @@
+direction: down
+
+title: "Voice — two modes in the chat window (built 2026-10-03)" {
+  shape: text
+  near: top-center
+  style.font-size: 20
+}
+
+classes: {
+  step: {shape: hexagon}
+  file: {shape: page}
+  ext: {style.fill: "#f3f3f3"; style.stroke: "#999999"}
+}
+
+mode1: "Mode 1 — text chat + press-to-record" {
+  rec: "🎙 press: MediaRecorder (webm/opus) … press again: stop"
+  stt: "POST /api/voice/transcribe -> STT connector" {class: step}
+  box: "text lands in the composer; the Producer sends (or edits) it"
+  rec -> stt -> box
+  box -> normal: "normal text turn (no TTS)"
+  normal: "→ /api/chat"
+}
+
+mode2: "Mode 2 — conversation mode (hands-free): text box LOCKED, strict 1:1 loop" {
+  mic: "mic always open — Silero VAD in the browser (@ricky0123/vad-web, v5)\nthreshold 0.5 · cut after 500 ms silence · pre-roll 0.4 s · min 0.35 s · max 30 s"
+  grace: "grace 0.9 s after a cut: voice resumes -> same turn; else the turn is complete" {class: step}
+  queue: "FIFO of complete turns (cuts made while she answers wait)"
+  stt: "ONE transcription — /api/voice/transcribe" {class: step}
+  chat: "ONE chat turn — /api/chat with X-556-Voice: 1\n(adds the spoken-style hint as an ephemeral system prompt; same session, same memory, same Telegram mirror)" {class: step}
+  tts: "ONE synthesis — /api/voice/speak: sanitize (no markdown/emoji) -> TTS -> cached /cache/audio/<id>" {class: step}
+  play: "ONE playback — speak_audio event: the avatar window plays + lip-syncs (claims 'playing');\nno avatar window -> the office plays" {class: step}
+  guard: "echo guard: mic paused while she speaks (speakers)"
+  mic -> grace -> queue -> stt -> chat -> tts -> play
+  play -> guard -> mic: "resume"
+}
+
+conn: "connectors (home/voice.json, 設定 → 語音連線)" {
+  fish: "Fish Audio — TTS POST /v1/tts {text, reference_id, format}, header model: s1\nASR POST /v1/asr multipart, header model: transcribe-1" {class: ext}
+  oai: "OpenAI-compatible — /audio/speech · /audio/transcriptions" {class: ext}
+  hf: "handsfree: threshold · min_silence_ms · pre_roll_s · grace_s · min_turn_s · max_turn_s · echo_guard · spoken_style" {class: file}
+}
+
+mode1.stt -> conn
+mode2.stt -> conn
+mode2.tts -> conn
