@@ -1,0 +1,2 @@
+{"model": "auto/556", "messages": [{"role": "user", "content": "hi & <b>bye</b>"}],
+ "tools": [{"type": "function", "function": {"name": "ping", "parameters": {"type": "object", "properties": {}}}}]}

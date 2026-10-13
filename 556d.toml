@@ -1,0 +1,46 @@
+# 556d configuration - paths relative to this file's directory unless absolute.
+
+[daemon]
+port = 55600
+
+[hermes]
+home = "home"
+exe  = "vendor/hermes-agent/.venv/Scripts/hermes.exe"
+port = 55610
+# token = ""   # empty = a fresh session token is generated on each start
+
+[embedder]
+enabled = true
+exe   = "bin/llama/llama-server.exe"
+model = "models/bge-m3-Q8_0.gguf"
+port  = 55602
+
+[shim]
+port = 55601                      # Python shim keeps :18767 until S5 repoints consumers
+routing_file = "shim/routing.json"
+timeout_seconds = 600
+
+[shim.backends.qwen]
+base_url = "http://127.0.0.1:18002/v1"
+model = "/mnt/c/localai/models/hub/Qwen3.6-27B-Balanced/Qwen3.6-27B-Uncensored-HauhauCS-Balanced-IQ3_XS.gguf"
+native_tools = true
+
+[shim.backends.gemini]
+base_url = "http://localhost:18765/v1"
+model = "agyapi/gemini-3.1-pro"
+native_tools = false
+
+[shim.backends.gemini-flash]
+base_url = "http://localhost:18765/v1"
+model = "agyapi/gemini-3.7-flash"
+native_tools = false
+
+[shim.backends.claude]
+base_url = "http://localhost:18765/v1"
+model = "agyapi/claude-sonnet-4-6"
+native_tools = false
+
+[shim.backends.claude-opus]
+base_url = "http://localhost:18765/v1"
+model = "agyapi/claude-opus-4-6"
+native_tools = false

@@ -40,7 +40,7 @@ app.whenReady().then(() => {
     },
   });
   win.setMenu(null);
-  win.loadURL('http://127.0.0.1:19200/index.html?embed=1');
+  win.loadURL('http://127.0.0.1:55600/index.html?embed=1'); // served by 556d
 });
 
 ipcMain.on('pet-drag-start', (_e, offset) => startDrag(offset));

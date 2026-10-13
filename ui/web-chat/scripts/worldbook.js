@@ -552,7 +552,7 @@ var WorldBook = {
     var self = this;
     var charId = getActiveCharId() || 'natsume';
     UI.showToast('Loading system prompt preview...', 'info');
-    fetch('http://localhost:19260/api/preview-system-prompt?character_id=' + encodeURIComponent(charId), {
+    fetch('http://127.0.0.1:55600/api/preview-system-prompt?character_id=' + encodeURIComponent(charId), {
       signal: AbortSignal.timeout(10000),
     }).then(function(res) {
       if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -749,7 +749,7 @@ var WorldBook = {
       });
     }
     try {
-      fetch('http://localhost:19260/api/worldbook', {
+      fetch('http://127.0.0.1:55600/api/worldbook', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ entries: entries }),

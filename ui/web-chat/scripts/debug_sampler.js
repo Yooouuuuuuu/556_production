@@ -241,7 +241,7 @@
 
     var startTime = Date.now();
 
-    fetch('http://127.0.0.1:19260/api/debug-llama', {
+    fetch('http://127.0.0.1:55600/api/debug-llama', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify(body),

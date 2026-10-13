@@ -414,7 +414,7 @@ var Studio = {
   // ================================================================
   // Dashboard (embedded, uses daemon API on port 19260)
   // ================================================================
-  dashboardUrl: 'http://localhost:19260',
+  dashboardUrl: 'http://127.0.0.1:55600',
 
   initDashboard: function() {
     var self = this;
@@ -669,7 +669,7 @@ var Studio = {
     fill.style.width = '60%';
     progressText.textContent = 'Waiting for response...';
 
-    fetch('http://127.0.0.1:19260/api/debug-llama', {
+    fetch('http://127.0.0.1:55600/api/debug-llama', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

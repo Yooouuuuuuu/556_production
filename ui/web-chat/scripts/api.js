@@ -4,12 +4,12 @@
 // ============================================================
 
 var ApiClient = {
-  base: 'http://localhost:19260',
+  base: 'http://127.0.0.1:55600',
   _modelsCache: null,
   _modelsPromise: null,
 
   init: function (apiBase) {
-    this.base = apiBase || 'http://localhost:19260';
+    this.base = apiBase || 'http://127.0.0.1:55600';
   },
 
   fetchModels: function () {

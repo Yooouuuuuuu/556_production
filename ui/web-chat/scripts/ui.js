@@ -164,7 +164,7 @@ var UI = {
         showToast(enabled ? 'Reasoning ON — 重启llama中，等~30s' : 'Reasoning OFF — 重启llama中，等~30s');
         // Trigger restart immediately via daemon API
         var xhr = new XMLHttpRequest();
-        xhr.open('POST', 'http://localhost:19260/api/set-rea?mode=' + rea);
+        xhr.open('POST', 'http://127.0.0.1:55600/api/set-rea?mode=' + rea);
         xhr.timeout = 3000;
         try { xhr.send(); } catch(_) {}
       });
@@ -1950,7 +1950,7 @@ var UI = {
 
     // Step 1: daemon generates a paint prompt from conversation context
     // (uses local llama if online, deterministic fallback otherwise).
-    fetch('http://localhost:19260/api/gen-prompt', {
+    fetch('http://127.0.0.1:55600/api/gen-prompt', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ characterId: charId, messages: recentMessages }),
@@ -3001,7 +3001,7 @@ var UI = {
 
             // Trigger Live2D lip-sync via bridge's speak_audio API
             var encodedPath = encodeURIComponent(job.path);
-            fetch('http://localhost:19200/api/speak_audio?action=start&audio_path=' + encodedPath + '&text=' + encodeURIComponent(job.text || ''), {
+            fetch('http://127.0.0.1:55600/api/speak_audio?action=start&audio_path=' + encodedPath + '&text=' + encodeURIComponent(job.text || ''), {
               signal: AbortSignal.timeout(5000),
             }).catch(function() {
               // Bridge might be offline, that's ok - audio still plays in chat
@@ -3016,7 +3016,7 @@ var UI = {
             // Auto-stop lip-sync after estimated duration + 2s
             var estDuration = (job.duration_sec || 8) + 2;
             setTimeout(function() {
-              fetch('http://localhost:19200/api/speak_audio?action=end', {
+              fetch('http://127.0.0.1:55600/api/speak_audio?action=end', {
                 signal: AbortSignal.timeout(5000),
               }).catch(function() {});
             }, estDuration * 1000);
@@ -3061,7 +3061,7 @@ var UI = {
     var recentMessages = this.state.messages.slice(-10);
 
     // Step 1: Ask daemon to generate a paint prompt via LLM (needs llama running)
-    fetch('http://localhost:19260/api/gen-prompt', {
+    fetch('http://127.0.0.1:55600/api/gen-prompt', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -3253,7 +3253,7 @@ var UI = {
   _resolveMediaPath: function(path) {
     // Proxy local files through daemon: /api/media/<encoded-absolute-path>
     if (!path) return '';
-    return 'http://localhost:19260/api/media/' + encodeURIComponent(path);
+    return 'http://127.0.0.1:55600/api/media/' + encodeURIComponent(path);
   },
 
   // Parse MEDIA: directive from message text, returns { cleanText, mediaPath }
@@ -3452,7 +3452,7 @@ var UI = {
 
     if (saveBtn) saveBtn.addEventListener('click', function() {
       var s = getSettings();
-      s.apiBase = document.getElementById('setting-api-base').value.trim() || 'http://localhost:19260';
+      s.apiBase = document.getElementById('setting-api-base').value.trim() || 'http://127.0.0.1:55600';
       s.bridgeUrl = document.getElementById('setting-bridge-url').value.trim() || 'http://localhost:19250';
       s.model = document.getElementById('setting-model-select').value || ApiClient.getDefaultModel();
       s.streamEnabled = document.getElementById('setting-stream').checked;
@@ -3482,7 +3482,7 @@ var UI = {
       // Trigger llama restart if reasoning changed
       var rea = s.reasoningEnabled ? 'on' : 'off';
       var xhr = new XMLHttpRequest();
-      xhr.open('POST', 'http://localhost:19260/api/set-rea?mode=' + rea);
+      xhr.open('POST', 'http://127.0.0.1:55600/api/set-rea?mode=' + rea);
       xhr.timeout = 3000;
       try { xhr.send(); } catch(_) {}
       // Sync mem0 chat toggle
@@ -3575,7 +3575,7 @@ var UI = {
       showToast('Switching model to ' + modelId + '...');
       switchBtn.disabled = true;
       switchBtn.innerHTML = '<i class="ph ph-spinner"></i>';
-      fetch('http://localhost:19260/api/switch-model', {
+      fetch('http://127.0.0.1:55600/api/switch-model', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model_id: modelId }),
@@ -3631,7 +3631,7 @@ var UI = {
     var reasoningToggle = document.getElementById('toggle-setting-reasoning-switch');
     var overlay = document.getElementById('settings-overlay');
 
-    if (apiBase) apiBase.value = s.apiBase || 'http://localhost:19260';
+    if (apiBase) apiBase.value = s.apiBase || 'http://127.0.0.1:55600';
     if (bridgeUrl) bridgeUrl.value = s.bridgeUrl || 'http://localhost:19250';
     if (streamCheckbox) streamCheckbox.checked = s.streamEnabled !== false;
     if (streamToggle) streamToggle.classList.toggle('on', s.streamEnabled !== false);
@@ -3664,7 +3664,7 @@ var UI = {
   checkGateway: function() {
     var self = this;
     // Use daemon API to check gateway status (avoids CORS noise on webchat port)
-    fetch('http://localhost:19260/api/status', { signal: AbortSignal.timeout(3000) })
+    fetch('http://127.0.0.1:55600/api/status', { signal: AbortSignal.timeout(3000) })
       .then(function(r) { return r.json(); })
       .then(function(services) {
         var gw = (Array.isArray(services) ? services : []).find(function(s) { return s.name === 'OpenClaw Gateway'; });
@@ -3715,7 +3715,7 @@ var UI = {
     if (memSource === 'mem0') {
       // Load all memories from daemon, auto-fetch if cache empty
       memViewerBody.innerHTML = '<div class="memory-viewer-loading">Loading memories...</div>';
-      fetch('http://localhost:19260/api/mem0-search?characterId=&query=&limit=50')
+      fetch('http://127.0.0.1:55600/api/mem0-search?characterId=&query=&limit=50')
         .then(function(r) { return r.json(); })
         .then(function(data) {
           if (data.ok && data.results && data.results.length > 0) {
@@ -3734,7 +3734,7 @@ var UI = {
       // Fetch session history from backend
       memViewerBody.innerHTML = '<div class="memory-viewer-loading">Loading session history...</div>';
       var limit = 20;
-      fetch('http://localhost:19260/api/session-history?sessionKey=main&limit=' + limit)
+      fetch('http://127.0.0.1:55600/api/session-history?sessionKey=main&limit=' + limit)
         .then(function(r) { return r.json(); })
         .then(function(data) {
           if (data.ok && data.history && data.history.length > 0) {
@@ -3882,7 +3882,7 @@ var UI = {
       if (startBtn) startBtn.style.display = online ? 'none' : '';
     }
     function checkStatus() {
-      fetch('http://localhost:19200/api/status')
+      fetch('http://127.0.0.1:55600/api/status')
         .then(function(r) { return r.json(); })
         .then(function(d) { setStatus(!!d.ok); })
         .catch(function() { setStatus(false); });
@@ -3891,7 +3891,7 @@ var UI = {
 
     if (startBtn) startBtn.onclick = function() {
       startBtn.textContent = '启动中...';
-      fetch('http://localhost:19260/api/start-service', {
+      fetch('http://127.0.0.1:55600/api/start-service', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: 'Live2D Bridge' }),
@@ -3909,7 +3909,7 @@ var UI = {
     };
 
     if (openBtn) openBtn.onclick = function() {
-      window.open('http://localhost:19200/', '_blank');
+      window.open('http://127.0.0.1:55600/', '_blank');
     };
 
     // LLM link toggle (persists in settings, drives streaming TTS lip-sync)
@@ -3938,7 +3938,7 @@ var UI = {
     var listEl = document.getElementById('live2d-model-list');
     if (!listEl) return;
     listEl.innerHTML = '<div class="live2d-model-loading">加载角色包中...</div>';
-    fetch('http://localhost:19200/api/models')
+    fetch('http://127.0.0.1:55600/api/models')
       .then(function(r) { return r.json(); })
       .then(function(data) {
         if (!data.ok) { listEl.innerHTML = '<div class="live2d-model-empty">加载失败: ' + escapeHtml(data.error || '') + '</div>'; return; }
@@ -3961,7 +3961,7 @@ var UI = {
             // Optimistic UI
             listEl.querySelectorAll('.live2d-model-item').forEach(function(x) { x.classList.remove('active'); });
             el.classList.add('active');
-            fetch('http://localhost:19200/api/switch-model?model=' + encodeURIComponent(model))
+            fetch('http://127.0.0.1:55600/api/switch-model?model=' + encodeURIComponent(model))
               .then(function(r) { return r.json(); })
               .then(function(d) {
                 if (d.ok) {
@@ -4001,7 +4001,7 @@ var UI = {
     if (!canvas) return;
     canvas.innerHTML = '';
     // Load data
-    fetch('http://localhost:19260/api/mem0-viz')
+    fetch('http://127.0.0.1:55600/api/mem0-viz')
       .then(function(r) { return r.json(); })
       .then(function(data) {
         if (!data.ok || !data.points || data.points.length === 0) {

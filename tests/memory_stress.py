@@ -9,7 +9,7 @@ import sys
 import time
 from pathlib import Path
 
-HERMES = r"D:\dev\556_production\hermes-agent\.venv\Scripts\hermes.exe"
+HERMES = r"D:\dev\556_production\vendor\hermes-agent\.venv\Scripts\hermes.exe"
 HOME = r"D:\dev\556_production\home"
 LOG = Path(r"D:\dev\556_production\tests\stress_log.jsonl")
 

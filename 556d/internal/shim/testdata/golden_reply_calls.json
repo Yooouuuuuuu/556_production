@@ -1,0 +1,9 @@
+{
+ "cleaned": "好的，我來查一下。\n\n順便找記憶：\n<tool_call>\n{'name': 'mem0_search', 'arguments': {'query': \"user's city\"}}\n</tool_call>\n<tool_call>\n{not json at all}\n</tool_call>",
+ "calls": [
+  {
+   "name": "get_weather",
+   "arguments": "{\"city\": \"台北\", \"unit\": \"c\", \"n\": 2}"
+  }
+ ]
+}

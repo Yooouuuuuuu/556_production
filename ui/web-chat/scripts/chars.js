@@ -259,7 +259,7 @@ function ensureDefaults(c) {
 
 // ---- Boot: build CHARACTERS from fallback + localStorage first, then API ----
 function loadCharactersFromAPI() {
-  return fetch('http://localhost:19260/api/characters', {
+  return fetch('http://127.0.0.1:55600/api/characters', {
     signal: AbortSignal.timeout(3000),
   })
     .then(function (r) {

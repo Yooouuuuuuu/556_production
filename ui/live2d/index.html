@@ -223,9 +223,14 @@ function stopLipAnalysis() {
 // ========== Network ==========
 function log(s){ st.textContent = s; console.log(s); }
 
+// Bridge WebSocket: same-origin /ws (556d), falling back to the legacy Node bridge port.
+var wsCandidates = ['ws://' + location.host + '/ws', 'ws://' + location.hostname + ':19201'];
+var wsTry = 0;
 function connectWS(){
-  ws = new WebSocket('ws://' + location.hostname + ':19201');
-  ws.onopen = function() { log('ws ok'); };
+  var url = wsCandidates[wsTry % wsCandidates.length];
+  wsTry++;
+  ws = new WebSocket(url);
+  ws.onopen = function() { wsTry = 0; log('ws ok (' + url + ')'); };
   ws.onmessage = function(e) {
     try {
       var d = JSON.parse(e.data);

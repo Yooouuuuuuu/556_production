@@ -1,0 +1,11 @@
+好的，我來查一下。
+<tool_call>
+{"name": "get_weather", "arguments": {"city": "台北", "unit": "c", "n": 2}}
+</tool_call>
+順便找記憶：
+<tool_call>
+{'name': 'mem0_search', 'arguments': {'query': "user's city"}}
+</tool_call>
+<tool_call>
+{not json at all}
+</tool_call>

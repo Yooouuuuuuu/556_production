@@ -1,8 +1,8 @@
 # vendored engine copy — provenance recorded in docs/STACK.md (upstream commit 7166071f)
-hermes-agent/
+vendor/hermes-agent/
 
 # reference clone of momori777/Artemis (read-only study copy)
-reference/
+vendor/artemis/
 
 ui/live2d/node_modules/
 ui/live2d/audio_cache/
@@ -17,3 +17,6 @@ models/
 bin/llama-cpu.zip
 bin/
 tests/stress_log.jsonl
+
+556d.exe
+*.log.err

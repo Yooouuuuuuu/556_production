@@ -18,3 +18,8 @@ avatar = official free samples (Hiyori) for now.
 **System name: 556 Production** (decided 2026-09-30; dir rename happens during the rewrite).
 Order update: media/voice slice moved to LAST (GPU/cloud cost); active fronts:
 naming ✅(system)/her-name-later → backend+frontend rewrite discussion → Path C build.
+
+## 0.2.0 — backend rewrite ✅ DONE 2026-09-30
+Plan of record: docs/PLAN-0.2.0.md. One Go daemon `556d` (supervisor + shim + bridge + UI API)
+beside an untouched Hermes; chat via tui_gateway; existing UIs repointed to the real her;
+ports → 556xx; Artemis-derived backend pieces retired. Frontend unchanged.
