@@ -48,6 +48,9 @@ today (0.7.0, incl. the characters' conversations), dashed pink = later work (Di
 - Per turn: history rebuilt from `state.db` → toolsets for this platform from `platform_toolsets` →
   AIAgent with SOUL + memory block + person file + 【她現在】 state block → LLM via the shim → rows
   appended → the memory worker fans out to kokoro (observe) and psyche (appraisal).
+- The exact bytes of one request — the system prompt block by block (what Hermes and the shim put around
+  the SOUL), the history replay and its cost, the last message's three pieces — are in `../prompt/prompt.md`
+  §1; the design that reshapes them is §2 there.
 - The psyche tick runs on a background thread inside the process, so the engine runs exactly when she
   runs. No Hermes cron: reminders are open loops the tick fires. Output checks use the
   `transform_llm_output` plugin hook and record only at first.

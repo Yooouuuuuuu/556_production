@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.7.9 — 2026-10-15
+
+- **Docs: `docs/prompt/`** — what she reads before she speaks, verified block by block against Hermes
+  `7166071f`, the plugins, the shim and 西's session store: the system prompt (the SOUL first, then about 5k
+  chars of Hermes's own English guidance, environment and profile text, the trailer, and the shim's tools
+  preamble), the history replayed with every past turn's memory and state blocks (`api_content`, so a per-turn
+  line costs 20+ copies per request), and the last message's three pieces. With it the design for 0.8.0: three
+  homes by cost, the six-part SOUL, pinned groups, the clock line, the thinking dials, the vendor-text filter,
+  and the order to build them (`prompt.md` §3, `prompt.d2`). `around-the-soul.md` is the decision brief for
+  the twelve blocks that are not the SOUL — keep / off / replace / drop, with the finding that in 79 turns the
+  two memory tools were never called and a non-existent tool was called eight times. `DECISIONS` 2026-10-15;
+  the 2026-10-02 "prompt layer" entry is superseded. No code change.
+
 ## 0.7.8 — 2026-10-15
 
 - **Fix (data): a conversation with another character rewrote the whole memory store.** kokoro built the counterpart

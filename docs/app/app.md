@@ -42,6 +42,8 @@ What landed since:
 - **0.7.8** (2026-10-15): no UI change. Fix (data): a conversation with another character rewrote that character's
   memory store (counterpart pipelines no longer pass a subject word; KeepsakeDB 1.0.1). `vendor/` is two git
   submodules (Hermes at its pinned commit, KeepsakeDB at `v1.0.1`); the repo is plain git.
+- **0.7.9** (2026-10-15): no UI change. `docs/prompt/` — the request she answers, verified, and the 0.8.0 design
+  (six-part SOUL, thinking dials, pinned groups, clock line, vendor-text filter).
 - **Coming**: see
   `../inner-life/inner-life.md`.
 - **Parked**: packaging (installer, updater, auto-start), pixel-alpha click-through for the avatar,

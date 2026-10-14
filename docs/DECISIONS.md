@@ -92,6 +92,32 @@ Design: `inner-life/inner-life.md` (its §0 lists every decision applied).
 - The narrator cue behind a proactive turn is never the user's words: 556d tags it, the app hides it by default and
   can show it as a note (設定 → 全域 → 程式).
 
+## Decided (2026-10-15) — the prompt: what she reads before she speaks [prompt] [structure] [inner-life]
+- New part `docs/prompt/` (`prompt.md`, `prompt.d2`): one request verified block by block, and the design
+  that reshapes it. Replaces the 2026-10-02 "prompt layer" entry, which promised this design pass.
+- Found 2026-10-14: Hermes puts about 5k chars of English vendor text around the SOUL — help guidance naming
+  her as a Nous Research product with a docs URL, assistant-posture guidance, the Windows host and home path,
+  the profile paths, the model / provider / platform trailer — and the shim opens its tools text with "You
+  are a function calling AI model". None of it was documented; the output checks (說破, 助理腔) flag exactly
+  these leaks on the way out. Decided: switch off what has a switch in `config.yaml`, drop the rest in the
+  shim by exact text, reword the shim's preamble, rewrite the wrappers in zh-TW. Vendor stays unedited.
+- Cost rule, verified in `state.db`: history replays every past user row with its memory and state blocks
+  (`api_content`), so a per-turn line is paid 20+ times per request and a system-prompt line once, cached.
+  Hence three homes by cost; the SOUL-vs-memory rule ("must it shape every reply even when nobody brings it
+  up?"); the six-part SOUL (parts 1–5 in SOUL.md, part 6 dated in the store); pinned groups as reserved tags
+  rendered into kokoro's static block; the clock line at the top of the state block with a pinned timezone
+  and absolute dates; the six thinking dials — five meters in a `thinking` block of `psyche.json`, two
+  multiple-choice sets whose labels never reach the model, one optional 想法 line, rumination as a knob;
+  and the hidden pre-reply scratch for dials 1 and 6 as a proposal behind four checks. Build order: `prompt.md` §3.
+- `around-the-soul.md` is the decision brief for the twelve blocks that are not the SOUL: keep / off / replace /
+  drop per block, and the tools question with the data — in 79 turns the three characters never called
+  `kokoro_search` or `kokoro_forget` and eight times called a tool Hermes does not have (`openmini_reply`,
+  her reply as its argument — the proxy openmini's own anti-truncation reply function, which our shim's
+  "no native channel" preamble made the model write out as text), each costing a second round trip and an
+  error row in history. Recommended
+  there, not yet decided: no tools at baseline, the preamble reworded for extensions. Nothing changes before
+  the decision.
+
 ## Decided (2026-10-15) — vendoring by submodule; plain git [structure]
 - `vendor/hermes-agent` and `vendor/keepsakedb` are git submodules: Hermes at upstream `7166071f` (fetched
   shallow, `ignore = dirty` because the runtime writes caches inside), KeepsakeDB at its release tag (`v1.0.1`).
@@ -289,6 +315,7 @@ Design: `inner-life/inner-life.md` (its §0 lists every decision applied).
 - Test stores so far say 「使用者」 (harness default); the real store starts with 「製作人」.
 
 ## Decided (2026-10-02) — the prompt layer: Producer settings that shape her system prompt [app] [memory]
+- Superseded 2026-10-15 by `prompt/prompt.md` (the design pass promised below) and the entry of that date.
 - Two Settings now write into the selected companion's `memories/USER.md` as managed lines that
   Hermes injects every turn: the **Producer's name** (「名字：…」) and **her reply language**
   (「回覆語言：…」; default = follow the Producer; options en / zh-CN / zh-TW / ja). Both take effect
