@@ -16,7 +16,7 @@ classes: {
 
 legend: |md
   0.5.0–0.7.0 are built (inner-life.md); stage 7 (TTS / Live2D from the state, nostalgia, mood-congruent recall) is later. **purple dashed** = the three lines the first overview missed.
-  Versions: 0.5.0 = state block milestone (L0–L3, A, B) · 0.6.0 = time skeleton, needs, proactive · 0.7.0 = relationships, hurt/repair, three characters
+  Versions: 0.5.0 = state block milestone (L0–L3, A, B) · 0.6.0 = time skeleton, needs, proactive · 0.7.0 = relationships, hurt/repair, three characters · 0.7.4–0.7.5 = two kinds of promise, asking another character, the mailbox, forgetting, undelivered items
 | {near: top-left}
 
 inputs: "inputs" {
@@ -34,7 +34,7 @@ engine: "psyche plugin — inside her Hermes process, beside kokoro; the ONLY wr
   l5: "L5 relationship[p] — warmth, bond, closeness hours, disclosure depth, attachment strength, anxiety/avoidance, trust (Beta), commitment (0.7.0)"
   l6: "L6 hurt ledger[p] — avoidance / resentment / benevolence; forgiveness; olive branch (0.7.0)"
   tom: "theory of mind[p] — presence model, reply latency, other-state (0.6.0)"
-  loops: "open loops — what you said (incl. reminders), her life, her promises, your promises; cue.time / cue.event (0.6.0)"
+  loops: "open loops — what you said (incl. reminders), her promises (only when she agreed), your promises; cue.time\nstates: waiting → due → asked · asking → answered (a promise that needs another character) · forgot (0.7.4–0.7.5)"
   b: "impact model B — deterministic: prototype matching → intensity → half-life/PAD → routing" {class: step}
   aq: "A queue — the appraisal LLM call, fired together with kokoro's observe; results applied at the next tick" {class: step}
   expr: "expression layer — regulation, display rules, five strategies (direct / reserved / humor / inverted / denial)" {class: step}
@@ -55,7 +55,7 @@ db: "psyche.db (her profile)" {
 
 outlets: "outlets" {
   block: "【她現在】 state block — ≤ 8 lines, words not numbers, transitions named;\ninjected at prefetch after the memory block; NEVER waits"
-  event: "event turn — POST to her own API with X-556-Event → a normal row in her ONE conversation\n→ app follower shows it, 556d sends it to Telegram, spoken per the 主動 override (0.6.0)"
+  event: "event turn — POST to her own API with X-556-Event → a normal row in her ONE conversation\n→ app follower shows her answer (the cue itself is a hidden note), 556d sends it to Telegram, spoken per the 主動 override (0.6.0);\nsend_failed → backoff, then 忘了; the cue row is dropped (0.7.4–0.7.5)"
   av: "TTS prosody + Live2D parameters (stage 7)" {class: later}
   page: "狀態 page + simulator — timeline, why, loops, relationship matrix; feedback buttons (too much / right / too little)"
 }
@@ -69,7 +69,7 @@ hermes: "Hermes (vendor, unchanged)" {
 
 d: "556d — hub, read-only here" {
   ro: "reads psyche.db for the 狀態 page; writes psyche.json from Settings (restart applies)"
-  msg: "inter-agent messaging — message_person(p, text) between characters (0.7.0)"
+  msg: "inter-agent messaging — the relay carries a conversation turn by turn (0.7.0); the mailbox keeps a message for a character who is not running until her start (0.7.5)"
 }
 
 inputs.turns -> engine.aq

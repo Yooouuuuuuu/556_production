@@ -1,6 +1,6 @@
 direction: down
 
-title: "556 Production v2 — structure: one process per character, her inner life inside it" {
+title: "556 Production — structure (0.7.5): one process per character, the inner life inside it, 556d around it" {
   shape: text
   near: top-center
   style.font-size: 20
@@ -22,19 +22,19 @@ classes: {
 }
 
 legend: |md
-  solid = runs today (0.6.0) · **dashed pink** = 0.7.0 work
+  solid = runs today (0.7.5) · **dashed pink** = later
 | {near: top-left}
 
-you: "你 — the person (named in Settings, else 製作人)" {shape: person}
+you: "你 — the person (named in 設定 → 全域; else each character's own default term)" {shape: person}
 
 app: "556 Production app (Electron)" {
   office: "office window" {
     chat: "聊天 — the one conversation, source badges"
     roster: "名單 — start / stop / switch"
     memory: "記憶 — long layer; toggle 近期紀錄"
-    settings: "設定 — two tiers · 她會的事 (extensions) · 你 (name)"
-    state: "狀態 — timeline, why, loops (0.5.0+)"
-    proactive: "主動 — schedule tab, no-disturb, sliders (0.6.0)"
+    settings: "設定 — 全域 (you · app · voice connectors · backend knobs) / 角色 (list → a character's page:\n基本 · 記憶 · 能力 · 主動 · 聲音 · 頻道 · config knobs; opening it puts her on stage) (0.7.4)"
+    state: "狀態 — timeline, why, loops (incl. 要問誰 / 問到了 / 忘了), relationships, ledger (0.5.0+)"
+    notes: "system notes — narrator cues, undelivered messages, backend errors: gray, hidden unless 程式 shows them (0.7.4)"
   }
   avatar: "avatar window (Live2D) — follows the chat window"
 }
@@ -42,30 +42,31 @@ app: "556 Production app (Electron)" {
 daemon: "556d (Go, :55600) — hub around her, never inside, never a chat participant" {
   hub: "hub API + /ws events"
   mgr: "companions manager — start (opens her ONE session) / stop (graceful)"
-  transcript: "Transcript — her state.db, read-only"
-  follower: "follower — new rows (Telegram, event turns) -> windows (2 s poll)"
+  transcript: "Transcript — her state.db, read-only; a failed turn's dangling user row is deactivated (active=0) (0.7.4)"
+  follower: "follower — new rows (Telegram, event turns tagged cue / event) -> windows (2 s poll)"
   mirror: "Telegram send — app turns and her event turns -> DM, plain text, no LLM"
-  relay: "relay (0.7.0) — characters talk to each other: a session per pair in each state.db,\none exchange at a time, turn cap; never plugin to plugin"
+  relay: "relay (0.7.0) + mailbox (0.7.5) — characters talk to each other: a session per pair in each state.db,\none exchange at a time, turn cap; a message for a character who is not running waits in home/mailbox and is delivered at her start"
   memapi: "memory page API — her store, delete via command queue"
   psyapi: "狀態 page API — her psyche.db, read-only (0.5.0+)"
   tools: "tools API — baseline [memory] + extensions per character (restart applies)"
+  voice: "voice — global connectors (home/voice.json) with a per-character override (profile voice.json); speak / transcribe use the effective one for the character on stage (0.7.4)"
   sup: "supervisor — job object, planned-stop marker"
   shim: "model shim :55601 (lanes)"
   embedder: "bge-m3 llama-server :55602 (shared)"
 }
 
-mane: "真音 — ONE process: hermes gateway run (HERMES_HOME = home/profiles/mane)" {
+mane: "a character — ONE process: hermes gateway run (HERMES_HOME = home/profiles/<id>)" {
   api: "API server platform\n/v1/chat/completions · /api/sessions"
   tg: "Telegram adapter — her own bot"
   dc: "Discord adapter (later)" {class: proposed}
   mcp: "MCP bindings (later, strictly hers)" {class: proposed}
   agent: "AIAgent — SOUL, toolsets for this platform, compression"
   kokoro: "kokoro plugin (MemoryProvider) — prefetch · observe"
-  psyche: "psyche plugin — THE engine: 1-min tick, A queue, impact model B,\nstate block, event turns; single writer of psyche.db (0.5.0)"
+  psyche: "psyche plugin — THE engine: 1-min tick, A queue, impact model B,\nstate block, event turns, loops (promises, asking others, forgetting); single writer of psyche.db"
   state: "state.db — THE one session + its messages = HISTORY" {class: file}
-  store: "memory/mane.db — KeepsakeDB = MEMORY\nlong (facts, subject 你) · short (dated notes)" {class: file}
+  store: "memory/<id>.db — KeepsakeDB = MEMORY\nlong (facts, subject 你) · short (dated notes)" {class: file}
   psydb: "psyche.db — events · appraisals · instances · snapshots · params (0.5.0)" {class: file}
-  cfg: "SOUL.md · config.yaml · kokoro.json · psyche.json · .env · people/你.md" {class: file}
+  cfg: "SOUL.md · config.yaml · kokoro.json · psyche.json · voice.json (override) · .env · people/你.md" {class: file}
 }
 
 telegram: "Telegram servers" {class: external}

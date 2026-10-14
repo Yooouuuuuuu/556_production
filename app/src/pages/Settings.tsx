@@ -4,6 +4,7 @@ import { VoiceSettings } from './VoiceSettings';
 import { DevSettings } from './DevSettings';
 import { Character } from './Character';
 import { useStore } from '../store';
+import { TIME_FORMATS, fmtDateTime } from '../fmt';
 import { t } from '../i18n';
 
 // 設定 in two layers. 全域: you (name, reply language), the app (character window on start, Telegram
@@ -70,7 +71,7 @@ export function Settings() {
 }
 
 function GlobalSettings() {
-  const { showCues, setShowCues } = useStore();
+  const { showCues, setShowCues, timeFormat, clock24, setTimeFormat, setClock24 } = useStore();
   const [s, setS] = useState<S | null>(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'warn' | 'err'; text: string } | null>(null);
@@ -151,6 +152,16 @@ function GlobalSettings() {
           {t('settings.show_cues')}
         </label>
         <p className="text-xs opacity-60">{t('settings.show_cues_note')}</p>
+        <div>
+          <label className={label}>{t('settings.time_format')}</label>
+          <select className={field} value={timeFormat} onChange={(e) => setTimeFormat(e.target.value as any)}>
+            {TIME_FORMATS.map((f) => <option key={f} value={f}>{t('settings.time_format_' + f)} — {fmtDateTime(Date.now() / 1000, f, clock24)}</option>)}
+          </select>
+        </div>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={clock24} onChange={(e) => setClock24(e.target.checked)} />
+          {t('settings.clock24')}
+        </label>
       </section>
 
       <div className="flex items-center gap-3">

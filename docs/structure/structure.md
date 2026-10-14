@@ -15,7 +15,7 @@ today (0.7.0, incl. the characters' conversations), dashed pink = later work (Di
   appraisal queue, impact model, state block, event turns; single writer of `psyche.db`). 556d only reads
   `psyche.db` (狀態 page) and writes `psyche.json` from Settings, applied by a restart like tool extensions.
 - Tools: baseline toolset per platform = memory only (kokoro_search / kokoro_forget); extensions per
-  character in Settings → 她會的事, written to `platform_toolsets`, applied by a restart. No hot toggling.
+  character in 設定 → 角色 → 能力, written to `platform_toolsets`, applied by a restart. No hot toggling.
 
 ## 2. One turn — `turn-flow.d2`
 

@@ -43,14 +43,27 @@ Design: `inner-life/inner-life.md` (its §0 lists every decision applied).
   the other one 「製作人」 (the SOUL and the history outweigh a note). The relay prefixes every delivered message with the speaker's
   display name, the block's first line names the counterpart, and the SOULs make the producer a role.
 
+## Decided (2026-10-14) — the 狀態 page and loops [app] [inner-life]
+- No light for the model lane: a character's status is online / offline / starting… / stopping… and nothing else; a
+  failed turn shows in the chat as a system note. The feedback buttons on feelings (±5 % gain) are gone from the page.
+- A loop ends with an outcome. Said = done (a reminder, her promise, a report; a report with nothing found is 沒成);
+  settled in conversation = done; seven days = 沒成; forgot stays its own word. The page shows two groups (進行中 /
+  已結束) with five words, finished items for seven days after the day they finished. One timeline by day replaces
+  the event and appraisal lists; the date and clock format are the person's choice (設定 → 全域 → 程式).
+- The same thing said again refreshes the one loop (the appraisal reports `loops.refresh`; the engine merges
+  near-duplicates by text similarity or cue time). Vague promises like 「晚點再說」 are legitimate loops.
+- 記性: `character.memory_reliability` 0–1, default 0.8 and on for every character; P(remember) = 記性 + 0.3 if
+  important − 0.3 × how much worse than usual her mood is.
+
 ## Decided (2026-10-14) — mailbox, forgetting, undelivered [inner-life]
 - Characters message each other through a mailbox: a message for a character who is not running waits in
   `home/mailbox/<id>.json` and is delivered when she starts, continuing the conversation (late delivery carries the
   time it was left; 7-day TTL; 20 per pair). Asking another character is therefore "send once, wait up to 48 h".
 - A due item the platform could not deliver is not used up: it backs off (5/15/60 min, then hourly) and after 6 h is
   marked 忘了 — in the character's world there is no "backend down", she forgot. Forgetting is also a character
-  parameter (`character.forgets`, off by default): base rate from conscientiousness or user-set, lower for important
-  things, higher when tired or low, higher the longer it waited; decided at the due moment with the seeded rng. The
+  parameter: 記性 `character.memory_reliability` (0–1, default 0.8 for every character, `forgets` on by default):
+  P(remember) = 記性 + 0.3 for an important item − 0.3 × how much worse than usual her mood is; decided at the due
+  moment with the seeded rng. The
   state page shows 忘了 at once (transparency over surprise).
 
 ## Decided (2026-10-14) — two kinds of promise [inner-life]

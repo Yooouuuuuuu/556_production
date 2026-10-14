@@ -39,6 +39,9 @@ Rules:
   CHARACTERS listed below (e.g. 「幫你問子睿」), put their ids in "ask"; otherwise [].
 - If {term} answers something {pronoun} was asking on someone's behalf (an open loop marked 代問), list that loop
   under loops.closed and report event_kind loop_resolved with the answer itself written in "cause".
+- If something said now is the SAME thing as an open loop listed below (the reminder asked again, the same plan
+  mentioned again, her 「晚點再說」 repeated), do not open a second loop: put that loop's id under loops.refresh with
+  the new cue_time when one is implied. Open a new loop only for a different thing.
 - Write "cause" as one short sentence in Traditional Chinese from her perspective, naming {term} as 「{term}」.
 Magnitude anchors (keep the scale stable across turns):
   a promise to her broken without notice: v -0.5..-0.7, R 0.6..0.8, devalue 0.4..0.7, intent by how avoidable it was;
@@ -72,6 +75,7 @@ Output JSON only, no prose:
  "loops": {{"new": [{{"what": "...", "origin": "counterpart_said|her_promise|counterpart_promise",
                      "cue_time": "YYYY-MM-DDTHH:MM" | null, "importance": 0..1,
                      "agreed": true|false, "ask": ["character id", ...]}}],
+           "refresh": [{{"id": "loop id", "cue_time": "YYYY-MM-DDTHH:MM" | null}}],
            "closed": ["loop id", ...]}},
  "farewell": false}}"""
 
@@ -166,7 +170,10 @@ def normalize(data: Dict[str, Any], max_events: int = 3) -> Dict[str, Any]:
                         "importance": _f(l.get("importance"), 0, 1, 0.5),
                         "agreed": (l.get("agreed") is not False), "ask": ask[:3]})
     closed = [str(x) for x in (loops.get("closed") or []) if x][:10]
-    return {"events": events, "loops": {"new": new, "closed": closed}, "farewell": bool(data.get("farewell"))}
+    refresh = [{"id": str(r.get("id")), "cue_time": (str(r["cue_time"])[:16] if r.get("cue_time") else None),
+                "importance": _f(r.get("importance"), 0, 1, 0.0)}
+               for r in (loops.get("refresh") or [])[:10] if isinstance(r, dict) and r.get("id")]
+    return {"events": events, "loops": {"new": new, "refresh": refresh, "closed": closed}, "farewell": bool(data.get("farewell"))}
 
 
 def turn_key(session_id: str, user_text: str, assistant_text: str) -> str:

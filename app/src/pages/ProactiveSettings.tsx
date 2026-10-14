@@ -29,6 +29,7 @@ export function ProactiveSettings({ onChanged }: { onChanged(): void }) {
   const label = 'block text-xs opacity-70 mb-1';
   const setP = (k: string, v: any) => setS({ ...s, proactive: { ...p, [k]: v } });
   const setCh = (k: string, v: number) => setS({ ...s, character: { ...ch, [k]: v } });
+  const setChAny = (k: string, v: any) => setS({ ...s, character: { ...ch, [k]: v } });
   const setB5 = (k: string, v: number) => setS({ ...s, character: { ...ch, big5: { ...b5, [k]: v } } });
 
   async function save() {
@@ -131,6 +132,12 @@ export function ProactiveSettings({ onChanged }: { onChanged(): void }) {
           {slider('chronotype', '晨型／夜型', Number(ch.chronotype ?? 0), (v) => setCh('chronotype', v), -1, 1)}
         </div>
       )}
+      <div className="space-y-1">
+        <div className="text-xs opacity-70">{t('proactive.memory_title')}</div>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={ch.forgets !== false} onChange={(e) => setChAny('forgets', e.target.checked)} />{t('proactive.forgets')}</label>
+        {ch.forgets !== false && slider('memory_reliability', t('proactive.forget_rate'), Number(ch.memory_reliability ?? 0.8), (v) => setChAny('memory_reliability', v), 0, 1)}
+        <p className="text-xs opacity-60">{t('proactive.forget_note')}</p>
+      </div>
       <div className="flex items-center gap-3">
         <button className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm disabled:opacity-40" disabled={saving} onClick={save}>{t('proactive.save')}</button>
         {notice && <span className="text-xs opacity-80">{notice}</span>}

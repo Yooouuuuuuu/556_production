@@ -185,7 +185,7 @@ class Engine:
             self.conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_events_dedup ON events(dedup)")
         lcols = {r[1] for r in self.conn.execute("PRAGMA table_info(loops)").fetchall()}
         for col, typ in (("ask", "TEXT"), ("asking", "TEXT"), ("answer", "TEXT"), ("tries", "INTEGER"), ("asked_at", "REAL"),
-                         ("fails", "INTEGER"), ("next_try", "REAL"), ("why", "TEXT")):
+                         ("fails", "INTEGER"), ("next_try", "REAL"), ("why", "TEXT"), ("outcome", "TEXT")):
             if col not in lcols:
                 self.conn.execute(f"ALTER TABLE loops ADD COLUMN {col} {typ}")
         self.conn.commit()
@@ -193,11 +193,26 @@ class Engine:
     def _save_loop(self, l: Dict[str, Any]) -> None:
         """Mirror a loop into the loops table (the 狀態 page reads it; the snapshot is the source of truth)."""
         self.conn.execute("INSERT OR REPLACE INTO loops(id, what, origin, cue_time, importance, state, created_at, closed_at, counterpart, "
-                          "ask, asking, answer, tries, asked_at, fails, next_try, why) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                          "ask, asking, answer, tries, asked_at, fails, next_try, why, outcome) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                           (l["id"], l["what"], l.get("origin"), l.get("cue_time"), float(l.get("importance", 0.5)), l["state"], l["created_at"],
                            l.get("closed_at"), l.get("counterpart") or MAIN, json.dumps(l.get("ask") or [], ensure_ascii=False),
                            l.get("asking"), l.get("answer"), int(l.get("tries") or 0), l.get("asked_at"),
-                           int(l.get("fails") or 0), l.get("next_try"), l.get("why")))
+                           int(l.get("fails") or 0), l.get("next_try"), l.get("why"), l.get("outcome")))
+
+    def _finish(self, l: Dict[str, Any], state: str, t: float, outcome: Optional[str]) -> None:
+        """A loop ends: closed (outcome ok / failed), expired (failed) or forgot. closed_at is the finish day the
+        狀態 page shows for a week."""
+        l["state"], l["closed_at"], l["outcome"], l["next_try"] = state, t, outcome, None
+        self._save_loop(l)
+
+    @staticmethod
+    def _similar(a: str, b: str) -> float:
+        """Character-bigram Jaccard: the backstop that stops the same reminder being opened twice."""
+        def grams(s: str) -> set:
+            s = "".join(ch for ch in (s or "") if not ch.isspace())
+            return {s[i:i + 2] for i in range(len(s) - 1)} if len(s) > 1 else {s}
+        ga, gb = grams(a), grams(b)
+        return len(ga & gb) / max(1, len(ga | gb))
 
     def _held(self, l: Dict[str, Any], t: float) -> bool:
         """A due item backing off after a failed delivery waits for its next try."""
@@ -205,21 +220,22 @@ class Engine:
         return nt is not None and t < float(nt)
 
     def _forget_p(self, l: Dict[str, Any], t: float) -> float:
-        """Chance that she forgets this item as it comes due (character.forgets): the base rate from
-        conscientiousness unless set by hand, lower for important things, higher when tired or low, higher
-        the longer it has been waiting."""
+        """Chance that she forgets this item as it comes due (character.forgets, decided 2026-10-14).
+        P(remember) = 記性 (character.memory_reliability, 0..1, default 0.8) + 0.3 when the item is
+        important (importance ≥ 0.7) − 0.3 × how much worse than usual her mood is (negative affect
+        above her baseline, full at +0.5), clamped to 0..1; this returns 1 − that."""
         ch = self.cfg["character"]
-        if not ch.get("forgets", False):
+        if not ch.get("forgets", True):
             return 0.0
-        rate = ch.get("forget_rate")
-        base = float(rate) if rate is not None else 0.3 * (1.0 - float(ch["big5"].get("conscientiousness", 0.7)))
-        weeks = max(0.0, (t - float(l.get("created_at", t))) / (7 * 86400))
-        p = base * (1.0 - float(l.get("importance", 0.5))) * (1.0 + 0.5 * self.fatigue + 0.5 * float(self.affect.get("neg", 0.0))) * (1.3 ** weeks)
-        return max(0.0, min(0.95, p))
+        rel = float(ch.get("memory_reliability", 0.8))
+        important = float(l.get("importance", 0.5)) >= 0.7
+        mood_bad = max(0.0, min(1.0, (float(self.affect.get("neg", 0.0)) - float(self.derived.get("mu_neg_base", 0.0))) / 0.5))
+        remember = max(0.0, min(1.0, rel + (0.3 if important else 0.0) - 0.3 * mood_bad))
+        return 1.0 - remember
 
     def _forget(self, l: Dict[str, Any], t: float, why: str) -> None:
-        l["state"], l["why"], l["next_try"] = "forgot", why, None
-        self._save_loop(l)
+        l["why"] = why
+        self._finish(l, "forgot", t, None)
         self._event("loop_forgot", {"loop": l["id"], "what": l["what"], "why": why}, t, dedup=f"forgot:{l['id']}")
 
     def _loops_for(self, p: str, states: Tuple[str, ...]) -> List[Dict[str, Any]]:
@@ -288,7 +304,8 @@ class Engine:
                 "fatigue": self.fatigue, "activity": self.activity, "needs": dict(self.needs), "contact": dict(self.contact),
                 "pm": {k: (list(v) if isinstance(v, list) else v) for k, v in self.pm.items()},
                 "share_backlog": list(self.share_backlog), "projects": [dict(p) for p in self.projects], "day": dict(self.day),
-                "rel": self.rel, "ledger": self.ledger, "others": self.others, "gain_adj": dict(self.gain_adj), "last_strategy": dict(self.last_strategy)}
+                "rel": self.rel, "rel_words": {p: RL.closeness_words(r, self._name(p)) for p, r in self.rel.items()},
+                "ledger": self.ledger, "others": self.others, "gain_adj": dict(self.gain_adj), "last_strategy": dict(self.last_strategy)}
 
     def _restore(self, s: Dict[str, Any]) -> None:
         self.tick = int(s["tick"])
@@ -588,9 +605,8 @@ class Engine:
             if l["state"] in ("due", "answered") and l.get("first_fail_at") is not None and \
                     t - float(l["first_fail_at"]) > float(pcfg.get("undelivered_window_h", 6.0)) * 3600:
                 self._forget(l, t, "undelivered")               # could not be delivered for hours: to her, she forgot
-            if l["state"] in ("waiting", "due", "asked", "asking", "answered", "forgot") and t - float(l["created_at"]) > 7 * 86400:
-                l["state"], l["closed_at"] = "expired", t
-                self.conn.execute("UPDATE loops SET state='expired', closed_at=? WHERE id=?", (t, l["id"]))
+            if l["state"] in ("waiting", "due", "asked", "asking", "answered") and t - float(l["created_at"]) > 7 * 86400:
+                self._finish(l, "expired", t, "failed")       # nothing came of it
         # --- waiting for your answer: past your usual latency, a small disappointment, never a follow-up
         aw = self.contact.get("awaiting_since")
         if aw is not None and (t - aw) / 3600.0 > T.latency_p90_h(self.pm, float(self.cfg.get("proactive", {}).get("reply_timeout_default_h", 6.0))):
@@ -825,6 +841,14 @@ class Engine:
         loops = data.get("loops") or {}
         pc = self.cfg.get("proactive", {})
         known = self._known_others()
+        for r in loops.get("refresh") or []:   # the same thing said again: keep the one loop, take the new time
+            lid = str(r.get("id") or "")
+            if lid in self.loops and self.loops[lid]["state"] in ("waiting", "due"):
+                l = self.loops[lid]
+                if r.get("cue_time"):
+                    l["cue_time"], l["state"], l["next_try"] = str(r["cue_time"])[:16], "waiting", None
+                l["importance"] = max(float(l.get("importance", 0.5)), float(r.get("importance") or 0.0))
+                self._save_loop(l)
         for i, l in enumerate(loops.get("new") or []):
             if l.get("agreed") is False and l.get("origin") in ("her_promise", "counterpart_said") and pc.get("promise_requires_agreement", True):
                 continue  # she did not commit: no loop, nothing to come back to
@@ -832,6 +856,14 @@ class Engine:
             cue = l.get("cue_time")
             if not cue and l.get("origin") == "her_promise":   # 「等我一下」: due when the current block ends, else in 30 min
                 cue = self.local(t + 1800).strftime("%Y-%m-%dT%H:%M")
+            dup = next((o for o in self.loops.values() if o["state"] in ("waiting", "due") and self._loop_cp(o) == p
+                        and (self._similar(o["what"], l["what"]) >= 0.6 or (cue and o.get("cue_time") == cue and self._similar(o["what"], l["what"]) >= 0.3))), None)
+            if dup is not None:   # the engine's backstop: the same item again becomes a refresh, never a second loop
+                if cue:
+                    dup["cue_time"], dup["state"], dup["next_try"] = cue, "waiting", None
+                dup["importance"] = max(float(dup.get("importance", 0.5)), float(l.get("importance", 0.5)))
+                self._save_loop(dup)
+                continue
             ask = [x for x in (l.get("ask") or []) if x in known and x != p]
             if not ask:  # the model may name a character instead of the id
                 ask = [i_ for i_, n in known.items() if i_ != p and any(str(x) == n for x in (l.get("ask") or []))]
@@ -853,8 +885,7 @@ class Engine:
                 continue
             if lid not in (loops.get("closed") or []):
                 continue
-            l["state"], l["closed_at"] = "closed", t
-            self.conn.execute("UPDATE loops SET state='closed', closed_at=? WHERE id=?", (t, lid))
+            self._finish(l, "closed", t, "ok")       # settled in conversation: it came to something
             self.needs["certainty"] = max(0.0, self.needs["certainty"] - 0.2)
         if data.get("farewell"):
             self.contact["farewell_until"] = t + 8 * 3600
@@ -903,8 +934,8 @@ class Engine:
                     if e["id"] == p["entry"]:
                         e["olive_offered"] = True
             if lid and lid in self.loops and fk in ("reminder", "return_promise", "report_back"):
-                self.loops[lid]["state"] = "asked"
-                self._save_loop(self.loops[lid])
+                l = self.loops[lid]   # she said it: the item is done; a report that found nothing is done but failed
+                self._finish(l, "closed", t, "failed" if (fk == "report_back" and not l.get("answer")) else "ok")
             elif lid and lid in self.loops and fk == "ask_other":
                 l = self.loops[lid]
                 l["state"], l["asking"], l["asked_at"] = "asking", cp, t
@@ -938,6 +969,7 @@ class Engine:
                     l["fails"] = int(l.get("fails") or 0) + 1
                     l["first_fail_at"] = l.get("first_fail_at") or t
                     l["next_try"] = t + [300, 900, 3600][min(2, l["fails"] - 1)] if l["fails"] <= 3 else t + 3600
+                    l["closed_at"], l["outcome"] = None, None
                     if fk == "report_back":
                         l["state"] = "answered"
                     elif fk in ("reminder", "return_promise"):
@@ -947,14 +979,16 @@ class Engine:
                     self._save_loop(l)
                 elif fk == "ask_other" and l["state"] == "asking":
                     self._ask_outcome(l, None, t)               # she chose not to ask now: next free slot
-                elif fk == "report_back" and l["state"] == "asked":
-                    l["state"], l["next_try"] = "answered", t + 3600   # not the moment to tell you: in an hour
+                elif fk == "report_back" and l["state"] == "closed":
+                    l["state"], l["next_try"], l["closed_at"], l["outcome"] = "answered", t + 3600, None, None   # not the moment: in an hour
+                    self._save_loop(l)
+                elif fk in ("reminder", "return_promise") and l["state"] == "closed":
+                    l["state"], l["next_try"], l["closed_at"], l["outcome"] = "due", t + 3600, None, None        # not the moment: in an hour
                     self._save_loop(l)
         elif kind == "cmd_close_loop":
             lid = p.get("loop")
-            if lid in self.loops and self.loops[lid]["state"] not in ("closed", "expired"):
-                self.loops[lid]["state"], self.loops[lid]["closed_at"] = "closed", t
-                self.conn.execute("UPDATE loops SET state='closed', closed_at=? WHERE id=?", (t, lid))
+            if lid in self.loops and self.loops[lid]["state"] not in ("closed", "expired", "forgot"):
+                self._finish(self.loops[lid], "closed", t, "ok")   # you closed it yourself
         elif kind == "cmd_add_loop":
             lid = f"ol_{k}_cmd_{eid}"
             rec = {"id": lid, "what": str(p.get("what", ""))[:120], "origin": "counterpart_said", "cue_time": p.get("cue_time"),

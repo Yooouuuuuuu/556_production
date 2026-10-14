@@ -44,7 +44,7 @@ event: "Event turns (0.6.0) — she speaks first" {
   text: "chat bubble, source = event"
 }
 
-conn: "connectors (home/voice.json, 設定 → 語音連線)" {
+conn: "connectors — global home/voice.json (設定 → 全域 → 語音連線) + per character home/profiles/<id>/voice.json\n(設定 → 角色 → 聲音: inherit / none / own provider; empty fields filled from the global block of the same kind) (0.7.4)" {
   fish: "Fish Audio — TTS POST /v1/tts {text, reference_id, format}, header model (default s1)\nASR POST /v1/asr multipart, header model: transcribe-1" {class: ext}
   oai: "OpenAI-compatible — /audio/speech · /audio/transcriptions" {class: ext}
   hf: "handsfree: threshold · min_silence_ms · pre_roll_s · grace_s · min_turn_s · max_turn_s · echo_guard · spoken_style" {class: file}

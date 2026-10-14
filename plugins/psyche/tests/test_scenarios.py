@@ -177,7 +177,7 @@ def test_reminder_fires_on_time_through_no_disturb(tmp_path):
     assert reminders() == []                # a spontaneous urge may happen, the reminder may not
     run(e, clock, 0.2)
     assert len(reminders()) == 1
-    assert e.loops[lid]["state"] == "asked"
+    assert e.loops[lid]["state"] == "closed" and e.loops[lid]["outcome"] == "ok"   # said it: done
     assert abs(hour_of(e, e.contact["pending"]["at"]) - 7.0) < 0.05
 
 
@@ -223,7 +223,7 @@ def test_promise_to_you_is_forced_even_at_night(tmp_path):
     e = make(tmp_path, "forced", clock)
     lid = _promise(e, "等她忙完回來找製作人", [])
     run(e, clock, 0.6)
-    assert len(_fired(e, "return_promise")) == 1 and e.loops[lid]["state"] == "asked"
+    assert len(_fired(e, "return_promise")) == 1 and e.loops[lid]["state"] == "closed"
 
 
 def test_promise_through_another_character(tmp_path):
@@ -250,7 +250,8 @@ def test_promise_through_another_character(tmp_path):
     # the report waits for a decent hour: it is 20:40, allowed; it fires at once and is one of her messages to you
     run(e, clock, 0.1)
     reps = _fired(e, "report_back")
-    assert len(reps) == 1 and reps[0][1] == "你" and e.loops[lid]["state"] == "asked"   # events for you carry the subject 你
+    assert len(reps) == 1 and reps[0][1] == "你"                                        # events for you carry the subject 你
+    assert e.loops[lid]["state"] == "closed" and e.loops[lid]["outcome"] == "ok"        # told you what he said: done
 
 
 def test_ask_once_then_wait_then_give_up_in_the_morning(tmp_path):
@@ -264,7 +265,7 @@ def test_ask_once_then_wait_then_give_up_in_the_morning(tmp_path):
     assert e.loops[lid]["tries"] == 1
     run(e, clock, 30)                         # no answer for 20 h: she gives up, and tells you in the morning, once
     assert len(_fired(e, "ask_other")) == 1
-    assert e.loops[lid]["state"] == "asked" and e.loops[lid]["answer"] is None
+    assert e.loops[lid]["state"] == "closed" and e.loops[lid]["outcome"] == "failed" and e.loops[lid]["answer"] is None   # told you: no luck
     reps = _fired(e, "report_back")
     assert len(reps) == 1
     h = hour_of(e, e.conn.execute("select at from events where kind='proactive_fired' order by id desc limit 1").fetchone()[0])
@@ -273,12 +274,12 @@ def test_ask_once_then_wait_then_give_up_in_the_morning(tmp_path):
 
 def test_forgetting_toggle_rate_and_importance(tmp_path):
     clock = Clock(T0)
-    e = make(tmp_path, "noforget", clock)      # default: never forgets
+    e = make(tmp_path, "noforget", clock, cfg(character={"forgets": False}))   # switched off: never forgets
     cue = e.local(T0 + 1800).strftime("%Y-%m-%dT%H:%M")
     lid = _promise(e, "提醒製作人繳電費", [], cue=cue)
     run(e, clock, 1)
-    assert e.loops[lid]["state"] == "asked"
-    c = cfg(character={"forgets": True, "forget_rate": 1.0})
+    assert e.loops[lid]["state"] == "closed"
+    c = cfg(character={"forgets": True, "memory_reliability": 0.0})
     e2 = make(tmp_path, "forgets", clock, c)
     lid2 = _promise(e2, "提醒製作人繳電費", [], cue=e2.local(clock.t + 1800).strftime("%Y-%m-%dT%H:%M"))
     e2.loops[lid2]["importance"] = 0.0          # nothing holds it: certain to slip
@@ -286,14 +287,19 @@ def test_forgetting_toggle_rate_and_importance(tmp_path):
     assert e2.loops[lid2]["state"] == "forgot" and e2.loops[lid2]["why"] == "forgot"
     assert e2.conn.execute("select count(*) from events where kind='loop_forgot'").fetchone()[0] == 1
     assert "繳電費" not in e2.state_block()      # she does not see what she forgot
+    e2.cfg["character"]["memory_reliability"] = 0.7   # an important item adds 0.3: at 0.7 it is always remembered
     lid3 = _promise(e2, "七點叫製作人起床", [], cue=e2.local(clock.t + 1800).strftime("%Y-%m-%dT%H:%M"))
-    e2.loops[lid3]["importance"] = 1.0          # important things are never forgotten
+    e2.loops[lid3]["importance"] = 1.0
     run(e2, clock, 1)
-    assert e2.loops[lid3]["state"] == "asked"
-    # her conscientiousness sets the base rate when none is given
-    e3 = make(tmp_path, "rate", clock, cfg(character={"forgets": True, "big5": {**config.DEFAULTS["character"]["big5"], "conscientiousness": 0.5}}))
-    expect = 0.15 * (1 + 0.5 * e3.fatigue + 0.5 * e3.affect["neg"])   # 0.3 × (1 − C), times the tired / low factor
-    assert abs(e3._forget_p({"importance": 0.0, "created_at": clock.t}, clock.t) - expect) < 1e-6
+    assert e2.loops[lid3]["state"] == "closed"
+    # the default: 記性 0.8 (+ the little her mood sits above its baseline right now)
+    e3 = make(tmp_path, "rate", clock)
+    mood_bad = max(0.0, min(1.0, (e3.affect["neg"] - e3.derived["mu_neg_base"]) / 0.5))
+    assert abs(e3._forget_p({"importance": 0.0, "created_at": clock.t}, clock.t) - (0.2 + 0.3 * mood_bad)) < 1e-6
+    assert abs(e3._forget_p({"importance": 0.9, "created_at": clock.t}, clock.t) - max(0.0, 0.3 * mood_bad - 0.1)) < 1e-6
+    e3.affect["neg"] = e3.derived["mu_neg_base"] + 0.5                  # a really bad day: the full −0.3
+    assert abs(e3._forget_p({"importance": 0.0, "created_at": clock.t}, clock.t) - 0.5) < 1e-6
+    assert abs(e3._forget_p({"importance": 0.9, "created_at": clock.t}, clock.t) - 0.2) < 1e-6
 
 
 def test_undelivered_due_item_backs_off_then_is_forgotten(tmp_path):
@@ -301,7 +307,7 @@ def test_undelivered_due_item_backs_off_then_is_forgotten(tmp_path):
     e = make(tmp_path, "undelivered", clock, cfg(proactive={"undelivered_window_h": 2.0}))
     lid = _promise(e, "提醒製作人繳電費", [], cue=e.local(T0 + 600).strftime("%Y-%m-%dT%H:%M"))
     run(e, clock, 0.3)
-    assert len(_fired(e, "return_promise")) == 1 and e.loops[lid]["state"] == "asked"
+    assert len(_fired(e, "return_promise")) == 1 and e.loops[lid]["state"] == "closed"
     # the platform failed to deliver: not used up — back to due with a backoff, retried, then 忘了 after the window
     e._record_and_apply("send_failed", {"why": "agent error: HTTP 502", "kind": "return_promise", "what": "提醒製作人繳電費", "counterpart": "你", "loop": lid}, counterpart="你")
     assert e.loops[lid]["state"] == "due" and e.loops[lid]["fails"] == 1 and e._held(e.loops[lid], clock.t)
@@ -317,6 +323,27 @@ def test_undelivered_due_item_backs_off_then_is_forgotten(tmp_path):
     run(e, clock, 2.5, on_fire=still_down)
     assert e.loops[lid]["state"] == "forgot" and e.loops[lid]["why"] == "undelivered"
     assert 2 <= len(_fired(e, "return_promise")) <= 6   # backoff: a handful of tries, not one per minute
+
+
+def test_same_thing_twice_is_one_loop(tmp_path):
+    clock = Clock(T0)
+    e = make(tmp_path, "dup", clock, cfg(character={"forgets": False}))
+    cue = e.local(T0 + 12 * 3600).strftime("%Y-%m-%dT%H:%M")
+    def ask(what, cue_time, turn):
+        e.record_appraisal({"events": [], "loops": {"new": [{"what": what, "origin": "counterpart_said", "cue_time": cue_time, "importance": 0.6,
+                                                               "agreed": True, "ask": []}], "closed": []}, "farewell": False},
+                           turn_id=turn, counterpart="製作人", platform="api_server")
+    ask("明早八點提醒製作人繳電費", cue, "t1")
+    ask("提醒製作人明天早上八點要繳電費", cue, "t2")       # the same thing said again: the engine's backstop merges it
+    assert len(e.loops) == 1
+    lid = next(iter(e.loops))
+    # the appraisal itself can say "same as X" and move the time
+    later = e.local(T0 + 14 * 3600).strftime("%Y-%m-%dT%H:%M")
+    e.record_appraisal({"events": [], "loops": {"new": [], "refresh": [{"id": lid, "cue_time": later}], "closed": []}, "farewell": False},
+                       turn_id="t3", counterpart="製作人", platform="api_server")
+    assert len(e.loops) == 1 and e.loops[lid]["cue_time"] == later and e.loops[lid]["state"] == "waiting"
+    ask("週五的面試", None, "t4")                            # a different thing is a second loop
+    assert len(e.loops) == 2
 
 
 def test_farewell_mode(tmp_path):

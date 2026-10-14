@@ -1,6 +1,6 @@
 # The app — 556 Production (Electron + React)
 
-Living doc; last verified 2026-10-06 (0.4.0). The shape decided on 2026-09-30 (notes below) still holds.
+Living doc; last verified 2026-10-14 (0.7.5). The shape decided on 2026-09-30 (notes below) still holds.
 What landed since:
 
 - **0.3.0** (2026-10-01): one app owns 556d's lifecycle; office window with 聊天, 名單, 記憶, 設定 (two tiers
@@ -8,7 +8,7 @@ What landed since:
   following it; tray icon; the Artemis SPA and pet retired.
 - **0.4.0** (2026-10-06): the one conversation per character shown with source badges (Telegram turns
   arrive through the follower); 記憶 shows the long layer with a 近期紀錄 toggle; 名單 shows 收尾中 during a
-  graceful stop; 設定 → 語音連線, 她會的事 (tool extensions, restart applies), 你 (your name, reply language);
+  graceful stop; 設定 gains the voice connectors, tool extensions (restart applies), your name and reply language;
   two voice modes in the chat window (`../voice/voice.md`).
 - **0.5.0** (2026-10-07): 狀態 tab — energy and mood words, feelings right now with their causes, things on her mind,
   recent events and the appraisal per turn, read-only from `psyche.db` (`GET /api/psyche`); Settings → 你 now writes
@@ -20,17 +20,23 @@ What landed since:
 - **0.7.0** (2026-10-13): 狀態 adds the relationship table, the hurt ledger, feedback buttons on feelings, and the
   characters' conversations (when 主動 → visibility allows); 設定 → 主動 adds inter-agent on/off, turn cap, visibility.
   The roster already holds several characters; each has her own one conversation with you.
-- **0.7.3** (2026-10-14): wording made general (no 她 / 製作人 / agency words in the windows); settings in two
-  layers — 設定 is yours and the app's (name, reply language, character window on start, Telegram mirror, voice
-  connectors, backend knobs), while a character's own settings (name, model, memory, abilities, 主動, channel
-  accounts, config knobs) open from its row on 名單 and put it in the chat window first.
-- **Unreleased** (2026-10-14): 設定 → 全域 / 角色 (the character list lives there; 名單 is start / stop / switch only);
-  a voice per character — TTS / STT override on the character's page (`home/profiles/<id>/voice.json`, 「跟全域一樣」
-  by default), applied by 556d for the character on stage (`../voice/voice.md`).
-- **Unreleased** (2026-10-14): narrator cues (the hidden turn behind a proactive message) are tagged by 556d and
-  hidden by the app; 設定 → 全域 → 程式 can show them as a dim 旁白 note, never as your bubble.
-- **Unreleased** (2026-10-14): a failed turn (model lane down) is a system note, never her bubble; 556d drops the
-  dangling user row so it never re-enters her context (`DiscardOrphans`, also swept at her start).
+- **0.7.3** (2026-10-14): wording made general — every pronoun, role word and workplace term left the windows; the
+  character is 「角色」 and the name shows where a name belongs. A page that throws shows its error in place with a retry
+  (React would otherwise unmount the whole window; 0.7.2's 狀態 blank was that).
+- **0.7.4** (2026-10-14): 設定 in two layers — 全域 (you: name, reply language; 程式: character window on start,
+  Telegram mirror, system notes; 語音連線 with the hands-free parameters; backend knobs) and 角色 (the list; a
+  character's page: 基本, 記憶, 能力, 主動, 聲音, 頻道, config knobs — opening it puts the character in the chat window,
+  since 556d edits the one on stage); 名單 is start / stop / switch only. A voice per character (TTS / STT override
+  over the global connectors, `../voice/voice.md`). Narrator cues (the hidden turn behind a proactive message) are
+  tagged by 556d and shown only as gray system notes when 程式 says so; a failed turn (model lane down) is a note too,
+  never a bubble, and its dangling user row is dropped. 狀態 shows the promise flow (要問誰, 第幾次, 答案).
+- **0.7.5** (2026-10-14): your name and reply language reach every character on save; the developer-knob labels
+  without 她; 狀態 names other characters by their display name; loop states 忘了 / 重試中; online / offline wording;
+  設定 → 角色 → 主動 → 記性 (the forgetting toggle). Backend: the mailbox between characters, forgetting, undelivered
+  due items backing off (`../inner-life/inner-life.md`).
+- **0.7.6** (2026-10-14): 狀態 — 熟悉度 back, feedback buttons gone, one 時間線 by day (date format and clock in
+  設定 → 全域 → 程式), 掛念 in 進行中 / 已結束 with five words and a seven-day fade; online / offline / starting… /
+  stopping… wording, no extra light for the model lane; 記性 on the character's 主動 page.
 - **Coming**: see
   `../inner-life/inner-life.md`.
 - **Parked**: packaging (installer, updater, auto-start), pixel-alpha click-through for the avatar,

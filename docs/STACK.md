@@ -41,8 +41,8 @@ instead of spawning if one already serves :55600.
 | `vendor/live2d/` | Cubism Core **4** (`live2dcubismcore.min.js`) | never edited |
 | `assets/live2d/hiyori/` | official free Hiyori model (Cubism-4-era assets, SDK tag 4-r.7) | third-party data |
 | `plugins/` | Python that plugs INTO Hermes: `kokoro/` memory provider on KeepsakeDB (live; linked into `home/plugins/`), platform adapter — planned | ours |
-| `home/` | HERMES_HOME of the agency shell (profile `default`): `config.yaml` (model → shim :55601 lane `auto/556`, `memory.provider: kokoro`), `kokoro.json`, `settings.json`, `plugins/kokoro` (junction), `memory/default.db` (the test stores), legacy `mem0.json` + `mem0_qdrant/` (Path A fallback), sessions | runtime (ignored) |
-| `home/profiles/mane/` | **真音's HERMES_HOME** (Hermes profile `mane`, created with `hermes profile create mane --clone`): her `SOUL.md`, `memories/USER.md` (the Producer's name lives here), `config.yaml`, `kokoro.json` (`subject: 製作人`, `producer_name`), `plugins/kokoro` (junction), `memory/mane.db`, `backups/`, `logs/`; later her `.env` (Telegram/Discord tokens) | runtime (ignored) |
+| `home/` | HERMES_HOME of the shared shell (profile `default`): `config.yaml` (model → shim :55601 lane `auto/556`, `memory.provider: kokoro`), `kokoro.json`, `settings.json`, `plugins/kokoro` (junction), `memory/default.db` (the test stores), legacy `mem0.json` + `mem0_qdrant/` (Path A fallback), sessions | runtime (ignored) |
+| `home/profiles/<id>/` | **a character's HERMES_HOME** (Hermes profile, created by `new-companion.ps1`; `mane` is the disposable test character): `SOUL.md`, `people/*.md` (`你.md` carries your name and reply language as managed lines, written into every profile on save), `config.yaml`, `kokoro.json` (`subject: 你`, `your_name`, `address_default`), `voice.json` (her voice override, optional), `psyche.json`, `.env` (her own bot tokens), `plugins/kokoro` + `plugins/psyche` (junctions), `memory/<id>.db` (KeepsakeDB), `state.db` (sessions = history), `psyche.db` | ours |
 | `shim/routing.json` | lanes → backends (hot-reload): `556`→gemini-flash, `pro`→gemini, `code`→claude | ours |
 | `tools/` | diagnostics: `cdp_shot.mjs` (real-Chrome screenshot), `ws_probe.mjs`, `hub_probe.mjs` | ours |
 | `models/`, `bin/` | bge-m3 Q8_0 GGUF; llama.cpp CPU build (ignored, downloaded) | downloaded |
@@ -96,8 +96,14 @@ on the first chat turn of a session). Never writes the memory tables itself. Eve
 
 **Settings & the config registry**: non-technical knobs directly; developer toggle shows every knob from
 `GET /api/config` (`internal/api/registry.go`: key, group, type, scope, file+path, effect) and writes them
-with `PUT /api/config` into her `config.yaml` / `kokoro.json` / `.env` or the agency's `556d.toml` /
-`shim/routing.json`; effects tell the UI what to restart. Secrets are masked and kept when left empty.
+with `PUT /api/config` into her `config.yaml` / `kokoro.json` / `.env` or the global `556d.toml` /
+`shim/routing.json`; effects tell the UI what to restart. Secrets are masked and kept when left empty. Since 0.7.4
+設定 has two layers: 全域 (`/api/settings` you + app, `/api/voice` connectors, backend knobs) and 角色 (a character's
+page; 556d edits the character on stage, so opening the page selects her). `/api/voice?companion=<id>` reads / writes
+her `voice.json` override; speak and transcribe use the effective config (`voice.Effective`). A failed turn (model
+lane down) is detected in the chat handler: the dangling user row is deactivated (`Transcript.DiscardOrphans`), the
+windows get `chat.error {discarded}` and show gray system notes; `POST /api/history/discard` does the same for a cue
+the engine could not get answered; unanswered rows older than 15 min are swept when her conversation opens.
 
 **Roster / lifecycle** (office tab 名單, route `#/roster`): `GET /api/companions` (every
 `home/profiles/<name>` with a config.yaml: display name from `companion.json`, channels detected from
@@ -134,12 +140,22 @@ id; her answer lands as a normal row; the hooks record `sent` / `silent`. 556d: 
 `proactive`, `life.busyness_mode`, `cares_about`); `POST /api/psyche/command` → `commands` table (close_loop,
 add_loop, life_event). Output checks (checks.py, record only) → `checks` table. Simulator: `tools/psychesim.py`
 (week / day / seeds / replay). Engine modules: life.py (sleep, activities, life events), needs.py, tom.py, urge.py,
-relation.py (L5 per counterpart, the hurt ledger, the expression strategies).
+relation.py (L5 per counterpart, the hurt ledger, the expression strategies). Loops since 0.7.4: a promise opens
+only when she agreed (`agreed`); a promise that needs another character (`ask`) is asked once at her free time
+(`ask_other` → relay), answered by that conversation's appraisal (`asking` → `answered`), reported back
+(`report_back`) when she is up, outside your no-disturb hours and you are around; `proactive.ask_give_up_h` 48.
+Undelivered due items back off (5/15/60 min, hourly) and after `undelivered_window_h` (6) are `forgot`;
+`character.forgets` (default on) / `memory_reliability` (記性, default 0.8): as an item comes due, P(remember) = 記性
++ 0.3 if important − 0.3 × how much worse than usual her mood is. 556d tags narrator cue rows (`source cue`).
 **Multi-agent (0.7.0)**: counterparts by session key (`556:agent:<name>`, source `556`); 556d `relay.go`:
 `POST /api/relay/session` (open + stamp), `POST /api/relay {from, to, text}` (one conversation per pair, turn cap from
-the initiator's psyche.json `proactive.inter_agent_turn_cap`, hub event `relay.turn`), `GET /api/relay/log`; her
-plugins reach 556d at `X556_HUB` (spawn env). Characters: `characters/<id>/` (SOUL, companion.json, psyche.json,
-people/, seeds.jsonl), `install-character.ps1`, `tools/seed-memories.py` (store without an owner, embedder up).
+the initiator's psyche.json `proactive.inter_agent_turn_cap`, hub event `relay.turn`), `GET /api/relay/log` (+
+`pending`, `outbox`); her plugins reach 556d at `X556_HUB` (spawn env). Mailbox (0.7.5): a message for a character
+who is not running waits in `home/mailbox/<id>.json` (20 per pair, 7-day TTL) and is delivered at her start or the
+next sweep, continuing the conversation; late delivery is prefixed with the time it was left. Characters:
+`characters/<id>/` (SOUL, companion.json, psyche.json, kokoro.json keys, people/, seeds.jsonl) — the user's own,
+ignored by git except `characters/README.md`; `install-character.ps1`, `tools/seed-memories.py` (store without an
+owner, embedder up).
 
 ## Third-party inventory (what is not ours, and where it lives)
 
@@ -160,8 +176,8 @@ not copied into `vendor/`. **Services** are called over the network under their 
 | Python | KeepsakeDB (ours, separate repo) → numpy; optional httpx (pipeline LLM client) | MIT | Hermes venv, `setup-vendor.ps1` |
 | Python | `ddgs` (DuckDuckGo search, keyless) for the 查網路 extension | MIT | Hermes venv, `setup-vendor.ps1` |
 | downloaded | llama.cpp CPU build; bge-m3 Q8_0 GGUF | MIT; MIT (BAAI) | `bin/`, `models/` (ignored) |
-| service | Fish Audio (TTS `/v1/tts`, ASR `/v1/asr`) | Fish Audio terms; key in `home/voice.json` | 設定 → 語音連線 |
-| service | Gemini / Claude through the Producer's proxy; Telegram Bot API | provider terms; her own bot token | shim lanes; her `.env` |
+| service | Fish Audio (TTS `/v1/tts`, ASR `/v1/asr`) | Fish Audio terms; key in `home/voice.json` (a character may override in her `voice.json`) | 設定 → 全域 → 語音連線 / 角色 → 聲音 |
+| service | Gemini / Claude through the user's proxy (:18765); Telegram Bot API | provider terms; her own bot token | shim lanes; her `.env` |
 
 Not used (considered and dropped): sherpa-onnx local STT and the MOSS-TTS server from the earlier
 voice agent — 556 uses cloud STT/TTS connectors instead; mem0 + Qdrant (replaced by KeepsakeDB).

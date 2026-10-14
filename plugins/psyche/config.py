@@ -18,8 +18,8 @@ DEFAULTS: Dict[str, Any] = {
     "enabled": True,
     "character": {
         # L0 — Big Five 0..1 and the six character constants (glossary E.1). Human-set per character.
-        "forgets": False,       # may forget a scheduled thing (a reminder, a promise) when it comes due
-        "forget_rate": None,    # base chance per due item; None = 0.3 × (1 − conscientiousness)
+        "forgets": True,            # may forget a scheduled thing (a reminder, a promise) as it comes due
+        "memory_reliability": 0.8,  # 記性 0..1: P(remember) = this + 0.3 if important − 0.3 × how much worse than usual her mood is
         "big5": {"openness": 0.6, "conscientiousness": 0.7, "extraversion": 0.55, "agreeableness": 0.65, "neuroticism": 0.4},
         "self_esteem_stability": 0.6,
         "expressiveness": 0.6,

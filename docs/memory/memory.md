@@ -13,7 +13,8 @@ Living doc. Graph: `memory-layers.d2` (commentary in the last section). Decision
   notes), one file, one observe call, searched concurrently. A recent-exchange layer was tried and removed:
   the last X turns are history, in Hermes's session store, shared by every surface.
 - Memories about you are **stored with the subject word 你** and rendered as her term for you (your name,
-  else 製作人) when injected or shown (2026-10-07, KeepsakeDB 0.2.1 `render_subject`).
+  else the character's own default term, `address_default` in her kokoro.json) when injected or shown (2026-10-07,
+  KeepsakeDB 0.2.1 `render_subject`).
 - Since 0.7.0 the store is shared across her counterparts: memories about another character are written with that
   character's name as the subject (one kokoro pipeline per counterpart, same file), and the other's person file
   (`people/<id>.md`) is injected in those conversations.

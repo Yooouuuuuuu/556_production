@@ -24,7 +24,7 @@ home: "HERMES_HOME = home/profiles/<name> — her folder (runtime, ignored by VC
   people: "people/你.md — the person file (name, reply language written by Settings);\nreplaces memories/USER.md (0.5.0)" {class: file}
   cfg: "config.yaml — model → shim lane · memory.provider: kokoro,\nbuilt-in memory writer OFF · platform_toolsets {api_server, telegram, cli}\n· platforms.telegram: restart notice off, slash commands admin-only" {class: file}
   env: ".env — TELEGRAM_BOT_TOKEN · TELEGRAM_ALLOWED_USERS · TELEGRAM_HOME_CHANNEL\n(API_SERVER_KEY/HOST/PORT arrive from 556d at spawn)" {class: file}
-  kk: "kokoro.json — memory settings (subject 你, your_name, address_default 製作人, layers, LLM, embedder)" {class: file}
+  kk: "kokoro.json — memory settings (subject 你, your_name, address_default per character, layers, LLM, embedder)" {class: file}
   pj: "psyche.json — engine params (personality, constants, time constants; overridable), restart applies (0.5.0)" {class: file}
   plug: "plugins/kokoro → junction (MemoryProvider)" {class: file}
   plug2: "plugins/psyche → junction (engine plugin) (0.5.0)" {class: file}
@@ -58,7 +58,7 @@ gw: "hermes gateway run (Python, one process per character)" {
 d: "556d (Go) — around her, never inside" {
   class: ours
   spawn: "spawn with env; graceful stop via the marker"
-  cfgw: "writes config.yaml / kokoro.json / psyche.json / .env / people/你.md\n(Settings, dev registry, 她會的事, 主動)"
+  cfgw: "writes config.yaml / kokoro.json / psyche.json / .env / people/你.md\n(設定 → 全域 / 角色: 能力, 主動, 聲音, 頻道, dev registry)"
   reads: "reads state.db and psyche.db read-only (history, live tail, 狀態 page);\nopens + stamps her one session at start"
   chat: "POST /v1/chat/completions per app turn (X-Hermes-Session-Id)"
   send: "Telegram send: app turns and her event turns -> her DM (plain text)"

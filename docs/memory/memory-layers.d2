@@ -36,7 +36,7 @@ history: "HISTORY — Hermes session store (state.db)" {
 short: "SHORT-TERM — KeepsakeDB layer \"short\"" {
   desc: |md
     - one LLM-written dated line per turn that would matter next week
-    - no tags; surface stamped (事務所 / Telegram)
+    - no tags; surface stamped (app / Telegram)
     - ring of ~1000, oldest dropped, no TTL
     - 記憶 shows it only behind a toggle (近期紀錄)
     - searched exactly like long: hybrid, top 5, same embedding
@@ -48,7 +48,7 @@ long: "LONG-TERM — KeepsakeDB layer \"long\"" {
     - facts with tags, trust labels [high] / plain
     - add / update / supersede / archive (+ consent windows)
     - **subject stored as 你** (fixed word; vector search stays sharp)
-    - rendered as her term for you (your name, else 製作人) when injected or shown
+    - rendered as her term for you (your name, else the character's own default term) when injected or shown
     - 0.5.0: source · turn_id · valence · arousal · instance_ids (nullable)
     - her own stance: subject = self (0.7.0)
   |

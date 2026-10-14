@@ -48,13 +48,13 @@ async function errorOf(r: Response): Promise<string> {
 
 export type PsycheInstance = { id: string; born_at: number; type: string; target: string; cause: string; intensity0: number; half_life_h: number; stack_key: string; loop_id: string | null; resolved_at: number | null; resolved_by: string | null };
 export type PsycheLoop = { id: string; what: string; origin: string; cue_time: string | null; importance: number; state: string; created_at: number; closed_at: number | null;
-  ask?: string | null; asking?: string | null; answer?: string | null; tries?: number | null; fails?: number | null; why?: string | null };
+  ask?: string | null; asking?: string | null; answer?: string | null; tries?: number | null; fails?: number | null; why?: string | null; outcome?: string | null };
 export type PsycheEvent = { id: number; at: number; kind: string; counterpart: string; payload: any };
 export type PsycheAppraisal = { id: number; at: number; turn_id: string; platform: string; data: any; error: string | null; ms: number; applied_tick: number | null };
 export type PsycheView = { companion: string; exists: boolean; running?: boolean; snapshot_at?: number;
   snapshot?: { tick: number; t: number; affect: { pos: number; neg: number; ar: number }; mood: number[]; energy: number;
     activity?: string; needs?: Record<string, number>; contact?: Record<string, any>; sleep?: Record<string, any>; last_block?: { text?: string; strategy?: string };
-    rel?: Record<string, any>; ledger?: Record<string, any[]>; others?: Record<string, any>; last_strategy?: Record<string, string> };
+    rel?: Record<string, any>; rel_words?: Record<string, string>; ledger?: Record<string, any[]>; others?: Record<string, any>; last_strategy?: Record<string, string> };
   inter_agent_visibility?: boolean;
   instances?: PsycheInstance[]; loops?: PsycheLoop[]; events?: PsycheEvent[]; appraisals?: PsycheAppraisal[];
   checks?: { id: number; at: number; platform: string; hits: Record<string, string[]>; excerpt: string }[]; checks_total?: number };

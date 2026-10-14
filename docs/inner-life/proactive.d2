@@ -1,6 +1,6 @@
 direction: down
 
-title: "Proactive (0.6.0) — one formula decides whether she wants to speak, one occasion decides what, one conversation carries it" {
+title: "Proactive (0.6.0 → 0.7.5) — one formula decides whether she wants to speak, one occasion decides what, one conversation carries it" {
   shape: text
   near: top-center
   style.font-size: 20
@@ -14,7 +14,9 @@ classes: {
 
 tick: "engine tick (every minute while she runs)" {shape: oval}
 
-due: "due open loops — bypass the probability, fire on time:\nreminders you asked for (「明早八點提醒我」) · her 「等我一下」 promise · a loop whose cue arrived" {class: step}
+due: "due open loops — bypass the probability, fire on time:\nreminders you asked for (「明早八點提醒我」) · her promise to you (「等我一下」) — forced through every gate\n(a loop opens only when she agreed, 0.7.4)" {class: step}
+ask: "a promise that needs another character (「幫你問子睿」, loops.ask, 0.7.4):\nasked once at her free time (ask_other → relay; the mailbox keeps it if they are down, 0.7.5),\nanswered by that conversation's appraisal (asking → answered), reported back (report_back) only when she is up,\noutside your no-disturb hours and you are around; no answer for 48 h → 「問不到」" {class: step}
+forgot: "忘了 (0.7.5) — as it comes due she may forget it: P(remember) = 記性 (0.8 default) + 0.3 if important\n− 0.3 × how much worse than usual her mood is; a due item the platform could not deliver\nbacks off 5/15/60 min then hourly and after 6 h is 忘了 too. She does not see it; she owns it when you bring it up" {class: gate}
 
 urge: "urge λ = W × O × p̂_reply × D × 1[gates]; P(fire) = 1 − exp(−λ·Δt)" {
   w: "W willingness — person-specific need gap (protest ↑, despair ↓), novelty gap, share backlog,\nhurt (small ↑, large ↓), anxiety slight ↑, avoidance ↓; clinginess gain 0.5–1.8"
@@ -24,28 +26,34 @@ urge: "urge λ = W × O × p̂_reply × D × 1[gates]; P(fire) = 1 − exp(−λ
   g: "hard gates — your no-disturb window · she is asleep or focused · a conversation or voice loop is live ·\ndaily cap · you already talked a lot today (usage threshold)" {class: gate}
 }
 
-kind: "type: return_promise (highest) · care · share · olive_branch · anniversary · longing (rare)\n+ timing jitter so nothing lands on the hour" {class: step}
+kind: "type: return_promise · reminder (forced) · ask_other · report_back · care · share · olive_branch · anniversary · longing (rare)" {class: step}
 
-event: "event turn — facts of the occasion, X-556-Event, her ONE session id → POST to her own API" {class: step}
-her: "she writes it in her own words — or decides to stay quiet (an allowed outcome)"
+event: "event turn — a narrator cue (【事件】…, never an instruction to send), X-556-Event, her ONE session id → POST to her own API;\n556d tags the cue row (source cue): shown only as a gray system note when 程式 asks, never as your words (0.7.4)" {class: step}
+her: "she writes it in her own words — or decides to stay quiet (an allowed outcome);\na platform error in that place is send_failed: the item is not used up, the cue row is dropped"
 check: "output checks (plugin hook): record only, nothing blocked, no retry" {class: step}
 row: "a normal assistant row in her conversation (state.db)" {class: file}
 
-app: "app window — follower shows it with a source badge; spoken if the 主動 override says so"
+app: "app window — follower shows her answer with the 主動 badge; spoken if the 主動 override says so"
 tg: "Telegram — 556d sends the text with her bot (same path as the app mirror)"
 timer: "wait-for-reply timer — past your p90 latency → small disappointment (anxiety-modulated); NEVER a follow-up"
 
-settings: "設定 → 主動" {
-  sched: "排程 — open loops listed like memories: what, cue, origin; delete = close (0.6.0)"
+settings: "設定 → 角色 → 主動 (and 狀態 → 掛念)" {
+  sched: "掛念 — 進行中 (等待 · 等待(到了) · 等待(等你回) · 進行中(去問了 / 問到了)) and 已結束 (完成 · 沒成 · 忘了, shown for 7 days after the finish day);\nsaid = done; the same thing again refreshes the one loop (appraisal loops.refresh + engine backstop)"
   nodisturb: "免打擾 — time window, overridable per day"
   cap: "每日上限 · usage threshold — visible, adjustable, never a retention knob"
   sliders: "personality sliders → psyche.json (restart applies)"
   speak: "speak proactive messages? (TTS override)"
+  forgets: "記性 — forgets on/off, rate (0.7.5)"
 }
 
 tick -> due
+tick -> ask
 tick -> urge
 due -> kind: "on time"
+ask -> kind: "her free slot / when you are around"
+due -> forgot: "as it comes due"
+her -> forgot: "undelivered for 6 h"
+settings.forgets -> forgot
 urge -> kind: "fired"
 kind -> event
 event -> her

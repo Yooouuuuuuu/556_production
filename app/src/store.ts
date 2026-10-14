@@ -2,6 +2,7 @@
 // the office chat, the avatar bubble and (later) other clients always agree.
 import { create } from 'zustand';
 import { api, BASE } from './api';
+import type { TimeFormat } from './fmt';
 
 export type Msg = { id: string; role: 'user' | 'assistant'; text: string; ts?: number; streaming?: boolean; source?: string; failed?: boolean };
 
@@ -21,6 +22,10 @@ type State = {
   proactiveSpeak: 'follow' | 'always' | 'never'; // 主動 setting: speak her event-turn messages?
   showCues: boolean;                         // 設定 → 全域: show the narrator cues behind proactive turns (source "cue")
   setShowCues(on: boolean): void;
+  timeFormat: TimeFormat;                    // 設定 → 全域: how dates read (年/月/日 · ISO · 日/月/年 · 月/日/年)
+  clock24: boolean;
+  setTimeFormat(f: TimeFormat): void;
+  setClock24(on: boolean): void;
   setHandsFree(on: boolean): void;
   setProactiveSpeak(v: 'follow' | 'always' | 'never'): void;
   setHistory(msgs: Msg[]): void;
@@ -50,6 +55,10 @@ export const useStore = create<State>((set, get) => ({
   proactiveSpeak: 'follow',
   showCues: (() => { try { return localStorage.getItem('556.show_cues') === '1'; } catch { return false; } })(),
   setShowCues(on) { set({ showCues: on }); try { localStorage.setItem('556.show_cues', on ? '1' : '0'); } catch { /* ignore */ } },
+  timeFormat: (() => { try { const v = localStorage.getItem('556.time_format'); return (v === 'iso' || v === 'dmy' || v === 'mdy' || v === 'ymd') ? v : 'ymd'; } catch { return 'ymd'; } })(),
+  clock24: (() => { try { return localStorage.getItem('556.clock24') !== '0'; } catch { return true; } })(),
+  setTimeFormat(f) { set({ timeFormat: f }); try { localStorage.setItem('556.time_format', f); } catch { /* ignore */ } },
+  setClock24(on) { set({ clock24: on }); try { localStorage.setItem('556.clock24', on ? '1' : '0'); } catch { /* ignore */ } },
   setHandsFree(on) { set({ handsFree: on }); },
   setProactiveSpeak(v) { set({ proactiveSpeak: v }); },
 

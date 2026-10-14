@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.7.6 — 2026-10-14
+
+- **狀態 round.** 熟悉度 shows again (the snapshot now carries the closeness words; the page reads the snapshot). The
+  three feedback buttons on feelings are gone. 最近發生 and 每回合的評估 became one 時間線: one line per round (the turn,
+  what the appraisal saw, how many feelings it bore) plus everything else that happened, newest first, grouped by
+  今天 / 昨天 / date; 設定 → 全域 → 程式 chooses the date format (年/月/日 · ISO · 日/月/年 · 月/日/年) and 24 h / 12 h.
+- **掛念 in two groups.** 進行中 (等待, 等待（到了）, 等待（等你回）, 進行中（去問了 / 問到了）) and 已結束 (完成, 沒成, 忘了),
+  finished items shown for seven days after the day they finished, then hidden (the database keeps them). A reminder,
+  her promise or a report counts as done the moment she says it (a report with nothing found is 沒成); a thing you
+  mentioned is done when it comes to something and 沒成 if seven days pass. Saying the same thing again refreshes the
+  one loop instead of opening another (the appraisal reports `loops.refresh`; the engine merges near-duplicates).
+- 名單 and the header say online / offline / starting… / stopping…. No extra light for the model lane: a character's
+  status is hers; a failed turn shows in the chat.
+- 設定 → 角色 → 主動 → 記性: on by default for every character, reliability 0.8. The roll as an item comes due:
+  P(remember) = 記性 + 0.3 for an important item − 0.3 × how much worse than usual her mood is (small things slip one
+  time in five, important ones never; on a really bad day half the small things).
+- Docs and graphs brought up to 0.7.5 (settings in two layers, a voice per character, cues and failed turns, the two
+  kinds of promise, the mailbox, forgetting).
+
 ## 0.7.5 — 2026-10-14
 
 - **Mailbox between characters** (556d `relay.go`): a message for a character who is not running waits in
