@@ -15,6 +15,10 @@ Living doc. Graph: `memory-layers.d2` (commentary in the last section). Decision
 - Memories about you are **stored with the subject word 你** and rendered as her term for you (your name,
   else the character's own default term, `address_default` in her kokoro.json) when injected or shown (2026-10-07,
   KeepsakeDB 0.2.1 `render_subject`).
+- Since 0.7.7 a memory can be **held** (`meta.hold`): kept and embedded, still a dedupe candidate for the observe, but never
+  injected and never hinted at — the psyche engine holds a turn's memories while a hurt from that turn is on its ledger,
+  and releases them when the entry closes (forgiven by time: tagged `舊帳` with the date and rendered with a
+  「（舊帳 …）」 prefix; repaired: plain). KeepsakeDB 0.3.1 `hold` / `patch` commands, `Memory.held`, `meta.prefix`.
 - Since 0.7.0 the store is shared across her counterparts: memories about another character are written with that
   character's name as the subject (one kokoro pipeline per counterpart, same file), and the other's person file
   (`people/<id>.md`) is injected in those conversations.

@@ -123,7 +123,7 @@ func (s *Store) List(ctx context.Context, q, tag string, includeArchived bool, l
 		args = append(args, tag)
 	}
 	if !includeArchived {
-		where = append(where, "m.archived = 0")
+		where = append(where, "m.archived = 0", "json_extract(m.meta, '$.hold') IS NULL") // held = kept but not shown (a hurt on the ledger)
 	}
 	where = append(where, "m.layer = ?")
 	args = append(args, layer)

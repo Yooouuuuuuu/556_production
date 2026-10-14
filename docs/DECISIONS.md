@@ -43,6 +43,14 @@ Design: `inner-life/inner-life.md` (its §0 lists every decision applied).
   the other one 「製作人」 (the SOUL and the history outweigh a note). The relay prefixes every delivered message with the speaker's
   display name, the block's first line names the counterpart, and the SOULs make the producer a role.
 
+## Decided (2026-10-14) — the hurt ledger and memory [inner-life] [memory]
+- The ledger keeps only hurts (TRIM); good things live in trust, warmth, bond and gratitude. No kindness ledger for now.
+- An entry exists only above an opening threshold (`relation.hurt_open_min` 0.1) and is in the prompt the whole time
+  it is open — no hidden interval. While it is open, what that turn left in memory is held (KeepsakeDB `hold`: kept,
+  not shown, not hinted). Forgiven by time → released as `舊帳` with the date and a render prefix; closed by an apology
+  or a correction → released plain. The appraisal sees open entries: a revisit without owning it raises the entry
+  (`revisited_hurt`), an apology cuts the ledger. Tags remain an organising handle, never a search scope.
+
 ## Decided (2026-10-14) — the 狀態 page and loops [app] [inner-life]
 - No light for the model lane: a character's status is online / offline / starting… / stopping… and nothing else; a
   failed turn shows in the chat as a system note. The feedback buttons on feelings (±5 % gain) are gone from the page.

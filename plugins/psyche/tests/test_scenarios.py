@@ -346,6 +346,90 @@ def test_same_thing_twice_is_one_loop(tmp_path):
     assert len(e.loops) == 2
 
 
+def _memory_db(tmp_path, turn_id):
+    """A minimal KeepsakeDB file: one memory from the turn, the command queue the engine writes to."""
+    import sqlite3
+    p = tmp_path / "mem.db"
+    c = sqlite3.connect(str(p))
+    c.executescript("""CREATE TABLE memories(id INTEGER PRIMARY KEY, text TEXT, tokens TEXT, tags TEXT DEFAULT '[]', meta TEXT DEFAULT '{}',
+                       archived INTEGER DEFAULT 0, archive_reason TEXT, created_at REAL, updated_at REAL, layer TEXT DEFAULT 'long');
+                       CREATE TABLE memory_tags(memory_id INTEGER, tag TEXT);
+                       CREATE TABLE commands(id INTEGER PRIMARY KEY, op TEXT, payload TEXT DEFAULT '{}', requested_at REAL, requested_by TEXT, done_at REAL, result TEXT);""")
+    c.execute("INSERT INTO memories(text, tokens, tags, meta, created_at, updated_at) VALUES (?, '', '[]', ?, 0, 0)",
+              ("他建議我走露一點的路線", '{"turn_id": "%s"}' % turn_id))
+    c.commit(); c.close()
+    return p
+
+
+def _commands(path):
+    import sqlite3, json as _j
+    c = sqlite3.connect(str(path))
+    try:
+        return [(op, _j.loads(pl)) for op, pl in c.execute("SELECT op, payload FROM commands ORDER BY id")]
+    finally:
+        c.close()
+
+
+def _slight(e, turn_id, cp="製作人", v=-0.6, R=0.7, intent=0.8):
+    e.record_appraisal({"events": [{"event_kind": "dismissed", "cause": "製作人建議她走露一點的路線吸引流量", "v": v, "R": R, "u": 0.3, "cert": 1.0,
+                                    "agent": "other", "intent": intent, "devalue": 0.6, "ambiguity": 0.1, "other_focus": 0.0, "other_v": 0.0,
+                                    "appeal": 0.0, "q": 0.3, "loop_id": None}], "loops": {"new": [], "closed": []}, "farewell": False},
+                       turn_id=turn_id, counterpart=cp, platform="api_server")
+
+
+def test_hurt_ledger_holds_memory_then_releases_as_old_account(tmp_path):
+    clock = Clock(T0)
+    mem = _memory_db(tmp_path, "t1")
+    e = Engine(tmp_path, "mane", cfg(character={"forgets": False}), db_path=tmp_path / "led.db", now_fn=clock, llm=None, memory_db=mem)
+    e.owner = True
+    e.load()
+    e.live = True
+    e._rel("你")["bond"] = 0.6                      # a friend's slight registers; a careless small one would stay below the threshold
+    _slight(e, "t1")
+    entries = [x for x in e.ledger["你"] if x.get("resolved_at") is None]
+    assert len(entries) == 1 and entries[0]["avoidance"] >= 0.1 and entries[0]["turn_id"] == "t1"
+    assert "心裡還記著一筆" in e.state_block()            # on the ledger = in the prompt, no gate
+    assert _commands(mem) == [("hold", {"turn_id": "t1", "on": True, "reason": f"委屈帳 {entries[0]['id']}"})]
+    # brought up again without being owned: the entry comes back up; the feelings see a dismissal
+    av = entries[0]["avoidance"]
+    e.record_appraisal({"events": [{"event_kind": "revisited_hurt", "cause": "製作人又提了一次那條路線", "v": -0.3, "R": 0.5, "u": 0.1, "cert": 1.0,
+                                    "agent": "other", "intent": 0.7, "devalue": 0.3, "ambiguity": 0.1, "other_focus": 0.0, "other_v": 0.0,
+                                    "appeal": 0.0, "q": 0.3, "loop_id": None, "ledger_id": entries[0]["id"]}],
+                        "loops": {"new": [], "closed": []}, "farewell": False}, turn_id="t2", counterpart="製作人", platform="api_server")
+    assert entries[0]["avoidance"] > av and entries[0]["revisits"] == 1
+    # time forgives: the entry closes and the turn's memories come back as 舊帳 with the date
+    run(e, clock, 24 * 4)
+    assert entries[0]["resolved_at"] is not None and not entries[0].get("repaired")
+    ops = _commands(mem)[1:]
+    assert ops[0] == ("hold", {"turn_id": "t1", "on": False, "reason": entries[0]["resolved_by"]})
+    assert ops[1][0] == "patch" and ops[1][1]["add_tags"] == ["舊帳"] and ops[1][1]["meta"]["prefix"].startswith("（舊帳 2026/10/1")
+    assert "心裡還記著一筆" not in e.state_block()
+
+
+def test_hurt_ledger_repaired_comes_back_plain_and_small_slights_never_open(tmp_path):
+    clock = Clock(T0)
+    mem = _memory_db(tmp_path, "t1")
+    e = Engine(tmp_path, "mane", cfg(character={"forgets": False}), db_path=tmp_path / "rep.db", now_fn=clock, llm=None, memory_db=mem)
+    e.owner = True
+    e.load()
+    e.live = True
+    _slight(e, "t1", v=-0.3, R=0.4, intent=0.1)        # a careless small one: below hurt_open_min — nothing opens, nothing is held
+    assert [x for x in e.ledger.get("你", []) if x.get("resolved_at") is None] == [] and _commands(mem) == []
+    e._rel("你")["bond"] = 0.6
+    _slight(e, "t1")
+    entry = [x for x in e.ledger["你"] if x.get("resolved_at") is None][0]
+    e.record_appraisal({"events": [{"event_kind": "apology", "cause": "製作人說他不該那樣講，對不起", "v": 0.5, "R": 0.6, "u": 0.2, "cert": 1.0,
+                                    "agent": "other", "intent": 0.9, "devalue": 0.0, "ambiguity": 0.0, "other_focus": 0.0, "other_v": 0.0,
+                                    "appeal": 0.0, "q": 0.6, "loop_id": None, "apology_components": 5}],
+                        "loops": {"new": [], "closed": []}, "farewell": False}, turn_id="t3", counterpart="製作人", platform="api_server")
+    assert entry["repaired"]
+    run(e, clock, 24 * 3.5)
+    assert entry["resolved_at"] is not None
+    ops = _commands(mem)
+    assert ops[0][0] == "hold" and ops[-1] == ("hold", {"turn_id": "t1", "on": False, "reason": "repaired"})
+    assert all(op != "patch" for op, _ in ops)       # repaired: plain memory again, no 舊帳
+
+
 def test_farewell_mode(tmp_path):
     clock = Clock(T0)
     e = make(tmp_path, "bye", clock)

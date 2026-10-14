@@ -310,9 +310,9 @@ class KokoroMemoryProvider(MemoryProvider):
             if tool_name == "kokoro_search":
                 k = max(1, min(int(args.get("k", 5) or 5), 20))
                 layer = args.get("layer") if args.get("layer") in ("long", "short") else None
-                hits = self._store.search(str(args.get("query", "")), k=k, archived="meta", layer=layer)
+                hits = [m for m in self._store.search(str(args.get("query", "")), k=k, archived="meta", layer=layer) if not m.held]
                 return json.dumps({"results": [
-                    {"id": m.id, "text": self._render(m.text), "tags": m.tags, "label": m.label, "layer": m.layer,
+                    {"id": m.id, "text": self._render(str(m.meta.get("prefix") or "") + m.text), "tags": m.tags, "label": m.label, "layer": m.layer,
                      "archived_reason": m.archive_reason if m.archived else None,
                      "dense": None if m.dense is None else round(m.dense, 3),
                      "bm25": None if m.bm25 is None else round(m.bm25, 2)} for m in hits]}, ensure_ascii=False)

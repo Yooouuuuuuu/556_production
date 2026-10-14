@@ -145,7 +145,17 @@ def open_entry(*, cause: str, severity: float, intent: float, forbearance: float
     base = _c(severity * intent_factor * (1.0 - forbearance) * (0.5 + anxiety) * (0.5 + bond) * 2.5)
     return {"id": eid, "at": t, "cause": cause, "severity": round(severity, 3), "intent": round(intent, 2),
             "avoidance": round(base, 4), "resentment": round(min(cap, base * 0.8), 4), "benevolence_drop": round(base * 0.5, 4),
+            "avoidance0": round(base, 4), "resentment0": round(min(cap, base * 0.8), 4), "repaired": False, "revisits": 0,
             "resolved_at": None, "resolved_by": None}
+
+
+def ledger_revisit(e: Dict[str, Any], t: float, cap: float = 0.5) -> None:
+    """The matter is brought up again without being owned (justified, repeated, brushed off): the entry
+    comes back up by half of what it opened with."""
+    e["avoidance"] = round(min(1.0, e["avoidance"] + 0.5 * float(e.get("avoidance0", e["avoidance"]))), 4)
+    e["resentment"] = round(min(cap, e["resentment"] + 0.5 * float(e.get("resentment0", e["resentment"]))), 4)
+    e["revisits"] = int(e.get("revisits", 0)) + 1
+    e["revisited_at"] = t
 
 
 def ledger_tick(entries: List[Dict[str, Any]], dt_h: float, *, agreeableness: float, commitment: float, t: float) -> None:
@@ -175,6 +185,7 @@ def ledger_repair(entries: List[Dict[str, Any]], kind: str, components: int, t: 
         if e.get("resolved_at") is None:
             e["avoidance"] = round(e["avoidance"] * f, 4)
             e["resentment"] = round(e["resentment"] * f, 4)
+            e["repaired"] = True   # closed by repair, not by time: its memories come back plain, not as 舊帳
             e["benevolence_drop"] = round(e["benevolence_drop"] * f, 4)
             if (e["avoidance"] + e["resentment"]) < 0.02:
                 e["resolved_at"], e["resolved_by"] = t, kind

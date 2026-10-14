@@ -104,7 +104,8 @@ DEFAULTS: Dict[str, Any] = {
         "report_only_when_awake": True,  # the answer comes back to you outside your no-disturb hours, when you are likely around
     },
     "tom": {"weekly_decay": 0.92},
-    "relation": {"k_bond": 0.004, "k_attachment": 0.0004, "trust_forget_days": 60},
+    "relation": {"k_bond": 0.004, "k_attachment": 0.0004, "trust_forget_days": 60,
+                 "hurt_open_min": 0.1},   # a hurt below this avoidance never opens a ledger entry (no hidden entries)
     # per counterpart priors (id -> fields of relation.fresh): 你, or another character's profile id
     "relationships": {},
     "llm": None,  # None = the llm block of kokoro.json (same lane as the memory observe)

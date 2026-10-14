@@ -113,6 +113,7 @@ class Engine:
         self._send_q: "queue.Queue[Dict[str, Any]]" = queue.Queue()
         self.recent: List[Tuple[str, str]] = []
         self._pending_annot: List[Tuple[str, str, float]] = []
+        self._pending_hold: List[Tuple[str, str, float]] = []   # (turn_id, entry id, deadline): hold the turn's memories once the observe wrote them
         self._intervals: List[Tuple[int, Optional[int]]] = []   # ticks she was running (from start/stop events)
         self.session_id: Optional[str] = None
         self._last_cfg_mtime: Optional[float] = None
@@ -541,8 +542,13 @@ class Engine:
         rcfg = self.cfg.get("relation", {})
         for p in list(self.rel):
             RL.tick(self.rel[p], dt_h, rcfg)
-            RL.ledger_tick(self.ledger.setdefault(p, []), dt_h, agreeableness=float(ch["big5"].get("agreeableness", 0.6)),
+            entries = self.ledger.setdefault(p, [])
+            was_open = {e["id"] for e in entries if e.get("resolved_at") is None}
+            RL.ledger_tick(entries, dt_h, agreeableness=float(ch["big5"].get("agreeableness", 0.6)),
                            commitment=self.rel[p]["commitment"], t=t)
+            for e in entries:
+                if e["id"] in was_open and e.get("resolved_at") is not None:
+                    self._release_memory(e, t, counterpart=p)
         # --- her life: the day's small event, project progress during work
         de = self.day.get("event")
         if de and int(de["tick"]) == k and self.activity not in ("sleep", "lying", "woken"):
@@ -819,6 +825,15 @@ class Engine:
         ch = self.cfg["character"]
         born: List[str] = []
         for n, ev in enumerate(data.get("events", [])):
+            if ev.get("event_kind") == "revisited_hurt":
+                # the matter is brought up again without being owned: the entry comes back up; for the feelings it is a dismissal
+                target = next((e for e in led if e.get("resolved_at") is None and e["id"] == ev.get("ledger_id")), None) \
+                    or next((e for e in reversed(led) if e.get("resolved_at") is None), None)
+                if target is not None:
+                    RL.ledger_revisit(target, t)
+                    self._event("ledger_revisited", {"entry": target["id"], "cause": target["cause"], "avoidance": target["avoidance"]}, t,
+                                counterpart=p, dedup=f"revisit:{aid}:{n}")
+                ev = {**ev, "event_kind": "dismissed"}
             new_ids = self._born_from(ev, k, t, aid, f"{aid}_{n}", counterpart=p)
             born += new_ids
             kind = ev.get("event_kind", "other")
@@ -833,9 +848,18 @@ class Engine:
             for iid in new_ids:
                 inst = self.instances[iid]
                 if inst["type"] == "hurt":
-                    led.append(RL.open_entry(cause=inst["cause"], severity=float(ev.get("R", 0.5)) * abs(float(ev.get("v", 0.0))),
-                                             intent=float(ev.get("intent", 0.3)), forbearance=self.derived["forbearance"], anxiety=rel["anxiety"],
-                                             bond=rel["bond"], t=t, eid=iid))
+                    entry = RL.open_entry(cause=inst["cause"], severity=float(ev.get("R", 0.5)) * abs(float(ev.get("v", 0.0))),
+                                          intent=float(ev.get("intent", 0.3)), forbearance=self.derived["forbearance"], anxiety=rel["anxiety"],
+                                          bond=rel["bond"], t=t, eid=iid)
+                    # an entry exists only above the opening threshold, and then it is in her prompt the whole time it is
+                    # open; while it is open the turn's memories are held (kept, not shown) — decided 2026-10-14
+                    if entry["avoidance"] >= float(self.cfg.get("relation", {}).get("hurt_open_min", 0.1)):
+                        entry["turn_id"] = turn_id
+                        led.append(entry)
+                        self._event("ledger_opened", {"entry": entry["id"], "cause": entry["cause"], "avoidance": entry["avoidance"]}, t,
+                                    counterpart=p, dedup=f"ledger:{iid}")
+                        if turn_id:
+                            self._hold_memory(turn_id, entry["id"])
             if kind in ("apology", "false_belief_corrected"):
                 RL.ledger_repair(led, kind, int(ev.get("apology_components", 3)), t)
         loops = data.get("loops") or {}
@@ -1064,6 +1088,20 @@ class Engine:
             c.close()
 
     def _retry_annotations(self) -> None:
+        if self._pending_hold and self.memory_db:   # the observe may land after the appraisal: hold once the rows exist
+            now = self.now_fn()
+            keep_h = []
+            for turn_id, eid, deadline in self._pending_hold:
+                try:
+                    if self._memory_rows(turn_id) > 0:
+                        self._memory_command("hold", {"turn_id": turn_id, "on": True, "reason": f"委屈帳 {eid}"})
+                        continue
+                    if now > deadline:
+                        continue
+                except Exception:  # noqa: BLE001
+                    pass
+                keep_h.append((turn_id, eid, deadline))
+            self._pending_hold = keep_h
         if not self._pending_annot or not self.memory_db:
             return
         now = self.now_fn()
@@ -1076,6 +1114,55 @@ class Engine:
                 pass
             keep.append((turn_id, patch, deadline))
         self._pending_annot = keep
+
+    # ------------------------------------------------------------------ the hurt ledger and her memory (2026-10-14)
+    def _memory_rows(self, turn_id: str) -> int:
+        c = sqlite3.connect(str(self.memory_db), timeout=5)
+        try:
+            return int(c.execute("SELECT COUNT(*) FROM memories WHERE json_extract(meta, '$.turn_id') = ?", (turn_id,)).fetchone()[0])
+        finally:
+            c.close()
+
+    def _memory_command(self, op: str, payload: Dict[str, Any]) -> None:
+        """A command for the memory engine's owner (kokoro, in this same process): the queue the memory page
+        uses for deletes. Holding and releasing a turn's memories goes through it — one writer, no stale index."""
+        c = sqlite3.connect(str(self.memory_db), timeout=5)
+        try:
+            c.execute("INSERT INTO commands(op, payload, requested_at, requested_by) VALUES (?,?,?,?)",
+                      (op, json.dumps(payload, ensure_ascii=False), self.now_fn(), "psyche"))
+            c.commit()
+        finally:
+            c.close()
+
+    def _hold_memory(self, turn_id: str, eid: str) -> None:
+        """While a hurt from this turn is on the ledger, what the turn left in her memory is kept but not shown."""
+        if not self.memory_db or not Path(self.memory_db).exists():
+            return
+        try:
+            if self._memory_rows(turn_id) > 0:
+                self._memory_command("hold", {"turn_id": turn_id, "on": True, "reason": f"委屈帳 {eid}"})
+            else:
+                self._pending_hold.append((turn_id, eid, self.now_fn() + 900))
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("psyche: memory hold skipped: %s", exc)
+
+    def _release_memory(self, e: Dict[str, Any], t: float, *, counterpart: str) -> None:
+        """The entry closed. Forgiven by time: its memories come back as 舊帳 with the date it happened (she
+        remembers the matter, the sting is gone). Closed by an apology or a correction: they come back plain."""
+        how = "repaired" if e.get("repaired") else str(e.get("resolved_by") or "forgiven")
+        self._event("ledger_closed", {"entry": e["id"], "cause": e["cause"], "how": how}, t, counterpart=counterpart, dedup=f"closed:{e['id']}")
+        turn_id = e.get("turn_id")
+        if not turn_id or not self.memory_db or not Path(self.memory_db).exists():
+            return
+        self._pending_hold = [x for x in self._pending_hold if x[1] != e["id"]]
+        try:
+            self._memory_command("hold", {"turn_id": turn_id, "on": False, "reason": how})
+            if not e.get("repaired"):
+                date = self.local(float(e["at"])).strftime("%Y/%m/%d")
+                self._memory_command("patch", {"turn_id": turn_id, "add_tags": ["舊帳"],
+                                               "meta": {"old_account_date": date, "prefix": f"（舊帳 {date}）"}, "reason": how})
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("psyche: memory release skipped: %s", exc)
 
     # ------------------------------------------------------------------ inputs (live)
     def record_appraisal(self, data: Optional[Dict[str, Any]], *, raw: str = "", error: Optional[str] = None, ms: float = 0.0,
@@ -1206,10 +1293,11 @@ class Engine:
                     loops.append({**l, "note": note})
                 today = self.local(job["at"]).strftime("%Y-%m-%d %H:%M")
                 ac = self.cfg["appraisal"]
+                ledger = [{"id": e["id"], "cause": e["cause"]} for e in self.ledger.get(cp, []) if e.get("resolved_at") is None]
                 data, raw, err, ms = A.run(self.llm, term=job["term"], cares_about=self.cfg.get("cares_about", []), loops=loops,
                                            recent=job["recent"], user_text=job["user"], assistant_text=job["assistant"], today=today,
                                            max_events=int(ac["max_events"]), retries=int(ac["retries"]), pronoun=self.pr,
-                                           others=self._known_others())
+                                           others=self._known_others(), ledger=ledger)
                 self.record_appraisal(data, raw=raw, error=err, ms=ms, turn_id=job["turn_id"], counterpart=job.get("counterpart", MAIN),
                                       platform=job["platform"], at=job["at"])
                 if err:
@@ -1382,7 +1470,7 @@ class Engine:
             lines.append("表現：" + "；".join(how))
             rel_line = RL.closeness_words(rel, term)
             open_hurt = [e for e in led if e.get("resolved_at") is None]
-            if open_hurt and gate >= 0.15:
+            if open_hurt:   # on the ledger = in her prompt, the whole time (entries below hurt_open_min never open)
                 rel_line += f"；心裡還記著一筆（{open_hurt[-1]['cause'][:30]}）"
             if rel["hours"] > 0 or rel["bond"] > 0 or counterpart != MAIN:
                 lines.append(f"對{term}：{rel_line}")

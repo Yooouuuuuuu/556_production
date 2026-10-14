@@ -61,6 +61,9 @@ function eventText(e: PsycheEvent, nameOf: (p: string) => string): string {
     case 'loop_due': return `⏰ 到了：${p.what ?? ''}`;
     case 'loop_answered': return `📨 問到了${p.answer ? `：${p.answer}` : '（沒問到）'}`;
     case 'loop_forgot': return `🙈 忘了：${p.what ?? ''}${p.why === 'undelivered' ? '（沒送出去）' : ''}`;
+    case 'ledger_opened': return `💢 記了一筆：${p.cause ?? ''}`;
+    case 'ledger_revisited': return `💢 又提起了：${p.cause ?? ''}`;
+    case 'ledger_closed': return `${p.how === 'repaired' ? '🕊 和解了' : '🍂 放下了（成了舊帳）'}：${p.cause ?? ''}`;
     case 'cmd_feedback': return `🎚 回饋：${EMOTION_ZH[p.type] ?? p.type} ${p.verdict}`;
     case 'cmd_close_loop': return '✔ 你關掉了一件掛念';
     case 'cmd_add_loop': return `➕ 你加了提醒：${p.what ?? ''}`;

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.7 — 2026-10-14
+
+- **The hurt ledger and memory.** An entry opens only above `relation.hurt_open_min` (0.1) and then sits in her state
+  block the whole time it is open (the old 0.15 display gate is gone, so nothing exists without showing). While it is
+  open, the memories that turn produced are held in KeepsakeDB (kept, embedded, still a dedupe candidate, never
+  injected or hinted at); when it closes by time they come back tagged 舊帳 with the date and a 「（舊帳 …）」 prefix,
+  when it closes by an apology or a correction they come back plain. The appraisal now sees the open ledger: bringing
+  the matter up again without owning it (`revisited_hurt`) raises the entry by half of what it opened with; an apology
+  cuts it. Events 記了一筆 / 又提起了 / 和解了 / 放下了 on the timeline; the 記憶 page does not list held rows.
+  Requires KeepsakeDB 0.3.1 (`hold` / `patch` commands, `meta.prefix`), installed editable from `D:\dev\KeepsakeDB`.
+
 ## 0.7.6 — 2026-10-14
 
 - **狀態 round.** 熟悉度 shows again (the snapshot now carries the closeness words; the page reads the snapshot). The

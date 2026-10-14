@@ -37,6 +37,8 @@ What landed since:
 - **0.7.6** (2026-10-14): 狀態 — 熟悉度 back, feedback buttons gone, one 時間線 by day (date format and clock in
   設定 → 全域 → 程式), 掛念 in 進行中 / 已結束 with five words and a seven-day fade; online / offline / starting… /
   stopping… wording, no extra light for the model lane; 記性 on the character's 主動 page.
+- **0.7.7** (2026-10-14): 時間線 shows the hurt ledger's life (記了一筆 / 又提起了 / 和解了 / 放下了); 記憶 does not list
+  held rows (a turn whose hurt is on the ledger). Backend: the ledger ↔ memory rules (`../inner-life/inner-life.md` §9).
 - **Coming**: see
   `../inner-life/inner-life.md`.
 - **Parked**: packaging (installer, updater, auto-start), pixel-alpha click-through for the avatar,

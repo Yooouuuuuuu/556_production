@@ -18,7 +18,7 @@ EVENT_KINDS = [
     "promise_kept", "promise_broken", "ignored", "dismissed", "praised_her", "criticized_her",
     "shared_news_good", "shared_news_bad", "apology", "disclosed_personal", "asked_about_her",
     "remembered_detail", "forgot_detail", "compared_her", "farewell", "return_after_absence",
-    "false_belief_corrected", "loop_resolved", "small_talk", "other",
+    "false_belief_corrected", "loop_resolved", "revisited_hurt", "small_talk", "other",
 ]
 LOOP_ORIGINS = ("counterpart_said", "her_promise", "counterpart_promise")
 
@@ -39,6 +39,9 @@ Rules:
   CHARACTERS listed below (e.g. 「幫你問子睿」), put their ids in "ask"; otherwise [].
 - If {term} answers something {pronoun} was asking on someone's behalf (an open loop marked 代問), list that loop
   under loops.closed and report event_kind loop_resolved with the answer itself written in "cause".
+- The HURT LEDGER below lists what {pronoun} still holds against {term}. If {term} brings one of those matters up
+  again without owning it (justifies it, repeats it, brushes it off), report event_kind revisited_hurt with its
+  "ledger_id". If {term} owns it, report apology (with "ledger_id" when it is clearly about that matter).
 - If something said now is the SAME thing as an open loop listed below (the reminder asked again, the same plan
   mentioned again, her 「晚點再說」 repeated), do not open a second loop: put that loop's id under loops.refresh with
   the new cue_time when one is implied. Open a new loop only for a different thing.
@@ -65,6 +68,7 @@ Fields per event (numbers in the given ranges):
   appeal: -1..1 like / dislike of a thing or idea mentioned (0 if none)
   q: 0..1 quality of this interaction (deep, attentive = high; one-liners = low)
   loop_id: id of a related open loop, or null
+  ledger_id: id of the hurt-ledger entry this is about (revisited_hurt / apology), or null
   she_disclosed: true if {pronoun} opened up about something personal in the reply
   other_disclosed: true if {term} opened up about something personal
   ppr: {{"understood": 0..1, "validated": 0..1, "cared": 0..1}} — how {term} responded to what {pronoun} had shared (only when relevant, else null)
@@ -82,9 +86,11 @@ Output JSON only, no prose:
 
 def build_user(term: str, cares_about: Sequence[str], loops: Sequence[Dict[str, Any]],
                recent: Sequence[Tuple[str, str]], user_text: str, assistant_text: str,
-               others: Optional[Dict[str, str]] = None) -> str:
+               others: Optional[Dict[str, str]] = None, ledger: Optional[Sequence[Dict[str, Any]]] = None) -> str:
     parts = ["## What she cares about"]
     parts += [f"- {c}" for c in cares_about] or ["- (nothing listed)"]
+    parts.append(f"\n## Hurt ledger (what she still holds against {term}; id: what happened)")
+    parts += [f"- {e['id']}: {e['cause']}" for e in (ledger or [])] or ["- none"]
     parts.append("\n## Other characters of the story (id: name) — use the id in loops.new.ask")
     parts += [f"- {i}: {n}" for i, n in (others or {}).items()] or ["- none"]
     parts.append("\n## Open loops (things she is waiting on)")
@@ -155,6 +161,7 @@ def normalize(data: Dict[str, Any], max_events: int = 3) -> Dict[str, Any]:
             "other_focus": _f(ev.get("other_focus"), 0, 1, 0.0), "other_v": _f(ev.get("other_v"), -1, 1, 0.0),
             "appeal": _f(ev.get("appeal"), -1, 1, 0.0), "q": _f(ev.get("q"), 0, 1, 0.3),
             "loop_id": (str(ev["loop_id"]) if ev.get("loop_id") else None),
+            "ledger_id": (str(ev["ledger_id"]) if ev.get("ledger_id") else None),
             "she_disclosed": bool(ev.get("she_disclosed")), "other_disclosed": bool(ev.get("other_disclosed")),
             "ppr": _ppr(ev.get("ppr")), "apology_components": int(_f(ev.get("apology_components"), 0, 6, 3)),
             "other_tired": bool(ev.get("other_tired")),
@@ -186,10 +193,10 @@ def turn_key(session_id: str, user_text: str, assistant_text: str) -> str:
 def run(llm: Any, *, term: str, cares_about: Sequence[str], loops: Sequence[Dict[str, Any]],
         recent: Sequence[Tuple[str, str]], user_text: str, assistant_text: str, today: str,
         max_events: int = 3, retries: int = 1, pronoun: str = "她",
-        others: Optional[Dict[str, str]] = None) -> Tuple[Optional[Dict[str, Any]], str, Optional[str], float]:
+        others: Optional[Dict[str, str]] = None, ledger: Optional[Sequence[Dict[str, Any]]] = None) -> Tuple[Optional[Dict[str, Any]], str, Optional[str], float]:
     """-> (normalized data or None, raw reply, error, ms). Retries once on a bad reply."""
     system = SYSTEM.format(term=term, today=today, kinds=", ".join(EVENT_KINDS), max_events=max_events, pronoun=pronoun)
-    user = build_user(term, cares_about, loops, recent, user_text, assistant_text, others)
+    user = build_user(term, cares_about, loops, recent, user_text, assistant_text, others, ledger)
     t0 = time.perf_counter()
     raw, err = "", None
     for attempt in range(1 + max(0, retries)):

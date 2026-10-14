@@ -1,7 +1,7 @@
 {
   "name": "556-production",
   "productName": "556 Production",
-  "version": "0.7.6",
+  "version": "0.7.7",
   "description": "556 Production - the agency where hearts are made",
   "private": true,
   "main": "out/main.js",
