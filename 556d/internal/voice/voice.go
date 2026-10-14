@@ -17,6 +17,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -103,6 +104,79 @@ func (c Config) Masked() map[string]any {
 			"voice": p.Voice, "format": p.Format, "language": p.Language}
 	}
 	return map[string]any{"tts": m(c.TTS), "stt": m(c.STT), "handsfree": c.HandsFree}
+}
+
+// Override is one character's voice (home/profiles/<id>/voice.json). A provider block whose kind is
+// "inherit" (or empty) uses the global connector; "none" switches that side off for this character;
+// a configured block replaces it, and fields left empty (base_url, api_key, model, format, language)
+// are filled from the global block of the same kind, so changing only the voice id is enough.
+// Hands-free parameters are global (they are about your microphone, not the character).
+type Override struct {
+	TTS Provider `json:"tts"`
+	STT Provider `json:"stt"`
+}
+
+const Inherit = "inherit"
+
+func LoadOverride(path string) Override {
+	o := Override{TTS: Provider{Kind: Inherit}, STT: Provider{Kind: Inherit}}
+	if b, err := os.ReadFile(path); err == nil {
+		_ = json.Unmarshal(b, &o)
+	}
+	if o.TTS.Kind == "" {
+		o.TTS.Kind = Inherit
+	}
+	if o.STT.Kind == "" {
+		o.STT.Kind = Inherit
+	}
+	return o
+}
+
+func SaveOverride(path string, o Override) error {
+	b, _ := json.MarshalIndent(o, "", "  ")
+	return os.WriteFile(path, b, 0o600)
+}
+
+// Masked returns the override safe for the UI: keys replaced by a flag.
+func (o Override) Masked() map[string]any {
+	m := func(p Provider) map[string]any {
+		return map[string]any{"kind": p.Kind, "base_url": p.BaseURL, "api_key_set": p.APIKey != "", "model": p.Model,
+			"voice": p.Voice, "format": p.Format, "language": p.Language}
+	}
+	return map[string]any{"tts": m(o.TTS), "stt": m(o.STT)}
+}
+
+// Effective is the config a character speaks and listens with: the global config with that
+// character's override applied (profileDir "" = the global config alone).
+func Effective(globalPath, profileDir string) Config {
+	c := Load(globalPath)
+	if profileDir == "" {
+		return c
+	}
+	o := LoadOverride(filepath.Join(profileDir, "voice.json"))
+	apply := func(dst *Provider, ov Provider) {
+		switch ov.Kind {
+		case Inherit, "":
+			return
+		case "none":
+			*dst = Provider{Kind: "none"}
+			return
+		}
+		if ov.Kind == dst.Kind {
+			ov.BaseURL = firstNonEmpty(ov.BaseURL, dst.BaseURL)
+			ov.APIKey = firstNonEmpty(ov.APIKey, dst.APIKey)
+			ov.Model = firstNonEmpty(ov.Model, dst.Model)
+			ov.Format = firstNonEmpty(ov.Format, dst.Format)
+			ov.Language = firstNonEmpty(ov.Language, dst.Language)
+		}
+		*dst = ov
+	}
+	apply(&c.TTS, o.TTS)
+	apply(&c.STT, o.STT)
+	if c.STT.APIKey == "" && c.STT.Kind == c.TTS.Kind && c.STT.Kind != "none" {
+		c.STT.APIKey = c.TTS.APIKey
+	}
+	return c
 }
 
 func (p Provider) Configured() bool { return p.Kind != "" && p.Kind != "none" }

@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/Yooouuuuuuu/556_production/556d/internal/companions"
 )
 
 // 狀態 page API: a read-only view of her psyche.db (the psyche plugin inside her Hermes process is
@@ -69,8 +71,26 @@ func (a *API) psycheHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	out["instances"] = psycheQuery(db, "SELECT id, born_at, type, target, cause, intensity0, half_life_h, stack_key, loop_id, resolved_at, resolved_by FROM instances ORDER BY born_at DESC LIMIT 60",
 		"id", "born_at", "type", "target", "cause", "intensity0", "half_life_h", "stack_key", "loop_id", "resolved_at", "resolved_by")
-	out["loops"] = psycheQuery(db, "SELECT id, what, origin, cue_time, importance, state, created_at, closed_at FROM loops ORDER BY created_at DESC LIMIT 40",
-		"id", "what", "origin", "cue_time", "importance", "state", "created_at", "closed_at")
+	lcols := map[string]bool{}
+	if rows, err := db.Query("PRAGMA table_info(loops)"); err == nil {
+		for rows.Next() {
+			var cid int
+			var name, typ string
+			var notnull, pk int
+			var dflt any
+			if rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk) == nil {
+				lcols[name] = true
+			}
+		}
+		rows.Close()
+	}
+	if lcols["ask"] { // 0.7.4+: a promise that needs another character (ask / asking / answer / tries)
+		out["loops"] = psycheQuery(db, "SELECT id, what, origin, cue_time, importance, state, created_at, closed_at, ask, asking, answer, tries FROM loops ORDER BY created_at DESC LIMIT 40",
+			"id", "what", "origin", "cue_time", "importance", "state", "created_at", "closed_at", "ask", "asking", "answer", "tries")
+	} else {
+		out["loops"] = psycheQuery(db, "SELECT id, what, origin, cue_time, importance, state, created_at, closed_at FROM loops ORDER BY created_at DESC LIMIT 40",
+			"id", "what", "origin", "cue_time", "importance", "state", "created_at", "closed_at")
+	}
 	out["events"] = psycheQuery(db, "SELECT id, at, kind, counterpart, payload FROM events ORDER BY id DESC LIMIT 60",
 		"id", "at", "kind", "counterpart", "payload")
 	out["appraisals"] = psycheQuery(db, "SELECT id, at, turn_id, platform, data, error, ms, applied_tick FROM appraisals ORDER BY id DESC LIMIT 20",
@@ -92,19 +112,8 @@ func (a *API) psycheHandler(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-// isSilence: her answer to an event turn that means "not now" (events.py SILENCE).
-func isSilence(s string) bool {
-	s = strings.Trim(strings.TrimSpace(s), "「」\"'()（）")
-	if s == "" || s == "沉默" {
-		return true
-	}
-	for _, e := range []string{"Model generated invalid tool call", "does not exist. Available tools", "Tool '", "[error", "Error:"} {
-		if strings.HasPrefix(s, e) || strings.Contains(s, e) {
-			return true // a platform error, not her words
-		}
-	}
-	return false
-}
+// isSilence: her answer to an event turn that means "not now" (events.py SILENCE), or a platform error.
+func isSilence(s string) bool { return companions.IsSilence(s) }
 
 // hotPaths are the psyche.json keys the engine re-reads every tick; anything else needs her restart.
 var hotPaths = []string{"proactive", "life.busyness_mode", "cares_about"}

@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.7.4 — 2026-10-14
+
+- **A failed turn leaves nothing behind.** When the model lane is down (or the agent errors), Hermes stores your
+  message and no answer, and the platform's error text came back as her bubble, was spoken to the avatar, and the
+  dangling user row re-entered her context on the next successful turn. Now 556d detects the failure
+  (`finish_reason: error`, `hermes.error`, or a platform-error text), deactivates that user row (`active = 0`, the
+  same flag Hermes uses to rewind), turns your undelivered message and the error into gray system notes (hidden
+  unless 設定 → 全域 → 程式 shows system notes, like the narrator cues), and neither mirrors nor speaks it. A cue the platform could not answer is dropped the same way (the engine calls
+  `POST /api/history/discard`), and when her conversation opens at start, unanswered rows older than 15 minutes
+  (a Telegram turn during the outage, an old cue) are swept.
+- **Two kinds of promise** (`docs/inner-life/inner-life.md` §13, §16). A loop opens only when she agreed in her
+  reply (the appraisal reports `agreed`; declining is her SOUL's business). A promise that concerns only her and you
+  is forced through at its time, as before. A promise that needs another character (「幫你問子睿」: the appraisal fills
+  `ask`) is carried to that character at her free time (`ask_other`, through the relay), the answer is taken from that
+  conversation's appraisal (loop state `asking` → `answered`), and the result comes back to you (`report_back`) only
+  when she is up, outside your no-disturb hours and when your presence model says you are around; no answer → retry at
+  the next free slot, give up after `proactive.ask_retry_max`. 狀態 shows each step (要問誰, 第幾次, 答案); her state
+  block says 已去問… / 問到了…. Knobs: `promise_requires_agreement`, `ask_retry_max`, `ask_timeout_h`,
+  `report_only_when_awake`. Four new engine tests.
+- **Narrator cues are never your words.** The hidden turn behind a proactive message (the 【事件】 cue the
+  psyche engine posts) used to surface as one of your bubbles whenever the chat reloaded its history (and stayed
+  there when the model failed to answer). 556d now tags such rows (`source: cue`; her answer `event`; silence or a
+  platform error in that place `cue`) in history and in the live follower alike; the app hides them by default
+  and 設定 → 全域 → 程式 has a switch to show them, styled as a dim centered 旁白 note. The follower also attaches
+  correctly when a cue landed before it did (her answer was filed as an app turn and hidden).
+- The engine records `send_failed` when the platform answers a cue with an error instead of her words (every
+  model backend down): Hermes stores the cue but calls no hook, so nothing was recorded and 狀態 stayed at 想開口.
+- **設定 has two tabs**: 全域 (you, the app, the global voice connectors, the backend knobs) and 角色, a list of
+  the characters; a character's page opens from that list, not from 名單 any more (名單 is only start / stop /
+  switch).
+- **A voice per character.** Each character's page has a 聲音 section: TTS and STT blocks that say 「跟全域一樣」
+  by default, or override the global connector for that character (only the differing fields are needed, e.g.
+  another Fish Audio reference_id). Stored in `home/profiles/<id>/voice.json`; 556d speaks and transcribes with the
+  effective config of the character on stage (`/api/voice/speak`, `/api/voice/transcribe`) or of `?companion=`.
+  Hands-free parameters stay global (they are about your microphone).
+
 ## 0.7.3 — 2026-10-14
 
 - **The app speaks generally**: no pronoun for the character (她), no role word for you (製作人), no agency

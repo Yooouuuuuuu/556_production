@@ -100,6 +100,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/memory", a.memoryList)          // her memory: view (delete-only page)
 	mux.HandleFunc("/api/memory/delete", a.memoryDelete) // through the KeepsakeDB command queue
 	mux.HandleFunc("/api/chat", a.chat)                  // same handler; the app and probes use this path
+	mux.HandleFunc("/api/history/discard", a.historyDiscard) // a failed turn's dangling user row, dropped (the engine, for cues)
 	mux.HandleFunc("/api/voice", a.voiceHandler)         // cloud STT/TTS connectors (home/voice.json)
 	mux.HandleFunc("/api/voice/test", a.voiceTest)       // TTS -> STT round trip
 	mux.HandleFunc("/api/voice/transcribe", a.voiceTranscribe) // raw audio -> text (push-to-talk / conversation mode)
@@ -260,7 +261,11 @@ func (a *API) chat(w http.ResponseWriter, r *http.Request) {
 		system = voice.Load(a.voicePath()).HandsFree.SpokenStyle
 	}
 	res, err := cl.Chat(ctx, text, key, sid, system)
-	if res.Reply != "" { // her reply arrives whole (see hermesapi.Chat); the windows render it as one delta
+	// a failed turn (the model lane down, an agent error): the platform's text is never her words. Nothing of it
+	// is kept — the dangling user row is deactivated so it cannot re-enter her context later — and the windows
+	// get a system note instead of a bubble; no mirror, no avatar bubble.
+	failed := err != nil || res.Err != "" || res.Status == "error" || companions.IsPlatformError(res.Reply)
+	if res.Reply != "" && !failed { // her reply arrives whole (see hermesapi.Chat); the windows render it as one delta
 		a.emit(map[string]any{"type": "chat.delta", "companion": name, "text": res.Reply})
 		if sse != nil {
 			sse(map[string]any{"content": res.Reply}, nil, nil)
@@ -274,19 +279,46 @@ func (a *API) chat(w http.ResponseWriter, r *http.Request) {
 	}
 	status := res.Status
 	reply := res.Reply
-	if err != nil {
-		log.Printf("[api] %s: hermes api error: %v", name, err)
-		a.emit(map[string]any{"type": "chat.error", "companion": name, "message": err.Error()})
-		if reply == "" {
-			reply = "（她好像遇到了問題：" + err.Error() + "）"
+	if failed {
+		why := res.Err
+		if err != nil {
+			why = err.Error()
+		} else if why == "" {
+			why = strings.TrimSpace(res.Reply)
 		}
-		status = "error"
-	} else if res.Err != "" {
-		a.emit(map[string]any{"type": "chat.error", "companion": name, "message": res.Err})
-		if reply == "" {
-			reply = "（她好像遇到了問題：" + res.Err + "）"
-			status = "error"
+		dsid := sid
+		if dsid == "" {
+			dsid = slot.id
 		}
+		n := 0
+		if dsid != "" {
+			var derr error
+			if n, derr = a.mgr.Transcript(name).DiscardOrphans(dsid, text, 0); derr != nil {
+				log.Printf("[api] %s: could not discard the unanswered row: %v", name, derr)
+			}
+		}
+		log.Printf("[api] %s: turn failed, nothing kept (discarded %d row): %s", name, n, why)
+		a.emit(map[string]any{"type": "chat.error", "companion": name, "message": why, "text": text, "discarded": n > 0})
+		a.emit(map[string]any{"type": "chat.complete", "companion": name, "text": "", "status": "error"})
+		a.emit(map[string]any{"type": "companion.state", "companion": name, "talking": false})
+		if reply == "" {
+			reply = "（她好像遇到了問題：" + why + "）"
+		}
+		if sse != nil {
+			sse(map[string]any{"content": reply}, "error", res.Usage)
+			_, _ = io.WriteString(w, "data: [DONE]\n\n")
+			if fl, ok := w.(http.Flusher); ok {
+				fl.Flush()
+			}
+			return
+		}
+		writeJSON(w, 200, map[string]any{
+			"id": id, "object": "chat.completion", "created": created, "model": "556",
+			"choices": []any{map[string]any{"index": 0, "finish_reason": "error",
+				"message": map[string]any{"role": "assistant", "content": reply}}},
+			"usage": res.Usage,
+		})
+		return
 	}
 	if ctx.Err() != nil {
 		status = "timeout"
@@ -506,9 +538,64 @@ func (a *API) openConversation(name string) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	if _, _, _, err := a.conversation(ctx, name, cl); err != nil {
+	_, sid, _, err := a.conversation(ctx, name, cl)
+	if err != nil {
 		log.Printf("[api] %s: could not open her conversation at start: %v", name, err)
+		return
 	}
+	// leftovers of failed turns (a Telegram turn while the lane was down, a cue nobody could answer): user rows
+	// at the tail of her conversation with no answer, older than 15 min, never re-enter her context
+	if sid != "" {
+		if n, derr := a.mgr.Transcript(name).DiscardOrphans(sid, "", float64(time.Now().Add(-15*time.Minute).Unix())); derr == nil && n > 0 {
+			log.Printf("[api] %s: discarded %d unanswered row(s) left by failed turns", name, n)
+		}
+	}
+}
+
+// historyDiscard: drop the dangling user row of a turn that failed — the psyche engine calls it for a
+// cue the platform could not answer (POST {companion, session_id?, text?}).
+func (a *API) historyDiscard(w http.ResponseWriter, r *http.Request) {
+	if cors(w, r, "POST, OPTIONS") {
+		return
+	}
+	if r.Method != http.MethodPost {
+		writeJSON(w, 405, map[string]any{"error": "POST only"})
+		return
+	}
+	var body struct {
+		Companion string `json:"companion"`
+		SessionID string `json:"session_id"`
+		Text      string `json:"text"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeJSON(w, 400, map[string]any{"error": err.Error()})
+		return
+	}
+	name := body.Companion
+	if name == "" {
+		name = a.selectedName()
+	}
+	if name == "" || !a.mgr.Exists(name) {
+		writeJSON(w, 404, map[string]any{"error": errNoCompanion.Error()})
+		return
+	}
+	sid := body.SessionID
+	if sid == "" {
+		sid = a.currentConversation(name)
+	}
+	if sid == "" {
+		writeJSON(w, 200, map[string]any{"discarded": 0})
+		return
+	}
+	n, err := a.mgr.Transcript(name).DiscardOrphans(sid, body.Text, 0)
+	if err != nil {
+		writeJSON(w, 502, map[string]any{"error": err.Error()})
+		return
+	}
+	if n > 0 {
+		log.Printf("[api] %s: discarded %d unanswered row(s) on request", name, n)
+	}
+	writeJSON(w, 200, map[string]any{"discarded": n})
 }
 
 // conversation resolves which Hermes session an app turn continues.
@@ -610,7 +697,11 @@ func (a *API) follow(name, channel string) {
 	f := a.followers[name]
 	if f == nil || f.sessionID != sid {
 		max, _ := tr.MaxID(sid)
-		a.followers[name] = &follower{sessionID: sid, cursor: max, lastUser: "app"} // a new conversation: start from now
+		nf := &follower{sessionID: sid, cursor: max, lastUser: "app"} // a new conversation: start from now
+		if tr.LastUserIsCue(sid) { // a cue landed before we attached: her next row is its answer, not an app turn
+			nf.event, nf.lastUser = true, "event"
+		}
+		a.followers[name] = nf
 		a.mu.Unlock()
 		return
 	}
@@ -633,15 +724,18 @@ func (a *API) follow(name, channel string) {
 		if m.Role == "user" {
 			f.lastUser = m.Source
 		}
-		// her own event turn (the psyche engine speaks first): the user row is her prompt, not you — hidden;
-		// her answer shows with source "event" and goes to Telegram like an app turn; silence shows nothing
-		if m.Role == "user" && strings.HasPrefix(strings.TrimSpace(m.Text), "【事件】") {
-			f.event = true
+		// her own event turn (the psyche engine speaks first): the user row is the narrator cue, not you — the
+		// app shows it as a note only when asked (source "cue"); her answer shows with source "event" and goes
+		// to Telegram like an app turn; silence (or a platform error) is a cue-styled note, never her words
+		if m.Role == "user" && m.Source == "cue" {
+			f.event, f.lastUser = true, "event"
+			a.emit(map[string]any{"type": "chat.user", "companion": name, "text": m.Text, "source": "cue"})
 			continue
 		}
 		if f.event && m.Role == "assistant" {
 			f.event = false
 			if isSilence(m.Text) {
+				a.emit(map[string]any{"type": "chat.complete", "companion": name, "text": m.Text, "status": "stop", "source": "cue"})
 				continue
 			}
 			a.emit(map[string]any{"type": "chat.complete", "companion": name, "text": m.Text, "status": "stop", "source": "event"})

@@ -30,3 +30,4 @@ characters/*/
 tests/*.txt
 tests/*.err
 tests/*.jsonl
+*.exe~

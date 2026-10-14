@@ -47,7 +47,8 @@ async function errorOf(r: Response): Promise<string> {
 }
 
 export type PsycheInstance = { id: string; born_at: number; type: string; target: string; cause: string; intensity0: number; half_life_h: number; stack_key: string; loop_id: string | null; resolved_at: number | null; resolved_by: string | null };
-export type PsycheLoop = { id: string; what: string; origin: string; cue_time: string | null; importance: number; state: string; created_at: number; closed_at: number | null };
+export type PsycheLoop = { id: string; what: string; origin: string; cue_time: string | null; importance: number; state: string; created_at: number; closed_at: number | null;
+  ask?: string | null; asking?: string | null; answer?: string | null; tries?: number | null };
 export type PsycheEvent = { id: number; at: number; kind: string; counterpart: string; payload: any };
 export type PsycheAppraisal = { id: number; at: number; turn_id: string; platform: string; data: any; error: string | null; ms: number; applied_tick: number | null };
 export type PsycheView = { companion: string; exists: boolean; running?: boolean; snapshot_at?: number;
@@ -113,20 +114,21 @@ export const api = {
     return r.json() as Promise<{ settings: Settings; restart_required: boolean; reembed_required: boolean }>;
   },
   restartHermes: () => fetch(BASE + '/api/restart-hermes', { method: 'POST' }),
-  voice: () => get<{ voice: VoiceConfig; kinds: string[] }>('/api/voice'),
+  // voice connectors: global, or one character's override (+ the effective config) with `companion`
+  voice: (companion?: string) => get<{ voice: VoiceConfig; effective?: VoiceConfig; kinds: string[]; companion?: string }>('/api/voice' + (companion ? `?companion=${encodeURIComponent(companion)}` : '')),
   config: () => get<{ knobs: Knob[]; companion: string }>('/api/config'),
   updateConfig: async (patch: Record<string, any>) => {
     const r = await fetch(BASE + '/api/config', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) });
     if (!r.ok) throw new Error(await errorOf(r));
     return r.json() as Promise<{ effects: Record<string, boolean>; errors: string[] }>;
   },
-  updateVoice: async (patch: Partial<VoiceConfig>) => {
-    const r = await fetch(BASE + '/api/voice', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) });
+  updateVoice: async (patch: Partial<VoiceConfig>, companion?: string) => {
+    const r = await fetch(BASE + '/api/voice' + (companion ? `?companion=${encodeURIComponent(companion)}` : ''), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) });
     if (!r.ok) throw new Error(await errorOf(r));
-    return r.json() as Promise<{ voice: VoiceConfig }>;
+    return r.json() as Promise<{ voice: VoiceConfig; effective?: VoiceConfig }>;
   },
-  testVoice: async (text?: string) => {
-    const r = await fetch(BASE + '/api/voice/test', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }) });
+  testVoice: async (text?: string, companion?: string) => {
+    const r = await fetch(BASE + '/api/voice/test' + (companion ? `?companion=${encodeURIComponent(companion)}` : ''), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }) });
     if (!r.ok) throw new Error(await errorOf(r));
     return r.json() as Promise<{ tts: { ok: boolean; ms?: number; bytes?: number; error?: string; audio_data_url?: string }; stt: { ok: boolean; ms?: number; text?: string; error?: string } }>;
   },

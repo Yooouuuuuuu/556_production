@@ -222,8 +222,93 @@ func (t *Transcript) query(q string, args ...any) ([]rawMessage, error) {
 	return out, rs.Err()
 }
 
+// IsCue: the psyche engine's narrator cue, stored as a "user" row when the character speaks first.
+// It is never the user's words; the app shows it only on request, styled as a note.
+func IsCue(text string) bool { return strings.HasPrefix(strings.TrimSpace(text), "【事件】") }
+
+// IsPlatformError: text the platform returned in place of her words (the model lane down, an invented
+// tool, an agent error). Never shown as hers, never kept.
+func IsPlatformError(s string) bool {
+	s = strings.TrimSpace(s)
+	for _, e := range []string{"Model generated invalid tool call", "does not exist. Available tools", "Tool '", "[error", "Error:",
+		"API call failed", "all backends failed", "HTTP 502", "HTTP 503", "HTTP 500"} {
+		if strings.HasPrefix(s, e) || strings.Contains(s, e) {
+			return true
+		}
+	}
+	return false
+}
+
+// IsSilence: her answer to a cue that means "not now" (events.py SILENCE), or a platform error
+// returned in place of her words.
+func IsSilence(s string) bool {
+	s = strings.Trim(strings.TrimSpace(s), "「」\"'()（）")
+	return s == "" || s == "沉默" || IsPlatformError(s)
+}
+
+// DiscardOrphans deactivates the trailing user rows of a session that never got an answer: a turn
+// that failed (the model lane down), or a cue the platform could not answer. Hermes stores the user
+// message before the call and nothing after a failure, so the row would otherwise re-enter her
+// context on the next successful turn (and the app's history). text limits it to that one message
+// (the newest match); before > 0 keeps rows newer than that epoch (turns still in flight).
+func (t *Transcript) DiscardOrphans(sessionID, text string, before float64) (int, error) {
+	db, err := t.open(false)
+	if err != nil {
+		return 0, err
+	}
+	defer db.Close()
+	var lastA sql.NullInt64
+	_ = db.QueryRow(`SELECT MAX(id) FROM messages WHERE session_id = ? AND role = 'assistant' AND active = 1`, sessionID).Scan(&lastA)
+	rows, err := db.Query(`SELECT id, content, timestamp FROM messages WHERE session_id = ? AND role = 'user' AND active = 1 AND id > ? ORDER BY id`,
+		sessionID, lastA.Int64)
+	if err != nil {
+		return 0, err
+	}
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		var c sql.NullString
+		var ts sql.NullFloat64
+		if rows.Scan(&id, &c, &ts) != nil {
+			continue
+		}
+		if text != "" && strings.TrimSpace(contentText(c)) != strings.TrimSpace(text) {
+			continue
+		}
+		if before > 0 && ts.Valid && ts.Float64 > before {
+			continue
+		}
+		ids = append(ids, id)
+	}
+	rows.Close()
+	if text != "" && len(ids) > 1 {
+		ids = ids[len(ids)-1:]
+	}
+	n := 0
+	for _, id := range ids {
+		if _, err := db.Exec(`UPDATE messages SET active = 0 WHERE id = ?`, id); err == nil {
+			n++
+		}
+	}
+	return n, nil
+}
+
+// LastUserIsCue reports whether a session's newest user row is a narrator cue — an event turn in
+// flight whose answer has not landed yet.
+func (t *Transcript) LastUserIsCue(sessionID string) bool {
+	db, err := t.open(true)
+	if err != nil {
+		return false
+	}
+	defer db.Close()
+	var c sql.NullString
+	_ = db.QueryRow(`SELECT content FROM messages WHERE session_id = ? AND role = 'user' AND active = 1 ORDER BY id DESC LIMIT 1`, sessionID).Scan(&c)
+	return IsCue(contentText(c))
+}
+
 // attribute marks each message's surface: a user message with a platform message id came
-// through a channel; her reply belongs to the question before it.
+// through a channel; her reply belongs to the question before it. A narrator cue is "cue", her
+// answer to it "event" (silence or a platform error in that place is "cue" too: not her words).
 func attribute(rows []rawMessage, channel, lastUserSource string) []Message {
 	if channel == "" {
 		channel = "channel"
@@ -232,6 +317,11 @@ func attribute(rows []rawMessage, channel, lastUserSource string) []Message {
 	for _, r := range rows {
 		m := r.Message
 		switch {
+		case r.Role == "user" && IsCue(r.Text):
+			m.Source = "cue"
+			lastUserSource = "event"
+		case r.Role == "assistant" && lastUserSource == "event" && IsSilence(r.Text):
+			m.Source = "cue"
 		case r.Role == "user" && r.channel:
 			m.Source = channel
 			lastUserSource = channel

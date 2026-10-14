@@ -194,6 +194,80 @@ def test_her_promise_comes_back(tmp_path):
     assert len(rows) == 1 and '"return_promise"' in rows[0][0]
 
 
+def _promise(e, what, ask, cp="製作人", cue=None):
+    e.record_appraisal({"events": [], "loops": {"new": [{"what": what, "origin": "her_promise", "cue_time": cue, "importance": 0.8,
+                                                           "agreed": True, "ask": ask}], "closed": []}, "farewell": False},
+                       turn_id=f"t{len(e.loops)}", counterpart=cp, platform="api_server")
+    return next(iter(e.loops))
+
+
+def _fired(e, kind):
+    return [r for r in e.conn.execute("select payload, counterpart from events where kind='proactive_fired'").fetchall() if f'"{kind}"' in r[0]]
+
+
+def test_promise_needs_agreement(tmp_path):
+    clock = Clock(T0)
+    e = make(tmp_path, "agree", clock)
+    e.record_appraisal({"events": [], "loops": {"new": [{"what": "幫製作人問子睿", "origin": "her_promise", "cue_time": None, "importance": 0.8,
+                                                           "agreed": False, "ask": ["zirui"]}], "closed": []}, "farewell": False},
+                       turn_id="t1", counterpart="製作人", platform="api_server")
+    assert e.loops == {}                      # she did not commit: nothing to come back to
+    e.record_appraisal({"events": [], "loops": {"new": [{"what": "明早八點提醒製作人", "origin": "counterpart_said", "cue_time": None,
+                                                           "importance": 0.8, "agreed": False, "ask": []}], "closed": []}, "farewell": False},
+                       turn_id="t2", counterpart="製作人", platform="api_server")
+    assert e.loops == {}
+
+
+def test_promise_to_you_is_forced_even_at_night(tmp_path):
+    clock = Clock(T0 + 3 * 3600)              # 23:00, inside no-disturb
+    e = make(tmp_path, "forced", clock)
+    lid = _promise(e, "等她忙完回來找製作人", [])
+    run(e, clock, 0.6)
+    assert len(_fired(e, "return_promise")) == 1 and e.loops[lid]["state"] == "asked"
+
+
+def test_promise_through_another_character(tmp_path):
+    clock = Clock(T0)                         # Monday 20:00, awake, free
+    c = cfg(relationships={"zirui": {}})
+    e = make(tmp_path, "ask", clock, c)
+    lid = _promise(e, "幫製作人問子睿有沒有對象", ["zirui"])
+    assert e.loops[lid]["ask"] == ["zirui"] and "zirui" in e.others
+    run(e, clock, 0.6)                        # the cue time (30 min) passes: she goes to ask, never speaks to you
+    assert _fired(e, "return_promise") == [] and _fired(e, "report_back") == []
+    asks = _fired(e, "ask_other")
+    assert len(asks) == 1 and asks[0][1] == "zirui"
+    assert e.loops[lid]["state"] == "asking" and e.loops[lid]["asking"] == "zirui" and e.loops[lid]["tries"] == 1
+    assert "替製作人問的" in e.state_block(counterpart="zirui") and "已去問zirui" in e.state_block()
+    # her question went out; 子睿 answers, and the appraisal of THAT conversation closes the loop with the answer
+    e.on_event_reply("【事件】…", "弟，你現在有對象嗎？", platform="api_server", counterpart="zirui")
+    e.record_appraisal({"events": [{"event_kind": "loop_resolved", "cause": "子睿說他目前單身", "v": 0.2, "R": 0.5, "u": 0.1, "cert": 1.0,
+                                    "agent": "other", "intent": 0.5, "devalue": 0.0, "ambiguity": 0.0, "other_focus": 0.5, "other_v": 0.0,
+                                    "appeal": 0.0, "q": 0.5, "loop_id": lid}],
+                        "loops": {"new": [], "closed": [lid]}, "farewell": False}, turn_id="t9", counterpart="zirui", platform="api_server")
+    assert e.loops[lid]["state"] == "answered" and e.loops[lid]["answer"] == "子睿說他目前單身"
+    assert "問到了：子睿說他目前單身" in e.state_block()
+    # the report waits for a decent hour: it is 20:40, allowed; it fires at once and is one of her messages to you
+    run(e, clock, 0.1)
+    reps = _fired(e, "report_back")
+    assert len(reps) == 1 and reps[0][1] == "你" and e.loops[lid]["state"] == "asked"   # events for you carry the subject 你
+
+
+def test_report_waits_for_morning_and_gives_up_after_retries(tmp_path):
+    clock = Clock(T0 + 2.5 * 3600)            # 22:30
+    c = cfg(relationships={"zirui": {}}, proactive={"ask_retry_max": 2, "ask_timeout_h": 1.0})
+    e = make(tmp_path, "retry", clock, c)
+    lid = _promise(e, "幫製作人問子睿週末有沒有空", ["zirui"])
+    run(e, clock, 0.6)                        # 23:06: asked once (she is still up: bedtime is later for this chronotype)
+    assert len(_fired(e, "ask_other")) == 1 and e.loops[lid]["state"] == "asking"
+    run(e, clock, 10)                         # no answer: a retry after the timeout, then giving up -> answered with no answer
+    assert e.loops[lid]["tries"] == 2 and e.loops[lid]["state"] in ("answered", "asked")
+    assert "沒問到" in e.state_block() or e.loops[lid]["state"] == "asked"
+    reps = _fired(e, "report_back")
+    assert len(reps) == 1                     # told you once, in the morning (not inside 23–8)
+    assert not (23 <= hour_of(e, e.conn.execute("select at from events where kind='proactive_fired' order by id desc limit 1").fetchone()[0]) or
+                hour_of(e, e.conn.execute("select at from events where kind='proactive_fired' order by id desc limit 1").fetchone()[0]) < 8)
+
+
 def test_farewell_mode(tmp_path):
     clock = Clock(T0)
     e = make(tmp_path, "bye", clock)

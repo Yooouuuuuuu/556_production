@@ -96,6 +96,10 @@ DEFAULTS: Dict[str, Any] = {
         "inter_agent_min_gap_min": 240,
         "inter_agent_turn_cap": 6,       # exchanges per conversation (cost control, not a script)
         "inter_agent_visibility": True,  # the 狀態 page may show their conversations
+        "promise_requires_agreement": True,  # a promise opens a loop only when she agreed in her reply
+        "ask_retry_max": 3,              # a promise that needs another character: how many times she tries to reach them
+        "ask_timeout_h": 3.0,            # ... and how long she waits for an answer before trying again
+        "report_only_when_awake": True,  # the answer comes back to you outside your no-disturb hours, when you are likely around
     },
     "tom": {"weekly_decay": 0.92},
     "relation": {"k_bond": 0.004, "k_attachment": 0.0004, "trust_forget_days": 60},

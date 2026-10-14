@@ -13,15 +13,88 @@ import (
 	"github.com/Yooouuuuuuu/556_production/556d/internal/voice"
 )
 
-// Voice connectors (agency-level, home/voice.json):
-//   GET  /api/voice        config with keys masked
-//   PUT  /api/voice        merge; an empty api_key keeps the stored one
+// Voice connectors (global: home/voice.json; per character: home/profiles/<id>/voice.json, an
+// override whose provider blocks may say "inherit"):
+//   GET  /api/voice                  global config with keys masked
+//   PUT  /api/voice                  merge; an empty api_key keeps the stored one
+//   GET  /api/voice?companion=<id>   that character's override + the effective config
+//   PUT  /api/voice?companion=<id>   merge into the override
 //   POST /api/voice/test   {text?}: TTS the text, then STT the result when both are configured —
 //                          a round trip that proves the connection; returns timings + the audio.
+//                          ?companion= tests what that character would use.
+// /api/voice/speak and /api/voice/transcribe use the effective config of ?companion= or, without
+// it, of the character on stage — so each character can have a voice of its own.
 
 var voiceMu sync.Mutex
 
 func (a *API) voicePath() string { return filepath.Join(a.settings.home, "voice.json") }
+
+// voiceCompanion is the character a request names (?companion= / X-556-Companion), "" for the global config.
+func (a *API) voiceCompanion(r *http.Request) string {
+	name := r.URL.Query().Get("companion")
+	if name == "" {
+		name = r.Header.Get("X-556-Companion")
+	}
+	return name
+}
+
+// voiceFor is the effective config for the named character, else the one on stage, else global.
+func (a *API) voiceFor(r *http.Request) voice.Config {
+	name := a.voiceCompanion(r)
+	if name == "" {
+		name = a.selectedName()
+	}
+	if name != "" && a.mgr.Exists(name) {
+		return voice.Effective(a.voicePath(), a.mgr.Dir(name))
+	}
+	return voice.Load(a.voicePath())
+}
+
+// voiceOverrideHandler: GET / PUT one character's voice override (profile voice.json).
+func (a *API) voiceOverrideHandler(w http.ResponseWriter, r *http.Request, name string) {
+	if !a.mgr.Exists(name) {
+		writeJSON(w, 404, map[string]any{"error": errNoCompanion.Error()})
+		return
+	}
+	path := filepath.Join(a.mgr.Dir(name), "voice.json")
+	cur := voice.LoadOverride(path)
+	kinds := []string{voice.Inherit, "none", "openai-compatible", "fish-audio"}
+	switch r.Method {
+	case http.MethodGet:
+		writeJSON(w, 200, map[string]any{"companion": name, "voice": cur.Masked(), "effective": voice.Effective(a.voicePath(), a.mgr.Dir(name)).Masked(), "kinds": kinds})
+	case http.MethodPut:
+		var patch struct {
+			TTS *voice.Provider `json:"tts"`
+			STT *voice.Provider `json:"stt"`
+		}
+		if err := decodeJSON(r, &patch); err != nil {
+			writeJSON(w, 400, map[string]any{"error": err.Error()})
+			return
+		}
+		merge := func(dst *voice.Provider, src *voice.Provider) {
+			if src == nil {
+				return
+			}
+			key := dst.APIKey
+			*dst = *src
+			if strings.TrimSpace(src.APIKey) == "" {
+				dst.APIKey = key
+			}
+			if dst.Kind == "" {
+				dst.Kind = voice.Inherit
+			}
+		}
+		merge(&cur.TTS, patch.TTS)
+		merge(&cur.STT, patch.STT)
+		if err := voice.SaveOverride(path, cur); err != nil {
+			writeJSON(w, 500, map[string]any{"error": err.Error()})
+			return
+		}
+		writeJSON(w, 200, map[string]any{"companion": name, "voice": cur.Masked(), "effective": voice.Effective(a.voicePath(), a.mgr.Dir(name)).Masked(), "kinds": kinds})
+	default:
+		writeJSON(w, 405, map[string]any{"error": "method not allowed"})
+	}
+}
 
 func (a *API) voiceHandler(w http.ResponseWriter, r *http.Request) {
 	if cors(w, r, "GET, PUT, OPTIONS") {
@@ -29,6 +102,10 @@ func (a *API) voiceHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	voiceMu.Lock()
 	defer voiceMu.Unlock()
+	if name := a.voiceCompanion(r); name != "" {
+		a.voiceOverrideHandler(w, r, name)
+		return
+	}
 	cur := voice.Load(a.voicePath())
 	switch r.Method {
 	case http.MethodGet:
@@ -86,7 +163,7 @@ func (a *API) voiceTest(w http.ResponseWriter, r *http.Request) {
 	if strings.TrimSpace(body.Text) == "" {
 		body.Text = "測試一下，我是五五六。"
 	}
-	cfg := voice.Load(a.voicePath())
+	cfg := a.voiceFor(r)
 	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
 	defer cancel()
 	out := map[string]any{}
@@ -145,7 +222,7 @@ func (a *API) voiceTranscribe(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 405, map[string]any{"error": "POST only"})
 		return
 	}
-	cfg := voice.Load(a.voicePath())
+	cfg := a.voiceFor(r)
 	if !cfg.STT.Configured() {
 		writeJSON(w, 409, map[string]any{"error": "STT is not configured (設定 → 語音連線)"})
 		return
@@ -215,7 +292,7 @@ func (a *API) voiceSpeak(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 400, map[string]any{"error": "nothing to say"})
 		return
 	}
-	cfg := voice.Load(a.voicePath())
+	cfg := a.voiceFor(r)
 	if !cfg.TTS.Configured() {
 		writeJSON(w, 409, map[string]any{"error": "TTS is not configured (設定 → 語音連線)"})
 		return

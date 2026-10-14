@@ -2,17 +2,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { api, CompanionInfo } from '../api';
 import { useStore } from '../store';
 import { t } from '../i18n';
-import { Character } from './Character';
 
 // The roster: every character under home/profiles. Nothing starts by itself — you start and stop
 // each one here; several can be active at once. "Switch" puts a character in the chat window (and
-// therefore on the avatar). A character's own settings open from its row (Character.tsx); 556d edits
-// the character on stage, so opening the page switches the stage to that character first.
+// therefore on the avatar). A character's own settings live under 設定 → 角色.
 export function Roster() {
   const [items, setItems] = useState<CompanionInfo[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
   const { selected, setSelected } = useStore();
 
   const load = useCallback(async () => {
@@ -44,20 +41,10 @@ export function Roster() {
     try {
       await api.select(name);
       setSelected(name);
-      return true;
     } catch (e) {
       setNotice(String(e));
-      return false;
     }
   }
-
-  async function openPage(name: string) {
-    if (name !== selected && !(await pick(name))) return;
-    setOpen(name);
-  }
-
-  const current = open ? items.find((c) => c.name === open) : undefined;
-  if (open && current) return <Character info={current} onBack={() => setOpen(null)} />;
 
   return (
     <div className="h-full overflow-y-auto p-5 max-w-2xl space-y-4">
@@ -73,7 +60,7 @@ export function Roster() {
             <span className={`w-2.5 h-2.5 rounded-full ${c.active ? (c.hermes_connected ? 'bg-green-400' : 'bg-amber-400') : 'bg-white/20'}`} />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <button className="font-medium hover:underline" onClick={() => openPage(c.name)}>{c.display_name || c.name}</button>
+                <span className="font-medium">{c.display_name || c.name}</span>
                 <span className="text-xs opacity-50">{c.name}</span>
                 {c.name === selected && <span className="text-xs px-1.5 rounded bg-pink-500/30">{t('roster.on_stage')}</span>}
               </div>
@@ -83,7 +70,6 @@ export function Roster() {
                 {(c.channels ?? []).length === 0 && <span>{t('roster.no_channels')}</span>}
               </div>
             </div>
-            <button className="px-3 py-1 rounded-lg text-sm bg-white/10 hover:bg-white/20" onClick={() => openPage(c.name)}>{t('roster.details')}</button>
             {c.name !== selected && <button className="px-3 py-1 rounded-lg text-sm bg-white/10 hover:bg-white/20" onClick={() => pick(c.name)}>{t('roster.switch')}</button>}
             {c.active
               ? <button className="px-3 py-1 rounded-lg text-sm bg-red-500/20 hover:bg-red-500/50 disabled:opacity-40" disabled={busy === c.name || c.stopping} onClick={() => act(c.name, 'stop')}>{t('roster.stop')}</button>

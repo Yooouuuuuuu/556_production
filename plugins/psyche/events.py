@@ -25,14 +25,23 @@ REASONS = {
     "share": "她今天有件事想告訴{term}：{what}",
     "longing": "有一陣子沒跟{term}說到話了，她想找他",
     "olive_branch": "之前的事她還有點在意，但想主動給個台階",
+    "ask_other": "她之前答應了{who}要幫忙問{term}一件事：{what}。現在她有空，來問{term}",
+    "report_back": "她之前答應{term}要幫忙去問{who}：{what}",
 }
 # an event-turn "reply" that is really a platform error (e.g. the model invented a tool): not her words
-ERRORISH = ("Model generated invalid tool call", "does not exist. Available tools", "Tool '", "[error", "Error:")
+ERRORISH = ("Model generated invalid tool call", "does not exist. Available tools", "Tool '", "[error", "Error:",
+            "API call failed", "all backends failed")
 
 
-def compose(kind: str, *, term: str, what: str, now_text: str, extra: str = "", pronoun: str = "她") -> str:
+def looks_error(reply: str) -> bool:
+    """A platform error returned in place of her words (no hook runs for these; the send worker records them)."""
+    r = (reply or "").strip()
+    return bool(r) and any(r.startswith(e) or e in r for e in ERRORISH)
+
+
+def compose(kind: str, *, term: str, what: str, now_text: str, extra: str = "", pronoun: str = "她", **fmt: str) -> str:
     """A narrator's cue, not an instruction to "send a message" — worded that way, Gemini invents a reply tool."""
-    reason = REASONS.get(kind, "{what}").format(term=term, what=what).replace("她", pronoun)
+    reason = REASONS.get(kind, "{what}").format(term=term, what=what, **fmt).replace("她", pronoun)
     lines = [f"{EVENT_MARK}（旁白，不是{term}說的話）現在是 {now_text}。{reason}。"]
     if extra:
         lines.append(extra)
@@ -99,6 +108,20 @@ def relay(hub: str, sender: str, to: str, text: str, timeout: float = 20.0) -> O
         return None
     except Exception as e:  # noqa: BLE001
         return f"{type(e).__name__}: {e}"
+
+
+def discard(hub: str, companion: str, session_id: str, text: str, timeout: float = 10.0) -> None:
+    """A cue the platform could not answer: ask 556d to drop the dangling user row so it never re-enters her context."""
+    if not hub:
+        return
+    req = urllib.request.Request(hub.rstrip("/") + "/api/history/discard",
+                                 data=json.dumps({"companion": companion, "session_id": session_id, "text": text}).encode(),
+                                 headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            r.read()
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def send(base: str, key: str, session_id: str, text: str, timeout: float = 180.0) -> Tuple[str, Optional[str]]:

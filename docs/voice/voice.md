@@ -20,7 +20,14 @@ Living doc; built 2026-10-03 → 2026-10-06 (0.4.0). Graph: `voice.d2`. Decision
   system message in the API request. The avatar window plays the audio and lip-syncs; without it the
   office window plays.
 
-## Connectors (`home/voice.json`, 設定 → 語音連線)
+## Connectors (`home/voice.json`, 設定 → 全域 → 語音連線; per character 設定 → 角色 → 聲音)
+
+- **A voice per character** (2026-10-14): `home/profiles/<id>/voice.json` holds an override with the same `tts` / `stt`
+  shape; a block whose kind is `inherit` uses the global connector, `none` switches that side off for the character,
+  and a configured block replaces it with empty fields (base_url, key, model, format, language) filled from the global
+  block of the same kind — so one character can be another Fish Audio `reference_id` and nothing else. 556d resolves
+  the effective config per request: `?companion=` else the character on stage (`voice.Effective`). Hands-free
+  parameters are global.
 
 - **Fish Audio first** (best zh / ja): TTS `POST /v1/tts` with a `reference_id` voice and the `model`
   header (s1 by default; the model is chosen in Settings); ASR `POST /v1/asr` multipart with model

@@ -20,10 +20,17 @@ What landed since:
 - **0.7.0** (2026-10-13): 狀態 adds the relationship table, the hurt ledger, feedback buttons on feelings, and the
   characters' conversations (when 主動 → visibility allows); 設定 → 主動 adds inter-agent on/off, turn cap, visibility.
   The roster already holds several characters; each has her own one conversation with you.
-- **Unreleased** (2026-10-14): wording made general (no 她 / 製作人 / agency words in the windows); settings in two
+- **0.7.3** (2026-10-14): wording made general (no 她 / 製作人 / agency words in the windows); settings in two
   layers — 設定 is yours and the app's (name, reply language, character window on start, Telegram mirror, voice
   connectors, backend knobs), while a character's own settings (name, model, memory, abilities, 主動, channel
   accounts, config knobs) open from its row on 名單 and put it in the chat window first.
+- **Unreleased** (2026-10-14): 設定 → 全域 / 角色 (the character list lives there; 名單 is start / stop / switch only);
+  a voice per character — TTS / STT override on the character's page (`home/profiles/<id>/voice.json`, 「跟全域一樣」
+  by default), applied by 556d for the character on stage (`../voice/voice.md`).
+- **Unreleased** (2026-10-14): narrator cues (the hidden turn behind a proactive message) are tagged by 556d and
+  hidden by the app; 設定 → 全域 → 程式 can show them as a dim 旁白 note, never as your bubble.
+- **Unreleased** (2026-10-14): a failed turn (model lane down) is a system note, never her bubble; 556d drops the
+  dangling user row so it never re-enters her context (`DiscardOrphans`, also swept at her start).
 - **Coming**: see
   `../inner-life/inner-life.md`.
 - **Parked**: packaging (installer, updater, auto-start), pixel-alpha click-through for the avatar,

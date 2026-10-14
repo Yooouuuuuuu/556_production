@@ -3,13 +3,15 @@ import { api, CompanionInfo, Settings as S } from '../api';
 import { ToolsSettings } from './ToolsSettings';
 import { ProactiveSettings } from './ProactiveSettings';
 import { DevSettings } from './DevSettings';
+import { VoiceSettings } from './VoiceSettings';
 import { t } from '../i18n';
 
-// One character's page (名單 → a character): everything that belongs to that character alone — name and
-// Live2D model (companion.json), memory language and context window (kokoro.json / config.yaml),
-// abilities (platform toolsets), 主動 (psyche.json), the channel accounts (.env) and, behind the
-// developer toggle, the model and memory-engine knobs of its own config files. 556d edits the
-// character on stage, so the roster switches the stage to this character before opening the page.
+// One character's page (設定 → 角色 → a character): everything that belongs to that character alone —
+// name and Live2D model (companion.json), memory language and context window (kokoro.json /
+// config.yaml), abilities (platform toolsets), 主動 (psyche.json), its own voice (profile voice.json
+// over the global connectors), the channel accounts (.env) and, behind the developer toggle, the
+// model and memory-engine knobs of its own config files. 556d edits the character on stage, so the
+// list switches the stage to this character before opening the page.
 export function Character({ info, onBack }: { info: CompanionInfo; onBack(): void }) {
   const [s, setS] = useState<S | null>(null);
   const [models, setModels] = useState<string[]>([]);
@@ -109,6 +111,7 @@ export function Character({ info, onBack }: { info: CompanionInfo; onBack(): voi
 
       <ToolsSettings onChanged={() => setRestartNeeded(true)} />
       <ProactiveSettings onChanged={() => setRestartNeeded(true)} />
+      <VoiceSettings companion={info.name} />
 
       <section className="space-y-3">
         <h2 className="font-semibold">{t('character.channels')}</h2>

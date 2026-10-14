@@ -20,6 +20,8 @@ const ACTIVITY_ZH: Record<string, string> = { sleep: '在睡覺', lying: '躺在
 const NEEDS_ZH: Record<string, string> = { affiliation_person: '想找你', affiliation_general: '想有人陪', competence: '想有進展', autonomy: '想自己決定', certainty: '想知道結果', novelty: '想有新鮮事' };
 const PHASE_ZH: Record<string, string> = { ok: '', protest: '想找你', despair: '悶著', detachment: '疏離' };
 const STRATEGY_ZH: Record<string, string> = { direct: '直說', reserved: '收斂', humor: '玩笑', inverted: '反話', denial: '否認', suppress: '先不提' };
+const LOOP_STATE_ZH: Record<string, string> = { waiting: '等待中', due: '到了', asking: '去問了', answered: '問到了', asked: '已開口' };
+const parseAsk = (s: string | null | undefined): string[] => { try { const v = JSON.parse(s || '[]'); return Array.isArray(v) ? v.map(String) : []; } catch { return []; } };
 const word = (x: number) => (x < 0.2 ? '' : x < 0.45 ? '有點' : x < 0.7 ? '蠻' : '很');
 const energyWord = (e: number, a?: string) => (a === 'sleep' ? '在睡覺' : a === 'woken' ? '很睏' : e >= 0.75 ? '精神很好' : e >= 0.55 ? '精神還不錯' : e >= 0.35 ? '有點累' : '很累');
 const intensityNow = (i: PsycheInstance, now: number) => i.intensity0 * Math.pow(0.5, Math.max(0, now - i.born_at) / 3600 / Math.max(1e-6, i.half_life_h));
@@ -42,6 +44,7 @@ function eventText(e: { kind: string; payload: any }): string {
     case 'life': return `🍃 ${p.text ?? ''}`;
     case 'rumination': return `🔁 又想起：${EMOTION_ZH[p.type] ?? p.type}`;
     case 'loop_due': return `⏰ 到了：${p.what ?? ''}`;
+    case 'loop_answered': return `📨 問到了${p.answer ? `：${p.answer}` : '（沒問到）'}`;
     case 'cmd_feedback': return `🎚 你的回饋：${EMOTION_ZH[p.type] ?? p.type} ${p.verdict}`;
     case 'start': return `▶ 開始（補了 ${p.gap_ticks ?? 0} 分鐘）`;
     case 'stop': return '■ 停止';
@@ -196,7 +199,11 @@ export function State() {
           <ul className="space-y-1">
             {loops.map((l) => (
               <li key={l.id} className="flex gap-2 items-baseline">
-                <span className="flex-1">{l.what}{l.cue_time ? <span className="text-xs opacity-50"> · {l.cue_time.replace('T', ' ')}</span> : null}<span className="text-xs opacity-40"> · {l.state}</span></span>
+                <span className="flex-1">{l.what}{l.cue_time ? <span className="text-xs opacity-50"> · {l.cue_time.replace('T', ' ')}</span> : null}
+                  <span className="text-xs opacity-40"> · {LOOP_STATE_ZH[l.state] ?? l.state}</span>
+                  {parseAsk(l.ask).length > 0 && <span className="text-xs opacity-50"> · 要問 {parseAsk(l.ask).map(nameOf).join('、')}{l.tries ? `（第 ${l.tries} 次）` : ''}</span>}
+                  {l.state === 'answered' && <span className="text-xs opacity-60"> · {l.answer ? `答案：${l.answer}` : '沒問到'}</span>}
+                </span>
                 <button className="text-xs opacity-60 hover:opacity-100 disabled:opacity-30" disabled={busy} onClick={() => command('close_loop', { loop: l.id })}>{t('state.close_loop')}</button>
               </li>
             ))}

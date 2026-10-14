@@ -10,7 +10,12 @@ import { useVoice } from '../voice/loop';
 const OWN_SOURCES = new Set(['app', 'office', 'http', 'voice', 'smoke', 'eval']);
 
 export function Chat() {
-  const { messages, talking, connected, error, setHistory, connect, selected, setHandsFree, setProactiveSpeak } = useStore();
+  const { messages, talking, connected, error, setHistory, connect, selected, setHandsFree, setProactiveSpeak, showCues } = useStore();
+  // system notes — narrator cues, undelivered messages, backend errors — are not real messages: gray, centered,
+  // and shown only when 設定 → 全域 → 程式 says so
+  const NOTE = new Set(['cue', 'system', 'failed']);
+  const shown = showCues ? messages : messages.filter((m) => !NOTE.has(m.source ?? ''));
+  const noteLabel = (s?: string) => (s === 'cue' ? t('chat.cue') : s === 'failed' ? t('chat.failed_tag') : t('chat.system'));
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -23,7 +28,7 @@ export function Chat() {
 
   useEffect(() => {
     connect();
-    api.voice().then((v) => setVoiceOk({ stt: v.voice.stt.kind !== 'none', tts: v.voice.tts.kind !== 'none' })).catch(() => {});
+    api.voice(selected || undefined).then((v) => { const eff = v.effective ?? v.voice; setVoiceOk({ stt: eff.stt.kind !== 'none', tts: eff.tts.kind !== 'none' }); }).catch(() => {});
     api.psycheSettings().then((r) => setProactiveSpeak((r.settings?.proactive?.speak as any) ?? 'follow')).catch(() => {});
     api.history().then((h) => setHistory((h.messages ?? []).map((m, i) => ({ id: `h${i}`, role: m.role, text: m.text, ts: m.ts, source: m.source }))))
       .catch(() => { /* backend not up yet; the header shows the status */ });
@@ -84,8 +89,14 @@ export function Chat() {
   return (
     <div className="h-full flex flex-col">
       <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
-        {messages.length === 0 && <p className="opacity-50 text-sm">{selected ? t('chat.empty') : t('chat.no_companion')}</p>}
-        {messages.map((m) => (
+        {shown.length === 0 && <p className="opacity-50 text-sm">{selected ? t('chat.empty') : t('chat.no_companion')}</p>}
+        {shown.map((m) => NOTE.has(m.source ?? '') ? (
+          <div key={m.id} className="flex justify-center">
+            <div className="max-w-[85%] px-3 py-1.5 rounded-lg border border-dashed border-white/15 text-xs italic opacity-50 whitespace-pre-wrap leading-relaxed">
+              <span className="not-italic opacity-80 mr-1">{noteLabel(m.source)}</span>{m.text}
+            </div>
+          </div>
+        ) : (
           <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[78%] px-3 py-2 rounded-2xl whitespace-pre-wrap leading-relaxed text-[15px] ${
               m.role === 'user' ? 'bg-pink-500/80 text-white rounded-br-sm' : 'bg-white/10 rounded-bl-sm'

@@ -43,6 +43,17 @@ Design: `inner-life/inner-life.md` (its §0 lists every decision applied).
   the other one 「製作人」 (the SOUL and the history outweigh a note). The relay prefixes every delivered message with the speaker's
   display name, the block's first line names the counterpart, and the SOULs make the producer a role.
 
+## Decided (2026-10-14) — two kinds of promise [inner-life]
+- A promise opens a loop only when she actually agreed in her reply (the appraisal reports `agreed`); whether she
+  agrees is her SOUL and the relationship state she sees, not a numeric affection gate.
+- A promise that concerns only her and the other person (a wake-up call, 「等我一下」) is forced through every gate at
+  its time, like a reminder you asked for. The 00:54 case showed the other kind: a promise that needs another
+  character (「幫你問子睿」) is carried to that character at her free time through the relay, answered by that
+  conversation's appraisal, and reported back only when she is up, outside your no-disturb hours and when your
+  presence model says you are around. No answer → retry at the next free slot, give up after `ask_retry_max`.
+- The narrator cue behind a proactive turn is never the user's words: 556d tags it, the app hides it by default and
+  can show it as a note (設定 → 全域 → 程式).
+
 ## Built (2026-10-08) — inner life stages 3–4: proactive [inner-life]
 - Urges are decided live only and recorded as replayable `proactive_fired` events; replay re-applies the record,
   a fast-forward after a stop decides nothing (no back-fill), a due loop fires at the first live tick. The first live

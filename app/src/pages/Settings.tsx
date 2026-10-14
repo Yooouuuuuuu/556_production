@@ -1,15 +1,76 @@
 import { useEffect, useState } from 'react';
-import { api, Settings as S } from '../api';
+import { api, CompanionInfo, Settings as S } from '../api';
 import { VoiceSettings } from './VoiceSettings';
 import { DevSettings } from './DevSettings';
+import { Character } from './Character';
+import { useStore } from '../store';
 import { t } from '../i18n';
 
-// 設定 — the global layer: you (name, reply language), the app (character window on start, Telegram
-// mirror), the voice connectors (home/voice.json) and the backend developer knobs (556d.toml, shim).
-// Everything that belongs to one character is on that character's page under 名單 (Character.tsx).
+// 設定 in two layers. 全域: you (name, reply language), the app (character window on start, Telegram
+// mirror), the global voice connectors (home/voice.json) and the backend developer knobs. 角色: the
+// list of characters; one character's page (Character.tsx) holds everything that is its own. 556d
+// edits the character on stage, so opening a page switches the stage to that character first.
 // Note: 556d applies your name and reply language into the character on stage (people/你.md,
-// kokoro.json of the selected profile); the global page saves the value once and restarts that one.
+// kokoro.json of the selected profile) and that one needs a restart.
 export function Settings() {
+  const [tab, setTab] = useState<'global' | 'characters'>('global');
+  const [open, setOpen] = useState<string | null>(null);
+  const [items, setItems] = useState<CompanionInfo[]>([]);
+  const [notice, setNotice] = useState<string | null>(null);
+  const { selected, setSelected } = useStore();
+
+  useEffect(() => {
+    if (tab !== 'characters') return;
+    const load = () => api.companions().then((r) => setItems(r.companions ?? [])).catch((e) => setNotice(String(e)));
+    load();
+    const id = setInterval(load, 3000);
+    return () => clearInterval(id);
+  }, [tab]);
+
+  async function openPage(name: string) {
+    if (name !== selected) {
+      try { await api.select(name); setSelected(name); } catch (e) { setNotice(String(e)); return; }
+    }
+    setOpen(name);
+  }
+
+  const seg = (on: boolean) => `px-3 py-1 rounded text-sm ${on ? 'bg-white/15' : 'hover:bg-white/5 opacity-70'}`;
+  const current = open ? items.find((c) => c.name === open) : undefined;
+
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex gap-1 px-5 pt-4">
+        <button className={seg(tab === 'global')} onClick={() => { setTab('global'); setOpen(null); }}>{t('settings.tab_global')}</button>
+        <button className={seg(tab === 'characters')} onClick={() => setTab('characters')}>{t('settings.tab_characters')}</button>
+      </div>
+      <div className="flex-1 overflow-hidden">
+        {tab === 'global' ? <GlobalSettings /> : open && current ? <Character info={current} onBack={() => setOpen(null)} /> : (
+          <div className="h-full overflow-y-auto p-5 max-w-2xl space-y-4">
+            <p className="text-xs opacity-60">{t('settings.characters_note')}</p>
+            {notice && <p className="text-sm text-red-300">{notice}</p>}
+            {items.length === 0 && <p className="opacity-60">{t('roster.empty')}</p>}
+            <ul className="space-y-2">
+              {items.map((c) => (
+                <li key={c.name}>
+                  <button className={`w-full text-left rounded-xl px-4 py-3 bg-white/5 hover:bg-white/10 flex items-center gap-3 ${c.name === selected ? 'ring-1 ring-pink-400/60' : ''}`} onClick={() => openPage(c.name)}>
+                    <span className={`w-2.5 h-2.5 rounded-full ${c.active ? (c.hermes_connected ? 'bg-green-400' : 'bg-amber-400') : 'bg-white/20'}`} />
+                    <span className="font-medium">{c.display_name || c.name}</span>
+                    <span className="text-xs opacity-50">{c.name}</span>
+                    {c.name === selected && <span className="text-xs px-1.5 rounded bg-pink-500/30">{t('roster.on_stage')}</span>}
+                    <span className="ml-auto opacity-50">›</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function GlobalSettings() {
+  const { showCues, setShowCues } = useStore();
   const [s, setS] = useState<S | null>(null);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'warn' | 'err'; text: string } | null>(null);
@@ -85,6 +146,11 @@ export function Settings() {
           {t('settings.mirror_to_telegram')}
         </label>
         <p className="text-xs opacity-60">{t('settings.mirror_note')}</p>
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={showCues} onChange={(e) => setShowCues(e.target.checked)} />
+          {t('settings.show_cues')}
+        </label>
+        <p className="text-xs opacity-60">{t('settings.show_cues_note')}</p>
       </section>
 
       <div className="flex items-center gap-3">

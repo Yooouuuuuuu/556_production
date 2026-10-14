@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import { api, BASE } from './api';
 
-export type Msg = { id: string; role: 'user' | 'assistant'; text: string; ts?: number; streaming?: boolean; source?: string };
+export type Msg = { id: string; role: 'user' | 'assistant'; text: string; ts?: number; streaming?: boolean; source?: string; failed?: boolean };
 
 type State = {
   messages: Msg[];
@@ -19,6 +19,8 @@ type State = {
   speaking: { url: string; n: number; playing: boolean } | null; // speak_audio: the avatar lip-syncs / plays it
   handsFree: boolean;                        // conversation mode is on (the 'follow' speak override follows it)
   proactiveSpeak: 'follow' | 'always' | 'never'; // 主動 setting: speak her event-turn messages?
+  showCues: boolean;                         // 設定 → 全域: show the narrator cues behind proactive turns (source "cue")
+  setShowCues(on: boolean): void;
   setHandsFree(on: boolean): void;
   setProactiveSpeak(v: 'follow' | 'always' | 'never'): void;
   setHistory(msgs: Msg[]): void;
@@ -46,6 +48,8 @@ export const useStore = create<State>((set, get) => ({
   speaking: null,
   handsFree: false,
   proactiveSpeak: 'follow',
+  showCues: (() => { try { return localStorage.getItem('556.show_cues') === '1'; } catch { return false; } })(),
+  setShowCues(on) { set({ showCues: on }); try { localStorage.setItem('556.show_cues', on ? '1' : '0'); } catch { /* ignore */ } },
   setHandsFree(on) { set({ handsFree: on }); },
   setProactiveSpeak(v) { set({ proactiveSpeak: v }); },
 
@@ -103,9 +107,17 @@ export const useStore = create<State>((set, get) => ({
             }
             break;
           }
-          case 'chat.error':
-            set({ error: ev.message || 'error' });
+          case 'chat.error': {
+            if (ev.discarded) { // the turn never reached her: your message becomes a gray note (not delivered), the error another; nothing of hers
+              const i = [...messages].reverse().findIndex((m) => m.role === 'user' && m.source !== 'failed');
+              const idx = i < 0 ? -1 : messages.length - 1 - i;
+              const next = idx >= 0 ? messages.map((m, j) => (j === idx ? { ...m, source: 'failed', failed: true } : m)) : messages;
+              set({ messages: [...next, { id: nextId(), role: 'assistant', text: String(ev.message || 'error'), source: 'system', ts: Date.now() / 1000 }], error: ev.message || 'error', talking: false });
+            } else {
+              set({ error: ev.message || 'error' });
+            }
             break;
+          }
           case 'companion.state':
             set({ talking: !!ev.talking });
             break;

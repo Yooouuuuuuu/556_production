@@ -27,8 +27,10 @@ def in_no_disturb(hour: float, windows: List[List[float]]) -> bool:
 
 def gates(*, cfg: Dict[str, Any], hour: float, activity: str, chatting: bool, proactive_today: int,
           minutes_today: float, last_sent_at: Optional[float], t: float, farewell_until: Optional[float],
-          running: bool, due_reminder: bool) -> Tuple[bool, str]:
-    """(allowed, why_not). due_reminder = a loop the counterpart asked for, which may pass no-disturb."""
+          running: bool, due_reminder: bool, due_report: bool = False, you_awake: bool = True) -> Tuple[bool, str]:
+    """(allowed, why_not). due_reminder = a reminder you asked for or her promise to you: only off / stopped hold it
+    back. due_report = an answer she fetched from another character for you: waits for her to be up, a decent hour
+    and you being around, nothing else (no cap, gap, usage or farewell)."""
     if not cfg.get("enabled", True):
         return False, "off"
     if not running:
@@ -41,6 +43,12 @@ def gates(*, cfg: Dict[str, Any], hour: float, activity: str, chatting: bool, pr
         return False, "woken"
     if chatting:
         return False, "in_conversation"
+    if due_report:
+        if in_no_disturb(hour, cfg.get("no_disturb", [])):
+            return False, "no_disturb"
+        if not you_awake:
+            return False, "you_away"
+        return True, ""
     if in_no_disturb(hour, cfg.get("no_disturb", [])) and not due_reminder:
         return False, "no_disturb"
     if proactive_today >= int(cfg.get("daily_cap", 3)) and not due_reminder:
@@ -68,14 +76,18 @@ def willingness(*, needs: Dict[str, float], phase: str, share_backlog: List[Dict
 
 
 def occasion(*, due_loops: List[Dict[str, Any]], share_backlog: List[Dict[str, Any]], care_loops: List[Dict[str, Any]],
-             phase: str, needs: Dict[str, float], floor: float) -> Tuple[float, str, Optional[Dict[str, Any]]]:
-    """(O, kind, payload). Due loops first (they are also handled as 'on time' by the engine)."""
+             phase: str, needs: Dict[str, float], floor: float,
+             report_loops: Optional[List[Dict[str, Any]]] = None) -> Tuple[float, str, Optional[Dict[str, Any]]]:
+    """(O, kind, payload). Due loops first (they are also handled as 'on time' by the engine), then an answer she
+    fetched for you (report_back), then the rest."""
     for l in due_loops:
         if l.get("origin") == "her_promise":
             return 1.0, "return_promise", l
     for l in due_loops:
         if l.get("origin") == "counterpart_said":
             return 1.0, "reminder", l
+    for l in report_loops or []:
+        return 1.0, "report_back", l
     if care_loops:
         return 0.8, "care", care_loops[0]
     if share_backlog:

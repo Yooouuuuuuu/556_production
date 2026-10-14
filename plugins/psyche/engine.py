@@ -183,7 +183,36 @@ class Engine:
         if "dedup" not in cols:
             self.conn.execute("ALTER TABLE events ADD COLUMN dedup TEXT")
             self.conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_events_dedup ON events(dedup)")
+        lcols = {r[1] for r in self.conn.execute("PRAGMA table_info(loops)").fetchall()}
+        for col, typ in (("ask", "TEXT"), ("asking", "TEXT"), ("answer", "TEXT"), ("tries", "INTEGER"), ("asked_at", "REAL")):
+            if col not in lcols:
+                self.conn.execute(f"ALTER TABLE loops ADD COLUMN {col} {typ}")
         self.conn.commit()
+
+    def _save_loop(self, l: Dict[str, Any]) -> None:
+        """Mirror a loop into the loops table (the 狀態 page reads it; the snapshot is the source of truth)."""
+        self.conn.execute("INSERT OR REPLACE INTO loops(id, what, origin, cue_time, importance, state, created_at, closed_at, counterpart, "
+                          "ask, asking, answer, tries, asked_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                          (l["id"], l["what"], l.get("origin"), l.get("cue_time"), float(l.get("importance", 0.5)), l["state"], l["created_at"],
+                           l.get("closed_at"), l.get("counterpart") or MAIN, json.dumps(l.get("ask") or [], ensure_ascii=False),
+                           l.get("asking"), l.get("answer"), int(l.get("tries") or 0), l.get("asked_at")))
+
+    def _loops_for(self, p: str, states: Tuple[str, ...]) -> List[Dict[str, Any]]:
+        """The loops that belong to a conversation with p: the ones opened there (for you: including the ones she is
+        asking someone else about on your behalf), and for another character the ones she is asking them about."""
+        out = []
+        for l in self.loops.values():
+            if l["state"] not in states:
+                continue
+            if p != MAIN and l.get("asking") == p:
+                out.append(l)
+            elif self._loop_cp(l) == p:
+                out.append(l)
+        return out
+
+    def _known_others(self) -> Dict[str, str]:
+        ids = [p for p in list(self.others) + list((self.cfg.get("relationships") or {}).keys()) if p != MAIN]
+        return {p: self._name(p) for p in dict.fromkeys(ids)}
 
     def tick_of(self, t: float) -> int:
         return int(t // self.tick_s)
@@ -524,7 +553,13 @@ class Engine:
                     l["state"] = "due"
                     self.conn.execute("UPDATE loops SET state='due' WHERE id=?", (l["id"],))
                     self._event("loop_due", {"loop": l["id"], "what": l["what"]}, t, dedup=f"due:{l['id']}")
-            if l["state"] in ("waiting", "due", "asked") and t - float(l["created_at"]) > 7 * 86400:
+            if l["state"] == "asking" and l.get("asked_at") is not None and \
+                    t - float(l["asked_at"]) > float(self.cfg.get("proactive", {}).get("ask_timeout_h", 3.0)) * 3600:
+                # she went to ask and got no answer: try again at her next free slot, or give up and tell you so
+                self._ask_outcome(l, None, t, gave_up=int(l.get("tries") or 0) >= int(self.cfg.get("proactive", {}).get("ask_retry_max", 3)))
+            if l["state"] == "due" and l.get("ask") and int(l.get("tries") or 0) >= int(self.cfg.get("proactive", {}).get("ask_retry_max", 3)):
+                self._ask_outcome(l, None, t, gave_up=True)
+            if l["state"] in ("waiting", "due", "asked", "asking", "answered") and t - float(l["created_at"]) > 7 * 86400:
                 l["state"], l["closed_at"] = "expired", t
                 self.conn.execute("UPDATE loops SET state='expired', closed_at=? WHERE id=?", (t, l["id"]))
         # --- waiting for your answer: past your usual latency, a small disappointment, never a follow-up
@@ -549,6 +584,17 @@ class Engine:
                     inst["resolved_at"], inst["resolved_tick"], inst["resolved_by"] = t, k, "faded"
                     self.conn.execute("UPDATE instances SET resolved_at=?, resolved_tick=?, resolved_by=? WHERE id=?", (t, k, "faded", inst["id"]))
         self.tick = k
+
+    def _ask_outcome(self, l: Dict[str, Any], answer: Optional[str], t: float, *, gave_up: bool = False) -> None:
+        """A promise that needed another character: an answer (or giving up) makes it 'answered' — she now owes you a
+        report; no answer and tries left puts it back to 'due' for her next free slot."""
+        if answer is not None or gave_up:
+            l["state"], l["answer"], l["asked_at"] = "answered", answer, None
+            self._event("loop_answered", {"loop": l["id"], "what": l["what"], "answer": answer, "asked": l.get("asking")}, t,
+                        dedup=f"answered:{l['id']}:{int(l.get('tries') or 0)}")
+        else:
+            l["state"], l["asked_at"] = "due", None
+        self._save_loop(l)
 
     def _parse_cue(self, s: str) -> Optional[float]:
         try:
@@ -644,17 +690,27 @@ class Engine:
             if c.get("pending"):
                 continue
             term = self._name(p)
-            due = [l for l in self.loops.values() if l["state"] == "due" and self._loop_cp(l) == p]
+            # due items: a reminder you asked for or her promise to you (forced through every gate), a promise that
+            # needs another character (asked at her free time, never spoken to you), an answer to report back to you
+            due = [l for l in self.loops.values() if l["state"] == "due" and self._loop_cp(l) == p and not l.get("ask")]
+            asks = [l for l in self.loops.values() if l["state"] == "due" and p != MAIN and p in (l.get("ask") or [])]
+            reports = [l for l in self.loops.values() if l["state"] == "answered" and self._loop_cp(l) == p] if p == MAIN else []
             due_reminder = any(l.get("origin") in ("counterpart_said", "her_promise") for l in due)
             if p == MAIN:
+                you_awake = (not pc.get("report_only_when_awake", True)) or T.p_expected(self.pm, d_.weekday(), hour) >= 0.12
                 ok, _why = U.gates(cfg=pc, hour=hour, activity=self.activity, chatting=chatting, proactive_today=int(self.contact["proactive_today"]),
                                    minutes_today=float(self.contact["minutes_today"]), last_sent_at=c.get("last_sent_at"), t=t,
-                                   farewell_until=self.contact.get("farewell_until"), running=running, due_reminder=due_reminder)
+                                   farewell_until=self.contact.get("farewell_until"), running=running, due_reminder=due_reminder,
+                                   due_report=bool(reports) and not due_reminder, you_awake=you_awake)
             else:
                 ok = (pc.get("enabled", True) and pc.get("inter_agent", True) and running and self.activity not in ("sleep", "lying", "woken")
-                      and not chatting and int(self.contact["proactive_today"]) < int(pc.get("daily_cap", 3))
+                      and not chatting and (bool(asks) or int(self.contact["proactive_today"]) < int(pc.get("daily_cap", 3)))
                       and (c.get("last_sent_at") is None or (t - c["last_sent_at"]) >= float(pc.get("inter_agent_min_gap_min", 240)) * 60))
             if not ok:
+                continue
+            if asks:  # she has a question to carry to this character; her free slot has come
+                l = asks[0]
+                cands.append((float("inf"), p, "ask_other", str(l["what"]), l, 1.0, 1.0))
                 continue
             care = [l for l in self.loops.values() if l["state"] == "waiting" and l.get("origin") == "counterpart_said" and self._loop_cp(l) == p
                     and l.get("cue_time") and self._parse_cue(l["cue_time"]) is not None and 0 <= (self._parse_cue(l["cue_time"]) - t) <= 2 * 3600]  # type: ignore[operator]
@@ -670,8 +726,8 @@ class Engine:
                 O, kind, payload = 0.9, "olive_branch", {"what": olive["cause"], "entry": olive["id"]}
             else:
                 O, kind, payload = U.occasion(due_loops=due, share_backlog=self.share_backlog, care_loops=care, phase=c.get("phase", "ok"),
-                                              needs=needs_p, floor=float(pc.get("occasion_floor", 0.1)))
-            if kind in ("reminder", "return_promise") and payload is not None:
+                                              needs=needs_p, floor=float(pc.get("occasion_floor", 0.1)), report_loops=reports)
+            if kind in ("reminder", "return_promise", "report_back") and payload is not None:
                 lam = float("inf")
             else:
                 p_hat = T.p_expected(self._pm_of(p), d_.weekday(), hour)
@@ -687,7 +743,7 @@ class Engine:
         fire = lam == float("inf") or rng.random() < U.fire_probability(lam, self.tick_s / 3600.0)
         if not fire:
             return
-        loop_id = payload.get("id") if (payload is not None and kind in ("reminder", "return_promise", "care")) else None
+        loop_id = payload.get("id") if (payload is not None and kind in ("reminder", "return_promise", "care", "ask_other", "report_back")) else None
         entry = payload.get("entry") if (payload is not None and kind == "olive_branch") else None
         eid = self._event("proactive_fired", {"kind": kind, "what": what, "loop": loop_id, "entry": entry, "counterpart": p,
                                               "W": round(W, 3), "O": round(O, 3)}, t, counterpart=p, dedup=f"urge:{k}")
@@ -695,7 +751,14 @@ class Engine:
             return
         row = self.conn.execute("SELECT id, at, kind, payload, applied_tick, counterpart FROM events WHERE id=?", (eid,)).fetchone()
         self._apply_event_row(row, k)
-        self._send_q.put({"kind": kind, "what": what, "at": t, "counterpart": p})
+        job: Dict[str, Any] = {"kind": kind, "what": what, "at": t, "counterpart": p, "loop": loop_id}
+        if kind == "ask_other" and payload is not None:      # the cue names who asked
+            job["fmt"] = {"who": self._name(payload.get("counterpart") or MAIN)}
+        elif kind == "report_back" and payload is not None:  # the cue carries what she found out, or that she could not
+            who = self._name(payload.get("asking") or (payload.get("ask") or [""])[0] or MAIN)
+            job["fmt"] = {"who": who}
+            job["extra"] = (f"她問到的結果：{payload['answer']}" if payload.get("answer") else f"她去問了{who}，但一直沒得到回覆，沒問到")
+        self._send_q.put(job)
 
     # ------------------------------------------------------------------ B: apply an appraisal
     def _apply_appraisal(self, row: Any, k: int) -> None:
@@ -731,21 +794,39 @@ class Engine:
             if kind in ("apology", "false_belief_corrected"):
                 RL.ledger_repair(led, kind, int(ev.get("apology_components", 3)), t)
         loops = data.get("loops") or {}
+        pc = self.cfg.get("proactive", {})
+        known = self._known_others()
         for i, l in enumerate(loops.get("new") or []):
+            if l.get("agreed") is False and l.get("origin") in ("her_promise", "counterpart_said") and pc.get("promise_requires_agreement", True):
+                continue  # she did not commit: no loop, nothing to come back to
             lid = f"ol_{k}_{aid}_{i}"
             cue = l.get("cue_time")
             if not cue and l.get("origin") == "her_promise":   # 「等我一下」: due when the current block ends, else in 30 min
                 cue = self.local(t + 1800).strftime("%Y-%m-%dT%H:%M")
+            ask = [x for x in (l.get("ask") or []) if x in known and x != p]
+            if not ask:  # the model may name a character instead of the id
+                ask = [i_ for i_, n in known.items() if i_ != p and any(str(x) == n for x in (l.get("ask") or []))]
             rec = {"id": lid, "what": l["what"], "origin": l.get("origin", "counterpart_said"), "cue_time": cue,
-                   "importance": float(l.get("importance", 0.5)), "state": "waiting", "created_at": t, "closed_at": None, "counterpart": p}
+                   "importance": float(l.get("importance", 0.5)), "state": "waiting", "created_at": t, "closed_at": None, "counterpart": p,
+                   "ask": ask, "asking": None, "answer": None, "tries": 0, "asked_at": None}
+            for x in ask:
+                self._other(x)  # the one to ask becomes a counterpart she will go and talk to
             self.loops[lid] = rec
-            self.conn.execute("INSERT OR REPLACE INTO loops(id, what, origin, cue_time, importance, state, created_at, counterpart) "
-                              "VALUES (?,?,?,?,?,?,?,?)", (lid, rec["what"], rec["origin"], cue, rec["importance"], "waiting", t, p))
-        for lid in loops.get("closed") or []:
-            if lid in self.loops and self.loops[lid]["state"] not in ("closed", "expired"):
-                self.loops[lid]["state"], self.loops[lid]["closed_at"] = "closed", t
-                self.conn.execute("UPDATE loops SET state='closed', closed_at=? WHERE id=?", (t, lid))
-                self.needs["certainty"] = max(0.0, self.needs["certainty"] - 0.2)
+            self._save_loop(rec)
+        answers = {str(e.get("loop_id")): str(e.get("cause") or "") for e in (data.get("events") or []) if e.get("loop_id")}
+        for lid in list(loops.get("closed") or []) + [x for x, _ in answers.items() if x not in (loops.get("closed") or [])]:
+            if lid not in self.loops or self.loops[lid]["state"] in ("closed", "expired"):
+                continue
+            l = self.loops[lid]
+            if l["state"] == "asking" and l.get("asking") == p:
+                # the character she asked answered (closed by the appraisal of THAT conversation): she now owes you a report
+                self._ask_outcome(l, answers.get(lid) or "問到了", t)
+                continue
+            if lid not in (loops.get("closed") or []):
+                continue
+            l["state"], l["closed_at"] = "closed", t
+            self.conn.execute("UPDATE loops SET state='closed', closed_at=? WHERE id=?", (t, lid))
+            self.needs["certainty"] = max(0.0, self.needs["certainty"] - 0.2)
         if data.get("farewell"):
             self.contact["farewell_until"] = t + 8 * 3600
         self.conn.execute("UPDATE appraisals SET applied_tick=? WHERE id=?", (k, aid))
@@ -792,20 +873,28 @@ class Engine:
                 for e in self.ledger.get(cp, []):
                     if e["id"] == p["entry"]:
                         e["olive_offered"] = True
-            if lid and lid in self.loops and fk in ("reminder", "return_promise"):
+            if lid and lid in self.loops and fk in ("reminder", "return_promise", "report_back"):
                 self.loops[lid]["state"] = "asked"
-                self.conn.execute("UPDATE loops SET state='asked' WHERE id=?", (lid,))
+                self._save_loop(self.loops[lid])
+            elif lid and lid in self.loops and fk == "ask_other":
+                l = self.loops[lid]
+                l["state"], l["asking"], l["tries"], l["asked_at"] = "asking", cp, int(l.get("tries") or 0) + 1, t
+                self._save_loop(l)
             if fk == "share":
                 self.share_backlog = [s for s in self.share_backlog if s.get("what") != what]
-            self.contact["proactive_today"] = int(self.contact["proactive_today"]) + 1
-            self._contact_of(cp)["pending"] = {"kind": fk, "what": what, "at": t, "tick": k}
+            if fk != "ask_other":  # a question carried to another character is not one of her messages to you
+                self.contact["proactive_today"] = int(self.contact["proactive_today"]) + 1
+            self._contact_of(cp)["pending"] = {"kind": fk, "what": what, "at": t, "tick": k, "loop": lid}
         elif kind == "sent":
             c = self._contact_of(cp)
             c["last_sent_at"], c["awaiting_since"], c["pending"] = t, t, None
         elif kind in ("silent", "send_failed"):
             self._contact_of(cp)["pending"] = None
-            if kind == "silent":
+            if kind == "silent" and p.get("kind") != "ask_other":
                 self.contact["proactive_today"] = max(0, int(self.contact["proactive_today"]) - 1)
+            lid = p.get("loop")
+            if lid and lid in self.loops and self.loops[lid]["state"] == "asking":
+                self._ask_outcome(self.loops[lid], None, t)  # the question never reached them: back to due, next free slot
         elif kind == "cmd_close_loop":
             lid = p.get("loop")
             if lid in self.loops and self.loops[lid]["state"] not in ("closed", "expired"):
@@ -951,10 +1040,11 @@ class Engine:
         message was sent (the plugin relays it to another character through 556d)."""
         pend = self._contact_of(counterpart).get("pending") or {}
         if EV.is_silence(reply):
-            self._record_and_apply("silent", {"kind": pend.get("kind"), "what": pend.get("what"), "counterpart": counterpart}, counterpart=counterpart)
+            self._record_and_apply("silent", {"kind": pend.get("kind"), "what": pend.get("what"), "counterpart": counterpart, "loop": pend.get("loop")},
+                                   counterpart=counterpart)
             return False
         self._record_and_apply("sent", {"kind": pend.get("kind"), "what": pend.get("what"), "text": reply[:500], "platform": platform,
-                                        "counterpart": counterpart}, counterpart=counterpart)
+                                        "counterpart": counterpart, "loop": pend.get("loop")}, counterpart=counterpart)
         self.recent = (self.recent + [(f"（{self.pr}主動傳的）", reply)])[-int(self.cfg["appraisal"]["recent_turns"]):]
         return True
 
@@ -1012,12 +1102,23 @@ class Engine:
             except queue.Empty:
                 continue
             try:
-                loops = [l for l in self.loops.values() if l["state"] in ("waiting", "due", "asked")]
+                cp = job.get("counterpart", MAIN)
+                loops = []
+                for l in self._loops_for(cp, ("waiting", "due", "asked", "asking", "answered")):
+                    note = ""
+                    if l["state"] == "asking" and l.get("asking") == cp:
+                        note = f"（代問：{self.pr}正替{self._name(l.get('counterpart') or MAIN)}問{job['term']}這件事；問到答案就關閉）"
+                    elif l["state"] == "asking":
+                        note = f"（{self.pr}已去問{self._name(l['asking'])}，等回覆）"
+                    elif l["state"] == "answered":
+                        note = f"（問到了：{l.get('answer') or '對方沒回'}）"
+                    loops.append({**l, "note": note})
                 today = self.local(job["at"]).strftime("%Y-%m-%d %H:%M")
                 ac = self.cfg["appraisal"]
                 data, raw, err, ms = A.run(self.llm, term=job["term"], cares_about=self.cfg.get("cares_about", []), loops=loops,
                                            recent=job["recent"], user_text=job["user"], assistant_text=job["assistant"], today=today,
-                                           max_events=int(ac["max_events"]), retries=int(ac["retries"]), pronoun=self.pr)
+                                           max_events=int(ac["max_events"]), retries=int(ac["retries"]), pronoun=self.pr,
+                                           others=self._known_others())
                 self.record_appraisal(data, raw=raw, error=err, ms=ms, turn_id=job["turn_id"], counterpart=job.get("counterpart", MAIN),
                                       platform=job["platform"], at=job["at"])
                 if err:
@@ -1044,15 +1145,33 @@ class Engine:
                     sid = EV.counterpart_session(self.hub_url, self.char, cp)
                 if not base or not sid:
                     logger.warning("psyche: cannot send an event turn (api %r, session %r, to %s)", base, sid, cp)
-                    self._record_and_apply("send_failed", {"why": "no api or session", "kind": job["kind"], "what": job["what"], "counterpart": cp}, counterpart=cp)
+                    self._record_and_apply("send_failed", {"why": "no api or session", "kind": job["kind"], "what": job["what"], "counterpart": cp,
+                                                           "loop": job.get("loop")}, counterpart=cp)
                     continue
                 now_text = self.local(self.now_fn()).strftime("%Y-%m-%d %H:%M（%a）")
-                text = EV.compose(job["kind"], term=self._name(cp), what=job["what"], now_text=now_text, pronoun=self.pr)
+                text = EV.compose(job["kind"], term=self._name(cp), what=job["what"], now_text=now_text, pronoun=self.pr,
+                                  extra=str(job.get("extra") or ""), **(job.get("fmt") or {}))
                 logger.info("psyche: event turn (%s) -> %s", job["kind"], "her API" if cp == MAIN else f"{cp} via her API")
-                _reply, err = EV.send(base, key, sid, text)
+                t0 = self.now_fn()
+                reply, err = EV.send(base, key, sid, text)
                 if err:
                     logger.warning("psyche: event turn failed: %s", err)
-                    self._record_and_apply("send_failed", {"why": err[:200], "kind": job["kind"], "what": job["what"], "counterpart": cp}, counterpart=cp)
+                    self._record_and_apply("send_failed", {"why": err[:200], "kind": job["kind"], "what": job["what"], "counterpart": cp,
+                                                           "loop": job.get("loop")}, counterpart=cp)
+                    EV.discard(self.hub_url, self.char, sid, text)
+                elif not (reply or "").strip() or EV.looks_error(reply):
+                    # the platform answered with an error (or nothing) instead of her words — e.g. every model backend
+                    # down. Hermes stores the cue but runs no hook, so no sent / silent would ever be recorded.
+                    time.sleep(2.0)
+                    with self.lock:
+                        seen = self.conn.execute("SELECT 1 FROM events WHERE kind IN ('sent','silent','send_failed') AND at >= ? AND counterpart = ? LIMIT 1",
+                                                 (t0 - 1, cp)).fetchone()
+                    if not seen:
+                        why = ("agent error: " + reply.strip()[:200]) if (reply or "").strip() else "empty reply"
+                        logger.warning("psyche: event turn answered with an error: %s", why)
+                        self._record_and_apply("send_failed", {"why": why, "kind": job["kind"], "what": job["what"], "counterpart": cp,
+                                                               "loop": job.get("loop")}, counterpart=cp)
+                        EV.discard(self.hub_url, self.char, sid, text)  # the cue must not re-enter her context later
                 # a successful send is recorded by the post_llm_call hook (sent / silent)
             except Exception:  # noqa: BLE001
                 logger.exception("psyche send worker error")
@@ -1176,10 +1295,20 @@ class Engine:
                 rel_line += f"；心裡還記著一筆（{open_hurt[-1]['cause'][:30]}）"
             if rel["hours"] > 0 or rel["bond"] > 0 or counterpart != MAIN:
                 lines.append(f"對{term}：{rel_line}")
-            waiting = [l for l in self.loops.values() if l["state"] in ("waiting", "due", "asked") and self._loop_cp(l) == counterpart]
-            waiting.sort(key=lambda l: (l["state"] != "due", -float(l.get("importance", 0.5))))
+            waiting = self._loops_for(counterpart, ("waiting", "due", "asked", "asking", "answered"))
+            waiting.sort(key=lambda l: (l["state"] not in ("due", "answered"), -float(l.get("importance", 0.5))))
+
+            def tag(l: Dict[str, Any]) -> str:
+                if l["state"] == "due":
+                    return "（到了）"
+                if l["state"] == "asking":
+                    who = self._name(l.get("counterpart") or MAIN)
+                    return f"（替{who}問的）" if counterpart != MAIN else f"（已去問{self._name(l['asking'])}，等回覆）"
+                if l["state"] == "answered":
+                    return f"（問到了：{str(l.get('answer'))[:24]}）" if l.get("answer") else "（去問了，沒問到）"
+                return ""
             if waiting:
-                lines.append("掛念：" + "、".join((l["what"] + ("（到了）" if l["state"] == "due" else "")) for l in waiting[:2]))
+                lines.append("掛念：" + "、".join(l["what"] + tag(l) for l in waiting[:2]))
             dom_type = dominant["type"] if dominant else None
             prev = self.last_block.get("dominant")
             prev_word = self.last_block.get("word")
