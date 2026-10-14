@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.8 — 2026-10-15
+
+- **Fix (data): a conversation with another character rewrote the whole memory store.** kokoro built the counterpart
+  pipeline with that character's name as the subject word, and KeepsakeDB's pipeline "migrated" the store to it —
+  every 「你…」 memory became 「子睿…」, and the main pipeline turned them back, taking real 子睿 mentions with it
+  (子晴's and 子睿's stores, 2026-10-14 22:06). Counterpart pipelines now pass no subject; KeepsakeDB 1.0.1 migrates only
+  on an explicit `migrate_subject=True` (the Settings knob). The two stores were repaired from the last clean snapshot,
+  the seed files and a reviewed rule, through the API (re-embedded, history kept).
+- **`vendor/` is two git submodules.** `vendor/hermes-agent` is pinned at upstream `7166071f` (fetched shallow) and
+  `vendor/keepsakedb` at the release tag `v1.0.1` (API frozen: bug fixes on 1.x, a schema change is 2.0), so a clone
+  carries both pins and `setup-vendor.ps1` only runs `git submodule update --init` and builds the venv.
+  `-LocalKeepsake <path>` still installs a checkout editable while developing KeepsakeDB; `tools/vendor-keepsake.ps1`
+  and the copied source are gone. The repo itself is plain git now (jj had no way to hold a submodule).
+
 ## 0.7.7 — 2026-10-14
 
 - **The hurt ledger and memory.** An entry opens only above `relation.hurt_open_min` (0.1) and then sits in her state

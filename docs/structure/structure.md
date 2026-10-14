@@ -65,7 +65,7 @@ today (0.7.0, incl. the characters' conversations), dashed pink = later work (Di
 
 ## 5. Zones
 
-- `vendor/hermes-agent/` — the vendored engine, never edited (pinned by `setup-vendor.ps1`).
+- `vendor/hermes-agent/` — the engine, a git submodule pinned in `.gitmodules`, never edited; `vendor/keepsakedb/` — the memory engine, a submodule at its release tag.
 - `home/` — runtime data and config; `home/profiles/<name>/` is a character. Ignored by VCS.
 - `556d/` (Go daemon), `app/` (Electron + React), `plugins/` (Python, inside Hermes by contract),
   `templates/companion/` (what `new-companion.ps1` copies), `docs/` (concepts only).

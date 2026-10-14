@@ -37,7 +37,8 @@ instead of spawning if one already serves :55600.
 | `app/` | the app: `electron/` (main, preload, backend lifecycle), `src/` (React: Office/Chat/Settings/Avatar, `live2d/Live2DStage`, `store` = hub WebSocket state, `api`, `i18n` zh-TW default), `assets/` icons, `scripts/` (dev runner, `cdp_capture.mjs`) | ours |
 | `app/public/vad/` | build output: Silero VAD models + audio worklet (from `@ricky0123/vad-web`) and ONNX Runtime wasm (from `onnxruntime-web`), copied by `scripts/copy-vad.mjs`, served by 556d at `/vad/` (ignored) | generated |
 | `556d/` | Go daemon: `internal/{config,supervisor,shim,bridge,hermes,api}`; config `556d.toml` | ours |
-| `vendor/hermes-agent/` | Hermes Agent v0.21.0, upstream `7166071f`; venv `.venv` (py3.11/uv). Ignored; `setup-vendor.ps1` restores it | **never edited** |
+| `vendor/hermes-agent/` | Hermes Agent v0.21.0: git submodule pinned at upstream `7166071f` (fetched shallow); its venv `.venv` (py3.11/uv) is ignored. `setup-vendor.ps1` checks it out and builds the venv | **never edited** |
+| `vendor/keepsakedb/` | KeepsakeDB 1.0.1 (ours, upstream Yooouuuuuuu/KeepsakeDB): git submodule pinned at the release tag `v1.0.1`, installed editable into the Hermes venv by `setup-vendor.ps1`. Bumped only on a bug-fix release (`git -C vendor/keepsakedb checkout vX.Y.Z`, commit the pin) | never edited here |
 | `vendor/live2d/` | Cubism Core **4** (`live2dcubismcore.min.js`) | never edited |
 | `assets/live2d/hiyori/` | official free Hiyori model (Cubism-4-era assets, SDK tag 4-r.7) | third-party data |
 | `plugins/` | Python that plugs INTO Hermes: `kokoro/` memory provider on KeepsakeDB (live; linked into `home/plugins/`), platform adapter — planned | ours |
@@ -77,7 +78,7 @@ instead of spawning if one already serves :55600.
   proxy, lane fallback chains, 4-attempt retry for emulated backends.
 
 ## Memory (kokoro on KeepsakeDB — see memory/memory.md and inner-life/inner-life.md)
-**KeepsakeDB 0.3.0** (`D:\dev\KeepsakeDB`, editable install in the Hermes venv; Hermes's curated MEMORY.md /
+**KeepsakeDB 1.0.1** (our memory engine, upstream Yooouuuuuuu/KeepsakeDB, API frozen; a git submodule at `vendor/keepsakedb/` pinned at the release tag, which `setup-vendor.ps1` installs editable, or a local checkout with `-LocalKeepsake` while developing it; Hermes's curated MEMORY.md /
 USER.md head is off, the person file `people/你.md` is injected by kokoro): one SQLite file per profile, hybrid recall (bge-m3 dense + FTS5 BM25 with
 CJK bigrams, RRF k=60), trust labels (high ≥ 0.60 / drop < 0.40), archive-with-reason + consent
 windows, L2 pipeline on `agy/gemini-3.8-flash` writing memories in the configured language
@@ -165,7 +166,7 @@ not copied into `vendor/`. **Services** are called over the network under their 
 
 | Kind | Piece | License / terms | Declared in |
 |---|---|---|---|
-| vendored | Hermes Agent v0.21.0 (`7166071f`) | MIT (Nous Research) | `vendor/hermes-agent/`, `setup-vendor.ps1` |
+| submodule | Hermes Agent v0.21.0 (`7166071f`) | MIT (Nous Research) | `.gitmodules` → `vendor/hermes-agent/` |
 | vendored | Live2D Cubism Core 4 | Live2D proprietary redistributable | `vendor/live2d/` |
 | data | Hiyori model (SDK 4-r.7) | Live2D Free Material License | `assets/live2d/hiyori/` |
 | npm | react, react-dom, zustand, pixi.js 7 | MIT | `app/package.json` |
@@ -173,7 +174,7 @@ not copied into `vendor/`. **Services** are called over the network under their 
 | npm | `@ricky0123/vad-web` (bundles the Silero VAD ONNX models — MIT, snakers4/silero-vad — and the audio worklet) | ISC | `app/package.json`; built into `app/public/vad/` |
 | npm | onnxruntime-web (wasm runtime for the VAD) | MIT | `app/package.json`; built into `app/public/vad/` |
 | Go | modernc.org/sqlite (pure Go), gorilla/websocket, BurntSushi/toml, yaml.v3, x/sys | BSD-3 / BSD-2 / MIT / MIT / BSD-3 | `556d/go.mod` |
-| Python | KeepsakeDB (ours, separate repo) → numpy; optional httpx (pipeline LLM client) | MIT | Hermes venv, `setup-vendor.ps1` |
+| submodule | KeepsakeDB 1.0.1 (ours) → numpy; optional httpx (pipeline LLM client) | MIT | `.gitmodules` → `vendor/keepsakedb/`; installed by `setup-vendor.ps1` |
 | Python | `ddgs` (DuckDuckGo search, keyless) for the 查網路 extension | MIT | Hermes venv, `setup-vendor.ps1` |
 | downloaded | llama.cpp CPU build; bge-m3 Q8_0 GGUF | MIT; MIT (BAAI) | `bin/`, `models/` (ignored) |
 | service | Fish Audio (TTS `/v1/tts`, ASR `/v1/asr`) | Fish Audio terms; key in `home/voice.json` (a character may override in her `voice.json`) | 設定 → 全域 → 語音連線 / 角色 → 聲音 |

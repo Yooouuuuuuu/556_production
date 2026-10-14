@@ -1,7 +1,7 @@
 
 # reference clone of momori777/Artemis (read-only study copy)
 # runtime data home (config may hold keys; state/memories are runtime)
-# vendored engine copy — provenance recorded in docs/STACK.md (upstream commit 7166071f)
+# vendor/hermes-agent and vendor/keepsakedb are git submodules pinned in .gitmodules (never edited here)
 *.log
 *.log.err
 556d.exe
@@ -21,7 +21,6 @@ tests/stress_*.log
 tests/stress_log.jsonl
 tools/node_modules/
 vendor/artemis/
-vendor/hermes-agent/
 app/public/vad/
 556d.new.exe
 docs/*.local.md

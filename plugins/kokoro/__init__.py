@@ -118,6 +118,7 @@ class KokoroMemoryProvider(MemoryProvider):
             language=cfg.get("language", "zh-TW"), max_candidates=int(cfg.get("max_candidates", 8)),
             consent_turns=int(cfg.get("consent_turns", 100)), context_k=int(cfg.get("context_k", 5)),
             subject=cfg.get("subject") or None,            # fixed subject word in stored memories (你)
+            migrate_subject=True,                           # only THIS pipeline may rename the word (Settings → 記憶主詞)
             user_name=self._your_name(cfg) or None,          # prompt-layer only; written through from Settings
             render_subject=self._address_term(cfg),         # how she refers to you when memories are injected
             retries=int(cfg.get("llm_retries", 1)),
@@ -202,9 +203,11 @@ class KokoroMemoryProvider(MemoryProvider):
             name = self._display_name(counterpart)
             pl = Pipeline(self._store, self._pipeline.llm, PipelineConfig(
                 language=base.language, max_candidates=base.max_candidates, consent_turns=base.consent_turns, context_k=base.context_k,
-                subject=name, user_name=None, render_subject=None, retries=base.retries, short_layer=base.short_layer,
+                subject=None, user_name=None, render_subject=None, retries=base.retries, short_layer=base.short_layer,
                 short_k=base.short_k, short_cap=base.short_cap, surface=f"跟{name}的對話"))
-            pl.subject = name  # the store's meta subject is 你; this pipeline speaks about the other character
+            # the store's word stays 你 (never pass a subject here: a differing subject used to rewrite the whole store);
+            # this pipeline only SPEAKS about the other character — its prompts use pl.subject
+            pl.subject = name
             self._pipelines[counterpart] = pl
         return pl
 

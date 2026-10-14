@@ -43,6 +43,13 @@ Design: `inner-life/inner-life.md` (its §0 lists every decision applied).
   the other one 「製作人」 (the SOUL and the history outweigh a note). The relay prefixes every delivered message with the speaker's
   display name, the block's first line names the counterpart, and the SOULs make the producer a role.
 
+## Incident (2026-10-14) — the subject word is the store's, never a pipeline's [memory]
+- A second pipeline on a store must never carry a subject of its own: KeepsakeDB's pipeline treated a differing
+  configured subject as "the user renamed the word" and rewrote every memory. Rule now: the store owns the word; a
+  rename is explicit (`migrate_subject=True`, only the main pipeline, only from Settings); counterpart pipelines speak
+  about the other character through `pl.subject` alone. Repairs go through the API (snapshot / seeds / reviewed rules),
+  never raw SQL, so history and embeddings stay right.
+
 ## Decided (2026-10-14) — the hurt ledger and memory [inner-life] [memory]
 - The ledger keeps only hurts (TRIM); good things live in trust, warmth, bond and gratitude. No kindness ledger for now.
 - An entry exists only above an opening threshold (`relation.hurt_open_min` 0.1) and is in the prompt the whole time
@@ -84,6 +91,15 @@ Design: `inner-life/inner-life.md` (its §0 lists every decision applied).
   presence model says you are around. No answer → retry at the next free slot, give up after `ask_retry_max`.
 - The narrator cue behind a proactive turn is never the user's words: 556d tags it, the app hides it by default and
   can show it as a note (設定 → 全域 → 程式).
+
+## Decided (2026-10-15) — vendoring by submodule; plain git [structure]
+- `vendor/hermes-agent` and `vendor/keepsakedb` are git submodules: Hermes at upstream `7166071f` (fetched
+  shallow, `ignore = dirty` because the runtime writes caches inside), KeepsakeDB at its release tag (`v1.0.1`).
+  One mechanism for both engines; the pins travel with a clone; nothing is copied by hand. The committed copy
+  under `vendor/keepsakedb` and `tools/vendor-keepsake.ps1` lasted one day and are gone.
+- The repo is plain git from here (it had been jj colocated on git): jj cannot hold a submodule. GitHub stays
+  release-only — fold with `git reset --soft <previous release>` and commit `vX.Y.Z`. The local `.jj`
+  directory and `refs/jj/*` are leftovers to delete.
 
 ## Built (2026-10-08) — inner life stages 3–4: proactive [inner-life]
 - Urges are decided live only and recorded as replayable `proactive_fired` events; replay re-applies the record,

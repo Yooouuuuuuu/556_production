@@ -39,6 +39,9 @@ What landed since:
   stopping… wording, no extra light for the model lane; 記性 on the character's 主動 page.
 - **0.7.7** (2026-10-14): 時間線 shows the hurt ledger's life (記了一筆 / 又提起了 / 和解了 / 放下了); 記憶 does not list
   held rows (a turn whose hurt is on the ledger). Backend: the ledger ↔ memory rules (`../inner-life/inner-life.md` §9).
+- **0.7.8** (2026-10-15): no UI change. Fix (data): a conversation with another character rewrote that character's
+  memory store (counterpart pipelines no longer pass a subject word; KeepsakeDB 1.0.1). `vendor/` is two git
+  submodules (Hermes at its pinned commit, KeepsakeDB at `v1.0.1`); the repo is plain git.
 - **Coming**: see
   `../inner-life/inner-life.md`.
 - **Parked**: packaging (installer, updater, auto-start), pixel-alpha click-through for the avatar,

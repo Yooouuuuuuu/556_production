@@ -4,7 +4,7 @@ Everything in `docs/` is a concept document: what each part is and why it is bui
 here is a to-do list. One folder per part; each holds one living doc that is always current (edited in
 place, with a "last verified" date) and its D2 graphs beside it (sources only; render with d2 for a
 picture). A part gets a second file only when its design is replaced wholesale, kept as
-`<part>-v1.md` with a "superseded by" line; small edits never make a new file. History is in jj.
+`<part>-v1.md` with a "superseded by" line; small edits never make a new file. History is in git.
 
 | Part | Doc | Graphs | What it covers |
 | --- | --- | --- | --- |

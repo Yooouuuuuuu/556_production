@@ -5,7 +5,7 @@ Hermes Agent as the brain, a Go daemon (`556d`) beside it, and one Windows app �
 and a Live2D companion on your desktop.
 
 ## Run
-1. `setup-vendor.ps1` once (restores the pinned Hermes engine + venv); download `bin/llama` and
+1. `setup-vendor.ps1` once (checks out the `vendor/` submodules — Hermes at its pinned commit, KeepsakeDB at its release — and builds the venv); download `bin/llama` and
    `models/bge-m3-Q8_0.gguf` as described in `docs/STACK.md`; build the daemon
    (`go -C 556d build -o ..\556d.exe .\cmd\556d`).
 2. `cd app && npm install --ignore-scripts && npm run build` (see STACK.md for the Electron
@@ -25,4 +25,4 @@ embedder re-embeds the store.
 `docs/README.md` is the map: one folder per part (`structure/`, `memory/`, `app/`, `voice/`, `inner-life/`), each a
 living concept doc with its graphs; `docs/DECISIONS.md` and `docs/STACK.md` at the docs root; working documents
 (roadmap, test list) are `docs/*.local.md`, ignored. `CHANGELOG.md` is per version.
-Version control is jj; `vendor/` is never edited.
+Version control is git; `vendor/` holds the two submodules and is never edited.
