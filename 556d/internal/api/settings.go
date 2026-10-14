@@ -132,14 +132,21 @@ func (s *SettingsStore) Update(patch json.RawMessage) (Settings, Applied, error)
 			return s.cur, Applied{}, err
 		}
 	}
-	if s.profileDirPath != "" && (next.YourName != s.cur.YourName || next.ReplyLanguage != s.cur.ReplyLanguage || next.MemoryLanguage != s.cur.MemoryLanguage || next.EmbedderModel != s.cur.EmbedderModel) {
-		if err := s.applyKokoro(next); err != nil {
+	if next.YourName != s.cur.YourName || next.ReplyLanguage != s.cur.ReplyLanguage {
+		// you are the same person to every character: your name and reply language go into EVERY profile's
+		// people/你.md and kokoro.json (read at each character's start), not only the one on stage
+		for _, dir := range s.profileDirs() {
+			if err := s.applyYouDir(dir, next); err != nil {
+				return s.cur, Applied{}, err
+			}
+		}
+		ap.RestartRequired = true
+	}
+	if s.profileDirPath != "" && (next.MemoryLanguage != s.cur.MemoryLanguage || next.EmbedderModel != s.cur.EmbedderModel) {
+		if err := s.applyKokoro(next); err != nil { // the memory engine settings are the selected character's own
 			return s.cur, Applied{}, err
 		}
-		if err := s.applyUserMD(next); err != nil {
-			return s.cur, Applied{}, err
-		}
-		ap.RestartRequired = true // people/你.md and kokoro.json are read at agent start
+		ap.RestartRequired = true // kokoro.json is read at agent start
 	}
 	b, _ := json.MarshalIndent(next, "", "  ")
 	if err := os.WriteFile(s.path(), b, 0o644); err != nil {
@@ -231,9 +238,51 @@ func (s *SettingsStore) applyKokoro(v Settings) error {
 	return os.WriteFile(p, out, 0o644)
 }
 
+// profileDirs lists every character's profile (home/profiles/<id> with a companion.json); the bound one
+// alone when there is no profiles folder.
+func (s *SettingsStore) profileDirs() []string {
+	var out []string
+	entries, err := os.ReadDir(filepath.Join(s.home, "profiles"))
+	if err == nil {
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			dir := filepath.Join(s.home, "profiles", e.Name())
+			if _, err := os.Stat(filepath.Join(dir, "companion.json")); err == nil {
+				out = append(out, dir)
+			}
+		}
+	}
+	if len(out) == 0 && s.profileDirPath != "" {
+		out = append(out, s.profileDirPath)
+	}
+	return out
+}
+
+// applyYouDir writes what is yours into one profile: kokoro.json your_name (how the character renders
+// memories about you) and the managed lines of people/你.md (name, reply language).
+func (s *SettingsStore) applyYouDir(dir string, v Settings) error {
+	p := filepath.Join(dir, "kokoro.json")
+	if raw, err := os.ReadFile(p); err == nil {
+		var m map[string]any
+		if json.Unmarshal(raw, &m) == nil {
+			m["your_name"] = v.YourName
+			delete(m, "producer_name")
+			out, _ := json.MarshalIndent(m, "", "  ")
+			if err := os.WriteFile(p, out, 0o644); err != nil {
+				return err
+			}
+		}
+	}
+	return s.applyUserMDDir(dir, v)
+}
+
 // addressDefault reads kokoro.json address_default of the bound profile ("" when absent).
-func (s *SettingsStore) addressDefault() string {
-	raw, err := os.ReadFile(filepath.Join(s.profileDir(), "kokoro.json"))
+func (s *SettingsStore) addressDefault() string { return addressDefaultDir(s.profileDir()) }
+
+func addressDefaultDir(dir string) string {
+	raw, err := os.ReadFile(filepath.Join(dir, "kokoro.json"))
 	if err != nil {
 		return ""
 	}
@@ -252,12 +301,16 @@ func (s *SettingsStore) applyUserMD(v Settings) error {
 	if s.profileDir() == "" {
 		return nil
 	}
-	dir := filepath.Join(s.profileDir(), "people")
+	return s.applyUserMDDir(s.profileDir(), v)
+}
+
+func (s *SettingsStore) applyUserMDDir(profile string, v Settings) error {
+	dir := filepath.Join(profile, "people")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
 	p := filepath.Join(dir, "你.md")
-	old := filepath.Join(s.profileDir(), "memories", "USER.md")
+	old := filepath.Join(profile, "memories", "USER.md")
 	raw, err := os.ReadFile(p)
 	if err != nil {
 		raw, _ = os.ReadFile(old) // first write: carry the old profile over
@@ -265,8 +318,8 @@ func (s *SettingsStore) applyUserMD(v Settings) error {
 	// how she addresses you until a name is set: kokoro.json address_default (製作人 for a blank companion; 哥 for a
 	// sibling); a long descriptive term is not worth quoting
 	nameLine := "- 名字：（尚未設定）"
-	if term := s.addressDefault(); term != "" && len([]rune(term)) <= 2 {
-		nameLine = "- 名字：（尚未設定，她叫你「" + term + "」）"
+	if term := addressDefaultDir(profile); term != "" && len([]rune(term)) <= 2 {
+		nameLine = "- 名字：（尚未設定，稱呼對方「" + term + "」）"
 	}
 	if strings.TrimSpace(v.YourName) != "" {
 		nameLine = "- 名字：" + strings.TrimSpace(v.YourName) + "（請這樣稱呼對方）"

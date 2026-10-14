@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.7.5 — 2026-10-14
+
+- **Mailbox between characters** (556d `relay.go`): a message for a character who is not running waits in
+  `home/mailbox/<id>.json` and is delivered when she starts (or at the next sweep), continuing the conversation where
+  it stopped; late delivery is prefixed with the time it was left; 7-day TTL, 20 per pair. `GET /api/relay/log` lists
+  `pending` and `outbox`. Asking another character is now "ask once, wait up to `proactive.ask_give_up_h` (48 h)".
+- **Forgetting.** `character.forgets` (off by default) lets a character forget a scheduled thing as it comes due:
+  base rate `character.forget_rate` or 0.3 × (1 − conscientiousness), lower for important items, higher when tired or
+  low, higher the longer it waited; decided with the seeded rng. A due item the platform could not deliver backs off
+  (5/15/60 min, then hourly) and after `proactive.undelivered_window_h` (6 h) is 忘了 too. Forgotten items leave her
+  state block, stay visible to the appraisal (she owns it when you bring it up) and show as 忘了 on 狀態.
+- 設定 → 全域 → 你: your name and reply language are written into every character's profile on save (people/你.md,
+  kokoro.json), not only the one on stage; each character applies them at its next start. Memory language and
+  embedder stay the selected character's own.
+- The developer-knob labels (556d's config registry) no longer say 她; the unnamed line in a person file reads
+  「稱呼對方「哥」」 instead of 「她叫你」, which was wrong for a character whose pronoun is 他.
+- 狀態 names the other characters by their display name (要問誰, 關係, 委屈帳) even before any conversation with them exists (the roster's names, not profile ids).
+
 ## 0.7.4 — 2026-10-14
 
 - **A failed turn leaves nothing behind.** When the model lane is down (or the agent errors), Hermes stores your

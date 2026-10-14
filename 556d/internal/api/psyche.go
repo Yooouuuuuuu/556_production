@@ -84,7 +84,10 @@ func (a *API) psycheHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		rows.Close()
 	}
-	if lcols["ask"] { // 0.7.4+: a promise that needs another character (ask / asking / answer / tries)
+	if lcols["why"] { // 0.7.5+: forgot / undelivered
+		out["loops"] = psycheQuery(db, "SELECT id, what, origin, cue_time, importance, state, created_at, closed_at, ask, asking, answer, tries, fails, why FROM loops ORDER BY created_at DESC LIMIT 40",
+			"id", "what", "origin", "cue_time", "importance", "state", "created_at", "closed_at", "ask", "asking", "answer", "tries", "fails", "why")
+	} else if lcols["ask"] { // 0.7.4+: a promise that needs another character (ask / asking / answer / tries)
 		out["loops"] = psycheQuery(db, "SELECT id, what, origin, cue_time, importance, state, created_at, closed_at, ask, asking, answer, tries FROM loops ORDER BY created_at DESC LIMIT 40",
 			"id", "what", "origin", "cue_time", "importance", "state", "created_at", "closed_at", "ask", "asking", "answer", "tries")
 	} else {

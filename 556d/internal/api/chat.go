@@ -550,6 +550,7 @@ func (a *API) openConversation(name string) {
 			log.Printf("[api] %s: discarded %d unanswered row(s) left by failed turns", name, n)
 		}
 	}
+	a.mailboxDrain(name) // what other characters said to her while she was down
 }
 
 // historyDiscard: drop the dangling user row of a turn that failed — the psyche engine calls it for a
@@ -678,6 +679,9 @@ func (a *API) followLoop() {
 		for _, info := range a.mgr.List() {
 			if info.Active && !info.Stopping && info.HermesConnected && len(info.Channels) > 0 {
 				a.follow(info.Name, info.Channels[0])
+			}
+			if info.Active && !info.Stopping && info.HermesConnected && a.mailboxHas(info.Name) {
+				go a.mailboxDrain(info.Name)
 			}
 		}
 	}

@@ -184,7 +184,8 @@ class Engine:
             self.conn.execute("ALTER TABLE events ADD COLUMN dedup TEXT")
             self.conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_events_dedup ON events(dedup)")
         lcols = {r[1] for r in self.conn.execute("PRAGMA table_info(loops)").fetchall()}
-        for col, typ in (("ask", "TEXT"), ("asking", "TEXT"), ("answer", "TEXT"), ("tries", "INTEGER"), ("asked_at", "REAL")):
+        for col, typ in (("ask", "TEXT"), ("asking", "TEXT"), ("answer", "TEXT"), ("tries", "INTEGER"), ("asked_at", "REAL"),
+                         ("fails", "INTEGER"), ("next_try", "REAL"), ("why", "TEXT")):
             if col not in lcols:
                 self.conn.execute(f"ALTER TABLE loops ADD COLUMN {col} {typ}")
         self.conn.commit()
@@ -192,10 +193,34 @@ class Engine:
     def _save_loop(self, l: Dict[str, Any]) -> None:
         """Mirror a loop into the loops table (the 狀態 page reads it; the snapshot is the source of truth)."""
         self.conn.execute("INSERT OR REPLACE INTO loops(id, what, origin, cue_time, importance, state, created_at, closed_at, counterpart, "
-                          "ask, asking, answer, tries, asked_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                          "ask, asking, answer, tries, asked_at, fails, next_try, why) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                           (l["id"], l["what"], l.get("origin"), l.get("cue_time"), float(l.get("importance", 0.5)), l["state"], l["created_at"],
                            l.get("closed_at"), l.get("counterpart") or MAIN, json.dumps(l.get("ask") or [], ensure_ascii=False),
-                           l.get("asking"), l.get("answer"), int(l.get("tries") or 0), l.get("asked_at")))
+                           l.get("asking"), l.get("answer"), int(l.get("tries") or 0), l.get("asked_at"),
+                           int(l.get("fails") or 0), l.get("next_try"), l.get("why")))
+
+    def _held(self, l: Dict[str, Any], t: float) -> bool:
+        """A due item backing off after a failed delivery waits for its next try."""
+        nt = l.get("next_try")
+        return nt is not None and t < float(nt)
+
+    def _forget_p(self, l: Dict[str, Any], t: float) -> float:
+        """Chance that she forgets this item as it comes due (character.forgets): the base rate from
+        conscientiousness unless set by hand, lower for important things, higher when tired or low, higher
+        the longer it has been waiting."""
+        ch = self.cfg["character"]
+        if not ch.get("forgets", False):
+            return 0.0
+        rate = ch.get("forget_rate")
+        base = float(rate) if rate is not None else 0.3 * (1.0 - float(ch["big5"].get("conscientiousness", 0.7)))
+        weeks = max(0.0, (t - float(l.get("created_at", t))) / (7 * 86400))
+        p = base * (1.0 - float(l.get("importance", 0.5))) * (1.0 + 0.5 * self.fatigue + 0.5 * float(self.affect.get("neg", 0.0))) * (1.3 ** weeks)
+        return max(0.0, min(0.95, p))
+
+    def _forget(self, l: Dict[str, Any], t: float, why: str) -> None:
+        l["state"], l["why"], l["next_try"] = "forgot", why, None
+        self._save_loop(l)
+        self._event("loop_forgot", {"loop": l["id"], "what": l["what"], "why": why}, t, dedup=f"forgot:{l['id']}")
 
     def _loops_for(self, p: str, states: Tuple[str, ...]) -> List[Dict[str, Any]]:
         """The loops that belong to a conversation with p: the ones opened there (for you: including the ones she is
@@ -546,20 +571,24 @@ class Engine:
         self.mood = model.mood_step(self.mood, center, tuple(dv["mood_default"]), dt_h, float(tc["mood_regress_tau_h"]),
                                     float(tc["mood_rise_max"]), float(tc["mood_fall_max"]))
         # --- loops: due by cue time, expiry
+        pcfg = self.cfg.get("proactive", {})
         for l in self.loops.values():
             if l["state"] == "waiting" and l.get("cue_time"):
                 ct = self._parse_cue(l["cue_time"])
                 if ct is not None and t >= ct:
+                    if rng.random() < self._forget_p(l, t):  # it slipped her mind (character.forgets)
+                        self._forget(l, t, "forgot")
+                        continue
                     l["state"] = "due"
                     self.conn.execute("UPDATE loops SET state='due' WHERE id=?", (l["id"],))
                     self._event("loop_due", {"loop": l["id"], "what": l["what"]}, t, dedup=f"due:{l['id']}")
             if l["state"] == "asking" and l.get("asked_at") is not None and \
-                    t - float(l["asked_at"]) > float(self.cfg.get("proactive", {}).get("ask_timeout_h", 3.0)) * 3600:
-                # she went to ask and got no answer: try again at her next free slot, or give up and tell you so
-                self._ask_outcome(l, None, t, gave_up=int(l.get("tries") or 0) >= int(self.cfg.get("proactive", {}).get("ask_retry_max", 3)))
-            if l["state"] == "due" and l.get("ask") and int(l.get("tries") or 0) >= int(self.cfg.get("proactive", {}).get("ask_retry_max", 3)):
-                self._ask_outcome(l, None, t, gave_up=True)
-            if l["state"] in ("waiting", "due", "asked", "asking", "answered") and t - float(l["created_at"]) > 7 * 86400:
+                    t - float(l["asked_at"]) > float(pcfg.get("ask_give_up_h", 48.0)) * 3600:
+                self._ask_outcome(l, None, t, gave_up=True)   # asked once, waited long enough: she will tell you she could not
+            if l["state"] in ("due", "answered") and l.get("first_fail_at") is not None and \
+                    t - float(l["first_fail_at"]) > float(pcfg.get("undelivered_window_h", 6.0)) * 3600:
+                self._forget(l, t, "undelivered")               # could not be delivered for hours: to her, she forgot
+            if l["state"] in ("waiting", "due", "asked", "asking", "answered", "forgot") and t - float(l["created_at"]) > 7 * 86400:
                 l["state"], l["closed_at"] = "expired", t
                 self.conn.execute("UPDATE loops SET state='expired', closed_at=? WHERE id=?", (t, l["id"]))
         # --- waiting for your answer: past your usual latency, a small disappointment, never a follow-up
@@ -692,9 +721,9 @@ class Engine:
             term = self._name(p)
             # due items: a reminder you asked for or her promise to you (forced through every gate), a promise that
             # needs another character (asked at her free time, never spoken to you), an answer to report back to you
-            due = [l for l in self.loops.values() if l["state"] == "due" and self._loop_cp(l) == p and not l.get("ask")]
-            asks = [l for l in self.loops.values() if l["state"] == "due" and p != MAIN and p in (l.get("ask") or [])]
-            reports = [l for l in self.loops.values() if l["state"] == "answered" and self._loop_cp(l) == p] if p == MAIN else []
+            due = [l for l in self.loops.values() if l["state"] == "due" and self._loop_cp(l) == p and not l.get("ask") and not self._held(l, t)]
+            asks = [l for l in self.loops.values() if l["state"] == "due" and p != MAIN and p in (l.get("ask") or []) and not self._held(l, t)]
+            reports = [l for l in self.loops.values() if l["state"] == "answered" and self._loop_cp(l) == p and not self._held(l, t)] if p == MAIN else []
             due_reminder = any(l.get("origin") in ("counterpart_said", "her_promise") for l in due)
             if p == MAIN:
                 you_awake = (not pc.get("report_only_when_awake", True)) or T.p_expected(self.pm, d_.weekday(), hour) >= 0.12
@@ -878,7 +907,7 @@ class Engine:
                 self._save_loop(self.loops[lid])
             elif lid and lid in self.loops and fk == "ask_other":
                 l = self.loops[lid]
-                l["state"], l["asking"], l["tries"], l["asked_at"] = "asking", cp, int(l.get("tries") or 0) + 1, t
+                l["state"], l["asking"], l["asked_at"] = "asking", cp, t
                 self._save_loop(l)
             if fk == "share":
                 self.share_backlog = [s for s in self.share_backlog if s.get("what") != what]
@@ -888,13 +917,39 @@ class Engine:
         elif kind == "sent":
             c = self._contact_of(cp)
             c["last_sent_at"], c["awaiting_since"], c["pending"] = t, t, None
+            lid = p.get("loop")
+            if lid and lid in self.loops:
+                l = self.loops[lid]
+                l["fails"], l["next_try"], l["first_fail_at"] = 0, None, None
+                if p.get("kind") == "ask_other":
+                    l["tries"] = int(l.get("tries") or 0) + 1   # the question really went out (556d keeps it if they are down)
+                self._save_loop(l)
         elif kind in ("silent", "send_failed"):
             self._contact_of(cp)["pending"] = None
-            if kind == "silent" and p.get("kind") != "ask_other":
+            fk = p.get("kind")
+            if kind == "silent" and fk != "ask_other":
                 self.contact["proactive_today"] = max(0, int(self.contact["proactive_today"]) - 1)
             lid = p.get("loop")
-            if lid and lid in self.loops and self.loops[lid]["state"] == "asking":
-                self._ask_outcome(self.loops[lid], None, t)  # the question never reached them: back to due, next free slot
+            if lid and lid in self.loops:
+                l = self.loops[lid]
+                if kind == "send_failed":
+                    # the platform failed, not her: the item is not used up. Back to where it was, with a backoff
+                    # (5, 15, 60 min, then hourly); after undelivered_window_h it becomes 忘了
+                    l["fails"] = int(l.get("fails") or 0) + 1
+                    l["first_fail_at"] = l.get("first_fail_at") or t
+                    l["next_try"] = t + [300, 900, 3600][min(2, l["fails"] - 1)] if l["fails"] <= 3 else t + 3600
+                    if fk == "report_back":
+                        l["state"] = "answered"
+                    elif fk in ("reminder", "return_promise"):
+                        l["state"] = "due"
+                    elif fk == "ask_other":
+                        l["state"], l["asked_at"] = "due", None
+                    self._save_loop(l)
+                elif fk == "ask_other" and l["state"] == "asking":
+                    self._ask_outcome(l, None, t)               # she chose not to ask now: next free slot
+                elif fk == "report_back" and l["state"] == "asked":
+                    l["state"], l["next_try"] = "answered", t + 3600   # not the moment to tell you: in an hour
+                    self._save_loop(l)
         elif kind == "cmd_close_loop":
             lid = p.get("loop")
             if lid in self.loops and self.loops[lid]["state"] not in ("closed", "expired"):
@@ -1104,9 +1159,11 @@ class Engine:
             try:
                 cp = job.get("counterpart", MAIN)
                 loops = []
-                for l in self._loops_for(cp, ("waiting", "due", "asked", "asking", "answered")):
+                for l in self._loops_for(cp, ("waiting", "due", "asked", "asking", "answered", "forgot")):
                     note = ""
-                    if l["state"] == "asking" and l.get("asking") == cp:
+                    if l["state"] == "forgot":
+                        note = f"（{self.pr}忘了這件事，沒做；若對方提起，回報 promise_broken（agent self）並關閉）"
+                    elif l["state"] == "asking" and l.get("asking") == cp:
                         note = f"（代問：{self.pr}正替{self._name(l.get('counterpart') or MAIN)}問{job['term']}這件事；問到答案就關閉）"
                     elif l["state"] == "asking":
                         note = f"（{self.pr}已去問{self._name(l['asking'])}，等回覆）"

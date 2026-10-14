@@ -18,6 +18,8 @@ DEFAULTS: Dict[str, Any] = {
     "enabled": True,
     "character": {
         # L0 — Big Five 0..1 and the six character constants (glossary E.1). Human-set per character.
+        "forgets": False,       # may forget a scheduled thing (a reminder, a promise) when it comes due
+        "forget_rate": None,    # base chance per due item; None = 0.3 × (1 − conscientiousness)
         "big5": {"openness": 0.6, "conscientiousness": 0.7, "extraversion": 0.55, "agreeableness": 0.65, "neuroticism": 0.4},
         "self_esteem_stability": 0.6,
         "expressiveness": 0.6,
@@ -97,8 +99,8 @@ DEFAULTS: Dict[str, Any] = {
         "inter_agent_turn_cap": 6,       # exchanges per conversation (cost control, not a script)
         "inter_agent_visibility": True,  # the 狀態 page may show their conversations
         "promise_requires_agreement": True,  # a promise opens a loop only when she agreed in her reply
-        "ask_retry_max": 3,              # a promise that needs another character: how many times she tries to reach them
-        "ask_timeout_h": 3.0,            # ... and how long she waits for an answer before trying again
+        "ask_give_up_h": 48.0,           # a promise that needs another character: asked once, then wait this long for an answer
+        "undelivered_window_h": 6.0,     # a due item that cannot be delivered (platform down) is retried this long, then 忘了
         "report_only_when_awake": True,  # the answer comes back to you outside your no-disturb hours, when you are likely around
     },
     "tom": {"weekly_decay": 0.92},

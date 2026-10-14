@@ -47,6 +47,141 @@ var (
 	relayBusy = map[relayPair]bool{}
 )
 
+// Mailbox (inner-life.md §18): a message for a character who is not running waits in
+// home/mailbox/<to>.json and is delivered when she starts (or at the next sweep), continuing the
+// conversation where it stopped — so A can ask while B is down and B can answer while A is down.
+// Late delivery carries the time it was left, so the listener does not take it for "now".
+type mailItem struct {
+	ID   string  `json:"id"`
+	From string  `json:"from"`
+	To   string  `json:"to"`
+	Text string  `json:"text"`
+	At   float64 `json:"at"`
+	Turn int     `json:"turn"` // turns already taken in this conversation
+	Cap  int     `json:"cap"`
+}
+
+const (
+	mailboxMaxPerPair = 20
+	mailboxTTL        = 7 * 24 * time.Hour
+)
+
+var mailMu sync.Mutex
+
+func (a *API) mailboxPath(to string) string { return filepath.Join(a.settings.home, "mailbox", to+".json") }
+
+func (a *API) mailboxLoad(to string) []mailItem {
+	var items []mailItem
+	if raw, err := os.ReadFile(a.mailboxPath(to)); err == nil {
+		_ = json.Unmarshal(raw, &items)
+	}
+	return items
+}
+
+func (a *API) mailboxSave(to string, items []mailItem) error {
+	if err := os.MkdirAll(filepath.Dir(a.mailboxPath(to)), 0o755); err != nil {
+		return err
+	}
+	if len(items) == 0 {
+		return os.Remove(a.mailboxPath(to))
+	}
+	b, _ := json.MarshalIndent(items, "", "  ")
+	return os.WriteFile(a.mailboxPath(to), b, 0o600)
+}
+
+func (a *API) mailboxHas(to string) bool {
+	st, err := os.Stat(a.mailboxPath(to))
+	return err == nil && st.Size() > 2
+}
+
+// mailboxPut queues a message for `to`; at most mailboxMaxPerPair from the same sender wait.
+func (a *API) mailboxPut(from, to, text string, turn, cap int) {
+	mailMu.Lock()
+	defer mailMu.Unlock()
+	items := a.mailboxLoad(to)
+	n := 0
+	for _, it := range items {
+		if it.From == from {
+			n++
+		}
+	}
+	if n >= mailboxMaxPerPair {
+		log.Printf("[relay] %s is not running and already holds %d messages from %s; this one is dropped", to, n, from)
+		return
+	}
+	b := make([]byte, 6)
+	_, _ = rand.Read(b)
+	items = append(items, mailItem{ID: hex.EncodeToString(b), From: from, To: to, Text: text, At: float64(time.Now().Unix()), Turn: turn, Cap: cap})
+	if err := a.mailboxSave(to, items); err != nil {
+		log.Printf("[relay] mailbox for %s: %v", to, err)
+		return
+	}
+	log.Printf("[relay] %s is not running; message from %s waits in the mailbox (%d waiting): %s", to, from, len(items), head(text, 60))
+}
+
+// mailboxDrain delivers what waits for `to`, in order, each continuing its conversation. Items older
+// than mailboxTTL are dropped; a pair already talking gets its item back for the next sweep.
+func (a *API) mailboxDrain(to string) {
+	if a.mgr.Client(to) == nil {
+		return
+	}
+	mailMu.Lock()
+	items := a.mailboxLoad(to)
+	if len(items) == 0 {
+		mailMu.Unlock()
+		return
+	}
+	_ = a.mailboxSave(to, nil)
+	mailMu.Unlock()
+	now := time.Now()
+	for _, it := range items {
+		left := time.Unix(int64(it.At), 0)
+		if now.Sub(left) > mailboxTTL {
+			log.Printf("[relay] mailbox for %s: a message from %s expired unread (%s)", to, it.From, head(it.Text, 40))
+			continue
+		}
+		pk := pairKey(it.From, it.To)
+		relayMu.Lock()
+		if relayBusy[pk] {
+			relayMu.Unlock()
+			mailMu.Lock()
+			_ = a.mailboxSave(to, append(a.mailboxLoad(to), it))
+			mailMu.Unlock()
+			continue
+		}
+		relayBusy[pk] = true
+		relayMu.Unlock()
+		text := it.Text
+		if now.Sub(left) > 10*time.Minute { // not "now": the listener knows when it was left
+			text = "（" + left.Format("1/2 15:04") + " 留的話）" + text
+		}
+		log.Printf("[relay] mailbox for %s: delivering a message from %s left %s ago", to, it.From, now.Sub(left).Round(time.Minute))
+		a.relayConversation(it.From, it.To, text, it.Cap-it.Turn, pk)
+	}
+}
+
+// mailboxOutbox lists what `from` has waiting in other characters' mailboxes (for the 狀態 page).
+func (a *API) mailboxOutbox(from string) []mailItem {
+	var out []mailItem
+	entries, err := os.ReadDir(filepath.Join(a.settings.home, "mailbox"))
+	if err != nil {
+		return out
+	}
+	mailMu.Lock()
+	defer mailMu.Unlock()
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		for _, it := range a.mailboxLoad(strings.TrimSuffix(e.Name(), ".json")) {
+			if it.From == from {
+				out = append(out, it)
+			}
+		}
+	}
+	return out
+}
+
 // relaySession returns the session id of `companion`'s conversation with `counterpart`, opening it when
 // it does not exist yet. Only an active companion can open one (her API server must be up).
 func (a *API) relaySession(ctx context.Context, companion, counterpart string) (string, error) {
@@ -133,8 +268,10 @@ func (a *API) relayHandler(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]any{"error": "unknown companion"})
 		return
 	}
-	if a.mgr.Client(body.To) == nil {
-		writeJSON(w, http.StatusConflict, map[string]any{"error": body.To + " is not running"})
+	cap := relayTurnCap(a.mgr.Dir(body.From))
+	if a.mgr.Client(body.To) == nil { // she will get it when she starts
+		a.mailboxPut(body.From, body.To, body.Text, 0, cap)
+		writeJSON(w, http.StatusOK, map[string]any{"accepted": true, "queued": true, "turn_cap": cap})
 		return
 	}
 	pk := pairKey(body.From, body.To)
@@ -146,7 +283,6 @@ func (a *API) relayHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	relayBusy[pk] = true
 	relayMu.Unlock()
-	cap := relayTurnCap(a.mgr.Dir(body.From))
 	go a.relayConversation(body.From, body.To, body.Text, cap, pk)
 	writeJSON(w, http.StatusOK, map[string]any{"accepted": true, "turn_cap": cap})
 }
@@ -179,8 +315,8 @@ func (a *API) relayConversation(speaker, listener, text string, cap int, pk rela
 	log.Printf("[relay] %s -> %s: conversation starts (cap %d): %s", speaker, listener, cap, head(text, 60))
 	for turn := 0; turn < cap; turn++ {
 		cl := a.mgr.Client(listener)
-		if cl == nil {
-			log.Printf("[relay] %s is not running; conversation ends", listener)
+		if cl == nil { // the rest of the conversation waits for her
+			a.mailboxPut(speaker, listener, text, turn, cap)
 			return
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
@@ -245,5 +381,20 @@ func (a *API) relayLogHandler(w http.ResponseWriter, r *http.Request) {
 			names[c.Counterpart] = companions.DisplayName(a.mgr.Dir(c.Counterpart), c.Counterpart)
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"companion": name, "conversations": convs, "names": names})
+	pending := a.mailboxLoad(name)
+	if pending == nil {
+		pending = []mailItem{}
+	}
+	outbox := a.mailboxOutbox(name)
+	if outbox == nil {
+		outbox = []mailItem{}
+	}
+	for _, it := range append(append([]mailItem{}, pending...), outbox...) {
+		for _, p := range []string{it.From, it.To} {
+			if _, ok := names[p]; !ok && p != name {
+				names[p] = companions.DisplayName(a.mgr.Dir(p), p)
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"companion": name, "conversations": convs, "names": names, "pending": pending, "outbox": outbox})
 }

@@ -198,7 +198,7 @@ def _promise(e, what, ask, cp="製作人", cue=None):
     e.record_appraisal({"events": [], "loops": {"new": [{"what": what, "origin": "her_promise", "cue_time": cue, "importance": 0.8,
                                                            "agreed": True, "ask": ask}], "closed": []}, "farewell": False},
                        turn_id=f"t{len(e.loops)}", counterpart=cp, platform="api_server")
-    return next(iter(e.loops))
+    return list(e.loops)[-1]
 
 
 def _fired(e, kind):
@@ -236,10 +236,11 @@ def test_promise_through_another_character(tmp_path):
     assert _fired(e, "return_promise") == [] and _fired(e, "report_back") == []
     asks = _fired(e, "ask_other")
     assert len(asks) == 1 and asks[0][1] == "zirui"
-    assert e.loops[lid]["state"] == "asking" and e.loops[lid]["asking"] == "zirui" and e.loops[lid]["tries"] == 1
+    assert e.loops[lid]["state"] == "asking" and e.loops[lid]["asking"] == "zirui" and e.loops[lid]["tries"] == 0
     assert "替製作人問的" in e.state_block(counterpart="zirui") and "已去問zirui" in e.state_block()
     # her question went out; 子睿 answers, and the appraisal of THAT conversation closes the loop with the answer
     e.on_event_reply("【事件】…", "弟，你現在有對象嗎？", platform="api_server", counterpart="zirui")
+    assert e.loops[lid]["tries"] == 1               # it went out (556d keeps it if he is down)
     e.record_appraisal({"events": [{"event_kind": "loop_resolved", "cause": "子睿說他目前單身", "v": 0.2, "R": 0.5, "u": 0.1, "cert": 1.0,
                                     "agent": "other", "intent": 0.5, "devalue": 0.0, "ambiguity": 0.0, "other_focus": 0.5, "other_v": 0.0,
                                     "appeal": 0.0, "q": 0.5, "loop_id": lid}],
@@ -252,20 +253,70 @@ def test_promise_through_another_character(tmp_path):
     assert len(reps) == 1 and reps[0][1] == "你" and e.loops[lid]["state"] == "asked"   # events for you carry the subject 你
 
 
-def test_report_waits_for_morning_and_gives_up_after_retries(tmp_path):
+def test_ask_once_then_wait_then_give_up_in_the_morning(tmp_path):
     clock = Clock(T0 + 2.5 * 3600)            # 22:30
-    c = cfg(relationships={"zirui": {}}, proactive={"ask_retry_max": 2, "ask_timeout_h": 1.0})
-    e = make(tmp_path, "retry", clock, c)
+    c = cfg(relationships={"zirui": {}}, proactive={"ask_give_up_h": 20.0})
+    e = make(tmp_path, "giveup", clock, c)
     lid = _promise(e, "幫製作人問子睿週末有沒有空", ["zirui"])
-    run(e, clock, 0.6)                        # 23:06: asked once (she is still up: bedtime is later for this chronotype)
+    run(e, clock, 0.6)                        # asked once; 556d keeps the message if 子睿 is down, so she only waits
     assert len(_fired(e, "ask_other")) == 1 and e.loops[lid]["state"] == "asking"
-    run(e, clock, 10)                         # no answer: a retry after the timeout, then giving up -> answered with no answer
-    assert e.loops[lid]["tries"] == 2 and e.loops[lid]["state"] in ("answered", "asked")
-    assert "沒問到" in e.state_block() or e.loops[lid]["state"] == "asked"
+    e.on_event_reply("【事件】…", "弟，你週末有空嗎？", platform="api_server", counterpart="zirui")
+    assert e.loops[lid]["tries"] == 1
+    run(e, clock, 30)                         # no answer for 20 h: she gives up, and tells you in the morning, once
+    assert len(_fired(e, "ask_other")) == 1
+    assert e.loops[lid]["state"] == "asked" and e.loops[lid]["answer"] is None
     reps = _fired(e, "report_back")
-    assert len(reps) == 1                     # told you once, in the morning (not inside 23–8)
-    assert not (23 <= hour_of(e, e.conn.execute("select at from events where kind='proactive_fired' order by id desc limit 1").fetchone()[0]) or
-                hour_of(e, e.conn.execute("select at from events where kind='proactive_fired' order by id desc limit 1").fetchone()[0]) < 8)
+    assert len(reps) == 1
+    h = hour_of(e, e.conn.execute("select at from events where kind='proactive_fired' order by id desc limit 1").fetchone()[0])
+    assert 8 <= h < 23
+
+
+def test_forgetting_toggle_rate_and_importance(tmp_path):
+    clock = Clock(T0)
+    e = make(tmp_path, "noforget", clock)      # default: never forgets
+    cue = e.local(T0 + 1800).strftime("%Y-%m-%dT%H:%M")
+    lid = _promise(e, "提醒製作人繳電費", [], cue=cue)
+    run(e, clock, 1)
+    assert e.loops[lid]["state"] == "asked"
+    c = cfg(character={"forgets": True, "forget_rate": 1.0})
+    e2 = make(tmp_path, "forgets", clock, c)
+    lid2 = _promise(e2, "提醒製作人繳電費", [], cue=e2.local(clock.t + 1800).strftime("%Y-%m-%dT%H:%M"))
+    e2.loops[lid2]["importance"] = 0.0          # nothing holds it: certain to slip
+    run(e2, clock, 1)
+    assert e2.loops[lid2]["state"] == "forgot" and e2.loops[lid2]["why"] == "forgot"
+    assert e2.conn.execute("select count(*) from events where kind='loop_forgot'").fetchone()[0] == 1
+    assert "繳電費" not in e2.state_block()      # she does not see what she forgot
+    lid3 = _promise(e2, "七點叫製作人起床", [], cue=e2.local(clock.t + 1800).strftime("%Y-%m-%dT%H:%M"))
+    e2.loops[lid3]["importance"] = 1.0          # important things are never forgotten
+    run(e2, clock, 1)
+    assert e2.loops[lid3]["state"] == "asked"
+    # her conscientiousness sets the base rate when none is given
+    e3 = make(tmp_path, "rate", clock, cfg(character={"forgets": True, "big5": {**config.DEFAULTS["character"]["big5"], "conscientiousness": 0.5}}))
+    expect = 0.15 * (1 + 0.5 * e3.fatigue + 0.5 * e3.affect["neg"])   # 0.3 × (1 − C), times the tired / low factor
+    assert abs(e3._forget_p({"importance": 0.0, "created_at": clock.t}, clock.t) - expect) < 1e-6
+
+
+def test_undelivered_due_item_backs_off_then_is_forgotten(tmp_path):
+    clock = Clock(T0)
+    e = make(tmp_path, "undelivered", clock, cfg(proactive={"undelivered_window_h": 2.0}))
+    lid = _promise(e, "提醒製作人繳電費", [], cue=e.local(T0 + 600).strftime("%Y-%m-%dT%H:%M"))
+    run(e, clock, 0.3)
+    assert len(_fired(e, "return_promise")) == 1 and e.loops[lid]["state"] == "asked"
+    # the platform failed to deliver: not used up — back to due with a backoff, retried, then 忘了 after the window
+    e._record_and_apply("send_failed", {"why": "agent error: HTTP 502", "kind": "return_promise", "what": "提醒製作人繳電費", "counterpart": "你", "loop": lid}, counterpart="你")
+    assert e.loops[lid]["state"] == "due" and e.loops[lid]["fails"] == 1 and e._held(e.loops[lid], clock.t)
+    run(e, clock, 0.04)
+    assert len(_fired(e, "return_promise")) == 1       # held for 5 min
+    run(e, clock, 0.1)
+    assert len(_fired(e, "return_promise")) == 2       # retried
+
+    def still_down(eng, ck):                            # every retry fails the same way while the lane is down
+        pend = eng.contact.get("pending") or {}
+        eng._record_and_apply("send_failed", {"why": "agent error: HTTP 502", "kind": pend.get("kind"), "what": pend.get("what"), "counterpart": "你", "loop": pend.get("loop")}, counterpart="你")
+    still_down(e, clock)
+    run(e, clock, 2.5, on_fire=still_down)
+    assert e.loops[lid]["state"] == "forgot" and e.loops[lid]["why"] == "undelivered"
+    assert 2 <= len(_fired(e, "return_promise")) <= 6   # backoff: a handful of tries, not one per minute
 
 
 def test_farewell_mode(tmp_path):

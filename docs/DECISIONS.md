@@ -43,6 +43,16 @@ Design: `inner-life/inner-life.md` (its §0 lists every decision applied).
   the other one 「製作人」 (the SOUL and the history outweigh a note). The relay prefixes every delivered message with the speaker's
   display name, the block's first line names the counterpart, and the SOULs make the producer a role.
 
+## Decided (2026-10-14) — mailbox, forgetting, undelivered [inner-life]
+- Characters message each other through a mailbox: a message for a character who is not running waits in
+  `home/mailbox/<id>.json` and is delivered when she starts, continuing the conversation (late delivery carries the
+  time it was left; 7-day TTL; 20 per pair). Asking another character is therefore "send once, wait up to 48 h".
+- A due item the platform could not deliver is not used up: it backs off (5/15/60 min, then hourly) and after 6 h is
+  marked 忘了 — in the character's world there is no "backend down", she forgot. Forgetting is also a character
+  parameter (`character.forgets`, off by default): base rate from conscientiousness or user-set, lower for important
+  things, higher when tired or low, higher the longer it waited; decided at the due moment with the seeded rng. The
+  state page shows 忘了 at once (transparency over surprise).
+
 ## Decided (2026-10-14) — two kinds of promise [inner-life]
 - A promise opens a loop only when she actually agreed in her reply (the appraisal reports `agreed`); whether she
   agrees is her SOUL and the relationship state she sees, not a numeric affection gate.

@@ -20,7 +20,7 @@ const ACTIVITY_ZH: Record<string, string> = { sleep: '在睡覺', lying: '躺在
 const NEEDS_ZH: Record<string, string> = { affiliation_person: '想找你', affiliation_general: '想有人陪', competence: '想有進展', autonomy: '想自己決定', certainty: '想知道結果', novelty: '想有新鮮事' };
 const PHASE_ZH: Record<string, string> = { ok: '', protest: '想找你', despair: '悶著', detachment: '疏離' };
 const STRATEGY_ZH: Record<string, string> = { direct: '直說', reserved: '收斂', humor: '玩笑', inverted: '反話', denial: '否認', suppress: '先不提' };
-const LOOP_STATE_ZH: Record<string, string> = { waiting: '等待中', due: '到了', asking: '去問了', answered: '問到了', asked: '已開口' };
+const LOOP_STATE_ZH: Record<string, string> = { waiting: '等待中', due: '到了', asking: '去問了', answered: '問到了', asked: '已開口', forgot: '忘了' };
 const parseAsk = (s: string | null | undefined): string[] => { try { const v = JSON.parse(s || '[]'); return Array.isArray(v) ? v.map(String) : []; } catch { return []; } };
 const word = (x: number) => (x < 0.2 ? '' : x < 0.45 ? '有點' : x < 0.7 ? '蠻' : '很');
 const energyWord = (e: number, a?: string) => (a === 'sleep' ? '在睡覺' : a === 'woken' ? '很睏' : e >= 0.75 ? '精神很好' : e >= 0.55 ? '精神還不錯' : e >= 0.35 ? '有點累' : '很累');
@@ -45,6 +45,7 @@ function eventText(e: { kind: string; payload: any }): string {
     case 'rumination': return `🔁 又想起：${EMOTION_ZH[p.type] ?? p.type}`;
     case 'loop_due': return `⏰ 到了：${p.what ?? ''}`;
     case 'loop_answered': return `📨 問到了${p.answer ? `：${p.answer}` : '（沒問到）'}`;
+    case 'loop_forgot': return `🙈 忘了：${p.what ?? ''}${p.why === 'undelivered' ? '（沒送出去）' : ''}`;
     case 'cmd_feedback': return `🎚 你的回饋：${EMOTION_ZH[p.type] ?? p.type} ${p.verdict}`;
     case 'start': return `▶ 開始（補了 ${p.gap_ticks ?? 0} 分鐘）`;
     case 'stop': return '■ 停止';
@@ -55,6 +56,7 @@ function eventText(e: { kind: string; payload: any }): string {
 export function State() {
   const [v, setV] = useState<PsycheView | null>(null);
   const [relay, setRelay] = useState<{ conversations: RelayConversation[]; names: Record<string, string> } | null>(null);
+  const [roster, setRoster] = useState<Record<string, string>>({}); // id -> display name, for 要問誰 / 關係 before any conversation exists
   const [err, setErr] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now() / 1000);
   const [showBlock, setShowBlock] = useState(false);
@@ -68,6 +70,7 @@ export function State() {
   };
   useEffect(() => {
     load();
+    api.companions().then((r) => setRoster(Object.fromEntries((r.companions ?? []).map((c) => [c.name, c.display_name || c.name])))).catch(() => {});
     const id = setInterval(load, 5000);
     return () => clearInterval(id);
   }, []);
@@ -95,7 +98,7 @@ export function State() {
   const others = snap?.others ?? {};
   const strategy = snap?.last_strategy?.strategy;
   const blockText = snap?.last_block?.text ?? '';
-  const nameOf = (p: string) => (p === '你' ? '你' : relay?.names?.[p] ?? p);
+  const nameOf = (p: string) => (p === '你' ? '你' : relay?.names?.[p] ?? roster[p] ?? p);
   const card = 'rounded-lg bg-white/5 p-3';
   const visible = v.inter_agent_visibility !== false;
 
@@ -203,6 +206,8 @@ export function State() {
                   <span className="text-xs opacity-40"> · {LOOP_STATE_ZH[l.state] ?? l.state}</span>
                   {parseAsk(l.ask).length > 0 && <span className="text-xs opacity-50"> · 要問 {parseAsk(l.ask).map(nameOf).join('、')}{l.tries ? `（第 ${l.tries} 次）` : ''}</span>}
                   {l.state === 'answered' && <span className="text-xs opacity-60"> · {l.answer ? `答案：${l.answer}` : '沒問到'}</span>}
+                  {l.state === 'forgot' && l.why === 'undelivered' && <span className="text-xs opacity-50"> · 沒送出去</span>}
+                  {l.fails ? <span className="text-xs opacity-40"> · 重試中（{l.fails}）</span> : null}
                 </span>
                 <button className="text-xs opacity-60 hover:opacity-100 disabled:opacity-30" disabled={busy} onClick={() => command('close_loop', { loop: l.id })}>{t('state.close_loop')}</button>
               </li>
