@@ -63,6 +63,7 @@ type Manager struct {
 	home      string
 	hermesExe string
 	root      string
+	Timezone  string // HERMES_TIMEZONE for every gateway (556d.toml [hermes] timezone)
 	sup       *supervisor.Supervisor
 	mu        sync.Mutex
 	live      map[string]*live
@@ -199,6 +200,7 @@ func (m *Manager) Start(name string) (Info, error) {
 			"API_SERVER_HOST=127.0.0.1",
 			"API_SERVER_PORT=" + fmt.Sprint(port),
 			"X556_HUB=http://127.0.0.1:55600", // her plugins reach 556d here (counterpart sessions, the relay)
+			"HERMES_TIMEZONE=" + m.Timezone,    // her date line and her engine's clock in the same zone
 		},
 		Dir:    m.root,
 		Health: fmt.Sprintf("http://127.0.0.1:%d/health", port),

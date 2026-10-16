@@ -28,8 +28,9 @@ type Daemon struct {
 }
 
 type Hermes struct {
-	Home string `toml:"home"` // profiles live under <home>/profiles/<name>
-	Exe  string `toml:"exe"`  // hermes.exe of the vendored venv; each companion runs `hermes gateway run`
+	Home     string `toml:"home"`     // profiles live under <home>/profiles/<name>
+	Exe      string `toml:"exe"`      // hermes.exe of the vendored venv; each companion runs `hermes gateway run`
+	Timezone string `toml:"timezone"` // IANA zone passed as HERMES_TIMEZONE so Hermes's date line and the engine's clock agree
 }
 
 type Embedder struct {
@@ -42,7 +43,7 @@ type Embedder struct {
 func Load(path string) (*Config, error) {
 	c := &Config{
 		Daemon:   Daemon{Port: 55600},
-		Hermes:   Hermes{Home: "home", Exe: "vendor/hermes-agent/.venv/Scripts/hermes.exe"},
+		Hermes:   Hermes{Home: "home", Exe: "vendor/hermes-agent/.venv/Scripts/hermes.exe", Timezone: "Asia/Taipei"},
 		Embedder: Embedder{Enabled: true, Exe: "bin/llama/llama-server.exe", Model: "models/bge-m3-Q8_0.gguf", Port: 18768},
 	}
 	if _, err := toml.DecodeFile(path, c); err != nil {

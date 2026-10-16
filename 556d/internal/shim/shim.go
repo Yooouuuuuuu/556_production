@@ -232,6 +232,7 @@ func (s *Shim) chat(w http.ResponseWriter, r *http.Request) {
 			var resp map[string]any
 			var err error
 			if p.be.NativeTools {
+				filterSystemMessages(req) // prompt hygiene on the passthrough path too
 				resp, err = s.upstream(p.be, req)
 				if err == nil {
 					log.Printf("[shim] lane=%s -> %s passthrough %.1fs", lane, p.name, time.Since(t0).Seconds())
@@ -246,6 +247,7 @@ func (s *Shim) chat(w http.ResponseWriter, r *http.Request) {
 						msg = map[string]any{}
 					}
 					calls, cleaned := parseToolCalls(str(msg["content"]), time.Now)
+					calls, cleaned = unwrapReplyFunction(calls, cleaned) // the proxy's own reply function is text, not a tool
 					broken := len(calls) == 0 && (strings.TrimSpace(cleaned) == "" ||
 						strings.HasPrefix(strings.TrimSpace(cleaned), "[openmini/") ||
 						strings.Contains(cleaned, "returned no text"))

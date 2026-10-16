@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.8.4 — 2026-10-16
+
+- **Prompt hygiene, first pass** (`docs/prompt/prompt.md` §2.7–2.8, `around-the-soul.md`, DECISIONS 2026-10-16). Her
+  system prompt no longer names a product, a machine, a model or the app:
+  - before every start 556d writes the switches into her `config.yaml` (`agent.task_completion_guidance`,
+    `agent.parallel_tool_call_guidance`, `agent.environment_probe` off) and replaces the platform hints with one
+    zh-TW line each (api_server, telegram, discord);
+  - the shim drops the paragraphs that have no switch from every system message, on every lane — the Nous Research
+    help guidance with its docs URL, the mid-turn steering note, the host / home / cwd and Windows-shell block, the
+    profile-paths line — and the Model / Provider / Platform trailer; it logs what it dropped when the set changes and
+    warns once if a Hermes prompt comes without the help paragraph (vendor text changed);
+  - the shim's own tools preamble no longer opens with "You are a function calling AI model" nor claims there is no
+    native channel; a text `<tool_call>` to the proxy's `openmini_reply` is unwrapped into reply text instead of being
+    forwarded as a call Hermes does not have (the eight misfires in 79 turns);
+  - kokoro's memory rule and 關於你 are a zh-TW plugin prompt section (`kokoro.memory`, after the memory tier), no
+    longer tied to the memory toolset; psyche's note around 【她現在】 is zh-TW.
+- **A clock.** The state block's first line under the title is the exact time, 現在：2026/10/16（四）15:40, from the
+  engine's own zone; the eight-line cap counts state lines, the clock is extra. `556d.toml` `[hermes] timezone`
+  (default `Asia/Taipei`) is passed to every gateway as `HERMES_TIMEZONE`.
+- Tests: three shim hygiene tests; the two golden files regenerated from the Go code (`go test ./internal/shim -run
+  Parity -update`) and reviewed — only the preamble changed; the psyche block test covers the clock line (47 pass).
+- Open from the same brief: tools at baseline (option C) waits for the 真音 test; Hermes's memory-context note stays.
+
 ## 0.8.3 — 2026-10-16
 
 - The skill's assembler: a list the model numbered itself (「1. …」) loses the numbers before it becomes bullets, a

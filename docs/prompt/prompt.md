@@ -65,7 +65,15 @@ Her session is endless (西's opened 2026-10-13 22:35 and is still the same sess
 approximately and the hour never — except a proactive cue's 現在是…, the MM/DD stamp on short notes, and
 the 在做 line, which is the engine's clock leaking through.
 
-**Verdict.** She opens with her SOUL and is then told, in English, that she runs on a Nous Research product
+**Built 2026-10-16 (0.8.4).** Blocks 3, 4 and 7 are switched off in her `config.yaml` before every start, 9 is replaced by
+one zh-TW line per platform, 2, 5, 6, 8 and the trailer of 12 are dropped by the shim before the request leaves (by
+paragraph shape; a log line names what was dropped and warns once if a Hermes prompt arrives without the help
+paragraph), 11 is a zh-TW plugin prompt section no longer tied to the toolset gate, 13's preamble no longer calls
+her a function calling AI model, and the proxy's `openmini_reply` text call is unwrapped into reply text. The
+clock line (§2.7) sits under the block's title and `HERMES_TIMEZONE` is set at spawn. Still open: the tools at
+baseline (`around-the-soul.md` §2, after the 真音 test) and Hermes's memory-context note, kept as is.
+
+**Verdict (as found, 2026-10-14).** She opens with her SOUL and is then told, in English, that she runs on a Nous Research product
 with a docs URL, must ship working artifacts, which Windows machine and user home she runs on, where her
 profile folders are, which model, provider and platform she is, and that she is a function calling AI
 model. The SOUL says 不解釋自己是程式、模型或系統, and the output checks (說破, 助理腔) flag exactly these
@@ -122,7 +130,7 @@ SOUL, so no fix was ever routed. This doc is that design pass; the 2026-10-02 en
 
 - The engine is the single writer of feelings. The LLM reads state, never writes it.
 - Numbers never reach the model: `psyche.json` holds numbers, the state block renders words, the SOUL is words.
-- Per-turn injection is paid 20+ times per request; the state block stays at eight lines of state.
+- Per-turn injection is paid 20+ times per request; the state block stays at eight lines of state (plus the clock line).
 - The SOUL is human-owned. Nothing in the pipeline rewrites it without a person approving; trait growth, if
   it ever comes, goes through a correction path with approval.
 - All character text is zh-TW with 台灣 particles, and nothing she reads names a product, a machine, a model
@@ -274,7 +282,7 @@ an unterminated tag at a block boundary, verify end to end on the streamed path;
 run on the visible text only, verify; (3) the scratch is not stored, so the fidelity eval needs a debug log
 to see it; (4) the shim's `<tool_call>` parser must ignore the think block, verify.
 
-### 2.7 The clock and dates
+### 2.7 The clock and dates (built 0.8.4: the line and the timezone; the cast's relative dates are untouched)
 
 One new line at the top of the state block, from the engine's own clock: 現在：2026/10/14（二）22:40. The
 block is already per turn and already in the user message, so it costs nothing in prefix cache and reaches
@@ -282,7 +290,7 @@ every path (app, Telegram, voice, cue, relay — all run the same hook). With it
 in her spawn env so Hermes and `psyche.json`'s `timezone_offset_h` agree; make dates in the SOUL absolute or
 absent (半年前四個人一起吃火鍋 drifts once she can see the clock); seeds carry `at` (§2.3 part 6).
 
-### 2.8 The vendor-text filter and the wrappers
+### 2.8 The vendor-text filter and the wrappers (built 0.8.4, except the tools decision)
 
 Target system prompt: the SOUL, the pinned groups, the memory rule in zh-TW, the date, the two tools —
 and nothing that names a product, a machine, a model or the app. Means, in order of cost:

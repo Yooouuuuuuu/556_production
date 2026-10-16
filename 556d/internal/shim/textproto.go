@@ -9,20 +9,18 @@ import (
 	"time"
 )
 
-// toolsPrompt is the Nous <tool_call> text-protocol preamble. It must stay byte-identical to
-// the Python shim's TOOLS_PROMPT: the parity tests compare rendered output.
-const toolsPrompt = "You are a function calling AI model. You are provided with function signatures within " +
-	"<tools> </tools> XML tags. You may call one or more functions to assist with the user query. " +
-	"If available tools are not relevant, just respond in natural language. Don't make assumptions " +
-	"about values to plug into functions. After calling functions you will receive results within " +
-	"<tool_response> </tool_response> XML tags.\nHere are the available tools:\n<tools>\n%s\n</tools>\n" +
-	"When you decide to call a function, output EXACTLY one or more blocks of the form:\n" +
+// toolsPrompt is the <tool_call> text-protocol preamble for lanes without native tool calling. It names no
+// product and does not call her a function-calling model (prompt hygiene, docs/prompt/around-the-soul.md);
+// the protocol the shim parses is unchanged. The golden files in testdata/ are regenerated with -update.
+const toolsPrompt = "Tools are available in this conversation. Their signatures are listed within " +
+	"<tools> </tools> XML tags. Use a tool only when the request needs it; otherwise just answer in natural " +
+	"language. Don't make assumptions about values to plug into functions. After a call you will receive its " +
+	"result within <tool_response> </tool_response> XML tags.\nHere are the available tools:\n<tools>\n%s\n</tools>\n" +
+	"To call a tool, write EXACTLY one or more blocks of the form:\n" +
 	"<tool_call>\n{\"name\": \"<function-name>\", \"arguments\": {...}}\n</tool_call>\n" +
 	"Rules: the JSON inside <tool_call> MUST use double quotes and be valid JSON. Output NOTHING else " +
-	"on the lines of a <tool_call> block. If you are not calling a function, never emit <tool_call>.\n" +
-	"IMPORTANT: you have NO native/internal function-calling channel in this session. Never attempt to " +
-	"invoke a function through any built-in tool mechanism — ALWAYS write the <tool_call> block as plain " +
-	"text inside your normal reply. A native function call here will fail and produce an empty response."
+	"on the lines of a <tool_call> block. If you are not calling a tool, never emit <tool_call>. Write the " +
+	"block as plain text inside your normal reply; this text block is the only way to call these tools."
 
 var toolCallRE = regexp.MustCompile(`(?s)<tool_call>\s*(\{.*?\})\s*</tool_call>`)
 
@@ -128,6 +126,9 @@ func toTextProtocol(body map[string]any, raw rawParts) map[string]any {
 		callsV, _ := m.Get("tool_calls")
 		calls, _ := callsV.([]any)
 
+		if role == "system" {
+			content = filterSystem(content) // prompt hygiene: Hermes's vendor paragraphs never reach the model
+		}
 		switch {
 		case role == "system" && toolsBlock != "":
 			out = append(out, map[string]any{"role": "system", "content": content + "\n\n" + toolsBlock})

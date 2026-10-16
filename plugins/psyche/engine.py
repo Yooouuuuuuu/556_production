@@ -1437,7 +1437,9 @@ class Engine:
                 act_zh = f"正在跟{term}說話（不是跟{self.term_fn()}），本來{act_zh}"
             elif self.activity == "chat":
                 act_zh = "在跟" + term + "聊天"
-            lines = [f"【{self.pr}現在】", f"在做：{act_zh}，{L.energy_word(self.energy, self.activity)}"]
+            d_now = self.local(t)
+            clock = f"現在：{d_now.strftime('%Y/%m/%d')}（{'一二三四五六日'[d_now.weekday()]}）{d_now.strftime('%H:%M')}"
+            lines = [f"【{self.pr}現在】", clock, f"在做：{act_zh}，{L.energy_word(self.energy, self.activity)}"]
             _, oct_zh, strength = model.octant(self.mood)
             mood_word = f"{model.intensity_word(strength)}{oct_zh}" if strength >= 0.2 else "平靜"
             feelings = []
@@ -1495,7 +1497,7 @@ class Engine:
                 now_word = (model.intensity_word(shown(dominant)) + model.EMOTION_ZH[dom_type]) if dominant else "已經平復了"
                 lines.append(f"轉變：剛才{prev_word}，現在{now_word}")
             lines.append("原則：情緒是底色，內容以對方的話題為主；不提沒做過的事；有自己的看法，不用附和")
-            text = "\n".join(lines[: int(ex.get("max_lines", 9))])
+            text = "\n".join(lines[: int(ex.get("max_lines", 8)) + 1])  # the clock line is not a state line
             self.last_block = {"dominant": dom_type, "word": (model.intensity_word(shown(dominant)) + model.EMOTION_ZH[dom_type]) if dominant else "平靜",
                                "at": t, "mood": mood_word, "text": text, "counterpart": counterpart, "strategy": name}
             if self.live:

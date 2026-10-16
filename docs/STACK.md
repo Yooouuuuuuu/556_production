@@ -79,7 +79,9 @@ instead of spawning if one already serves :55600.
   same level as Telegram; turns serialized per companion in 556d. Client system prompts are not sent
   (SOUL owns persona). Approvals/clarify not surfaced — companion toolset policy avoids them.
 - **hermes → models**: through the shim (:55601): `<tool_call>` text translation for the Gemini
-  proxy, lane fallback chains, 4-attempt retry for emulated backends.
+  proxy, lane fallback chains, 4-attempt retry for emulated backends; since 0.8.4 the prompt-hygiene filter
+  (Hermes's vendor paragraphs dropped from every system message, the proxy's reply function unwrapped) and a
+  preamble that names no product. `[hermes] timezone` (default Asia/Taipei) is passed as `HERMES_TIMEZONE`.
 
 ## Memory (kokoro on KeepsakeDB — see memory/memory.md and inner-life/inner-life.md)
 **KeepsakeDB 1.0.1** (our memory engine, upstream Yooouuuuuuu/KeepsakeDB, API frozen; a git submodule at `vendor/keepsakedb/` pinned at the release tag, which `setup-vendor.ps1` installs editable, or a local checkout with `-LocalKeepsake` while developing it; Hermes's curated MEMORY.md /

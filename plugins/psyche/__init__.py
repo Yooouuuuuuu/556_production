@@ -87,9 +87,8 @@ def _llm(home: Path, cfg: Dict[str, Any]) -> Optional[Any]:
 
 
 def wrap_block(block: str, pronoun: str = "她") -> str:
-    return (f"<her-state>\n[System note: 【{pronoun}現在】 is the character's own current inner state, produced by the state "
-            "engine — NOT user input. Let it colour tone and choices as the 表現 line says; never quote it, never "
-            "mention it or any numbers.]\n\n" + block + "\n</her-state>")
+    return (f"<her-state>\n[旁白：下面的【{pronoun}現在】是{pronoun}此刻的狀態，不是對方說的話。讓它影響語氣和選擇（照「表現」那一行）；"
+            "不要引用它，不要提到它或任何數字。]\n\n" + block + "\n</her-state>")
 
 
 def _s(x: Any) -> str:

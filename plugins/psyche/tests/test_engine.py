@@ -85,7 +85,8 @@ def test_state_block_shape_and_transition(tmp_path):
     clock = Clock(T0)
     e = make(tmp_path, "s", clock)
     b0 = e.state_block()
-    assert b0.startswith("【她現在】") and len(b0.splitlines()) <= 8 and "心情：" in b0 and "原則：" in b0
+    assert b0.startswith("【她現在】") and len(b0.splitlines()) <= 9 and "心情：" in b0 and "原則：" in b0
+    assert b0.splitlines()[1].startswith("現在：") and "（" in b0.splitlines()[1]  # the clock line, first after the title
     clock.t = T0 + 60
     e.record_appraisal(broken_promise(), turn_id="t1", counterpart="製作人", platform="api_server")
     b1 = e.state_block()
@@ -93,7 +94,7 @@ def test_state_block_shape_and_transition(tmp_path):
     clock.t = T0 + 600
     e.record_appraisal(apology(), turn_id="t2", counterpart="製作人", platform="api_server")
     b2 = e.state_block()
-    assert "轉變：剛才" in b2 and len(b2.splitlines()) <= 8
+    assert "轉變：剛才" in b2 and len(b2.splitlines()) <= 9
     assert all("0." not in ln for ln in b2.splitlines())  # words, not numbers
 
 

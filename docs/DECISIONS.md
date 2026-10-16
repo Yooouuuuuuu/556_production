@@ -92,6 +92,23 @@ Design: `inner-life/inner-life.md` (its §0 lists every decision applied).
 - The narrator cue behind a proactive turn is never the user's words: 556d tags it, the app hides it by default and
   can show it as a note (設定 → 全域 → 程式).
 
+## Built (2026-10-16) — prompt hygiene, first pass [prompt] [structure]
+- The vendor text has two kinds of removal and both run every time: the switches Hermes offers are written into her
+  `config.yaml` before every start (idempotent), and the paragraphs with no switch are dropped by the shim by their
+  shape — a paragraph that starts with a known first line — rather than by exact text, because three of them carry
+  machine-specific values (host, home, profile path). The shim logs what it dropped whenever the set changes and
+  warns once if a Hermes prompt arrives without the help paragraph (a Hermes bump changed the text).
+- The shim's preamble was ours to reword; the protocol it parses is unchanged, so the golden files were regenerated
+  from the Go code and reviewed (only the preamble differs). A text `<tool_call>` to the proxy's own reply function is
+  reply text, never a tool call: unwrapped, logged.
+- kokoro's memory rule and 關於你 moved from the provider's system-prompt block (gated on the memory toolset) to a
+  plugin prompt section, in zh-TW, so they survive if the tools go. KeepsakeDB's block titles (`Memory`, `Facts
+  (long-term)`, `Notes (recent, dated)`) stay English: they are the pinned library's, explained in zh-TW.
+- The clock is the first line under 【她現在】, from the engine's own zone; the block's cap counts state lines, the
+  clock is extra. `HERMES_TIMEZONE` comes from `556d.toml` (default Asia/Taipei) so Hermes's date line agrees.
+- Not done here: the tools-at-baseline decision (needs the live 真音 test), Hermes's memory-context note (kept), the
+  cast's relative dates (the cast is untouched until the skill rewrites it).
+
 ## Decided (2026-10-16) — authoring: the soul skill, a test character first, the slider path as backup [prompt]
 - A character is written in two layers: inputs the person owns (`describe/*.md` in their own words, `profile.json`
   with the numbers and choices the engine reads, `companion.json`, `kokoro.json`) and outputs a skill generates

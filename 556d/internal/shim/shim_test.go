@@ -2,6 +2,7 @@ package shim
 
 import (
 	"encoding/json"
+	"flag"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -9,8 +10,11 @@ import (
 	"time"
 )
 
-// Parity tests: golden files were produced by the Python shim (shim/shim.py) via
-// scratchpad/gen_golden.py. Any divergence in model-facing text is a real bug.
+// Golden tests: the files were first produced by the retired Python shim; since the preamble was reworded in
+// 0.8.4 (prompt hygiene) they are regenerated from this code with `go test ./internal/shim -run Parity -update`
+// and reviewed in the diff. Any unreviewed divergence in model-facing text is a real bug.
+
+var update = flag.Bool("update", false, "rewrite the golden files from the current output")
 
 func load(t *testing.T, name string) []byte {
 	t.Helper()
@@ -36,6 +40,12 @@ func TestToTextProtocolParity(t *testing.T) {
 			var got []map[string]any
 			b, _ := json.Marshal(out["messages"])
 			_ = json.Unmarshal(b, &got)
+			if *update {
+				pretty, _ := json.MarshalIndent(got, "", " ")
+				if err := os.WriteFile(filepath.Join("testdata", "golden_"+name+".json"), append(pretty, '\n'), 0o644); err != nil {
+					t.Fatal(err)
+				}
+			}
 			var want []map[string]any
 			if err := json.Unmarshal(load(t, "golden_"+name+".json"), &want); err != nil {
 				t.Fatal(err)

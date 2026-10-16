@@ -1,10 +1,10 @@
 [
  {
-  "role": "system",
-  "content": "You are a function calling AI model. You are provided with function signatures within <tools> </tools> XML tags. You may call one or more functions to assist with the user query. If available tools are not relevant, just respond in natural language. Don't make assumptions about values to plug into functions. After calling functions you will receive results within <tool_response> </tool_response> XML tags.\nHere are the available tools:\n<tools>\n{\"name\": \"ping\", \"parameters\": {\"type\": \"object\", \"properties\": {}}}\n</tools>\nWhen you decide to call a function, output EXACTLY one or more blocks of the form:\n<tool_call>\n{\"name\": \"<function-name>\", \"arguments\": {...}}\n</tool_call>\nRules: the JSON inside <tool_call> MUST use double quotes and be valid JSON. Output NOTHING else on the lines of a <tool_call> block. If you are not calling a function, never emit <tool_call>.\nIMPORTANT: you have NO native/internal function-calling channel in this session. Never attempt to invoke a function through any built-in tool mechanism — ALWAYS write the <tool_call> block as plain text inside your normal reply. A native function call here will fail and produce an empty response."
+  "content": "Tools are available in this conversation. Their signatures are listed within \u003ctools\u003e \u003c/tools\u003e XML tags. Use a tool only when the request needs it; otherwise just answer in natural language. Don't make assumptions about values to plug into functions. After a call you will receive its result within \u003ctool_response\u003e \u003c/tool_response\u003e XML tags.\nHere are the available tools:\n\u003ctools\u003e\n{\"name\": \"ping\", \"parameters\": {\"type\": \"object\", \"properties\": {}}}\n\u003c/tools\u003e\nTo call a tool, write EXACTLY one or more blocks of the form:\n\u003ctool_call\u003e\n{\"name\": \"\u003cfunction-name\u003e\", \"arguments\": {...}}\n\u003c/tool_call\u003e\nRules: the JSON inside \u003ctool_call\u003e MUST use double quotes and be valid JSON. Output NOTHING else on the lines of a \u003ctool_call\u003e block. If you are not calling a tool, never emit \u003ctool_call\u003e. Write the block as plain text inside your normal reply; this text block is the only way to call these tools.",
+  "role": "system"
  },
  {
-  "role": "user",
-  "content": "hi & <b>bye</b>"
+  "content": "hi \u0026 \u003cb\u003ebye\u003c/b\u003e",
+  "role": "user"
  }
 ]

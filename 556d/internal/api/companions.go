@@ -1,6 +1,7 @@
 package api
 
 import (
+	"log"
 	"net/http"
 	"strings"
 
@@ -35,6 +36,9 @@ func (a *API) companionsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	switch action {
 	case "start":
+		if _, err := ensurePromptHygiene(a.mgr.Dir(name)); err != nil {
+			log.Printf("[hygiene] %s: %v", name, err) // her prompt keeps the vendor switches on; the shim still filters
+		}
 		info, err := a.mgr.Start(name)
 		if err != nil {
 			writeJSON(w, 400, map[string]any{"error": err.Error()})

@@ -5,6 +5,11 @@ about the twelve that are not the SOUL — what Hermes and the shim add — so t
 off, replaced or dropped on purpose before anything changes. Verified against Hermes `7166071f`, the
 plugins, the shim and the three live stores (西, 子晴, 子睿). Nothing described here is changed yet.
 
+**Status 2026-10-16 (0.8.4).** §4 items 1–4 landed: the config switches and zh-TW hints before every start
+(`internal/api/hygiene.go`), the shim filter and the reworded preamble with the `openmini_reply` unwrap
+(`internal/shim/hygiene.go`, `textproto.go`), kokoro's block as a zh-TW plugin section, psyche's note in zh-TW. Open:
+§2 (tools at baseline, after the 真音 test) and the memory-context note (kept). §5's verdicts stand.
+
 ## 0. The facts that decide it
 
 **Which vendor blocks actually apply.** Several of Hermes's guidance blocks are gated on the model name

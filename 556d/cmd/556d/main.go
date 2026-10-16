@@ -76,6 +76,7 @@ func main() {
 	br := bridge.New(cfg.Bridge)
 	br.Register(mux)
 	mgr := companions.New(ctx, cfg.Hermes.Home, cfg.Hermes.Exe, cfg.Root, sup)
+	mgr.Timezone = cfg.Hermes.Timezone
 	hub := api.New(mgr, br, sup, cfg.Hermes.Home, cfg.Daemon.Profile)
 	hub.Shutdown = requestShutdown
 	hub.Register(mux)

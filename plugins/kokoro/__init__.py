@@ -129,7 +129,20 @@ class KokoroMemoryProvider(MemoryProvider):
                     self._pipeline.cfg.language)
 
     def system_prompt_block(self) -> str:
-        return self._memory_block_text() + self._your_profile_block()
+        # 0.8.4: the memory rule and your profile are a plugin prompt section (register), in zh-TW, independent of
+        # the memory toolset gate that used to carry this block; nothing here, or it would be injected twice.
+        return ""
+
+    def prompt_section(self, _info: Any = None) -> str:
+        """The system-prompt section: how to read the Memory block, then 關於<term>（people/你.md）."""
+        if self._home is None:
+            try:
+                from hermes_constants import get_hermes_home
+                self._home = Path(get_hermes_home())
+                self._cfg = _read_config(self._home)
+            except Exception:
+                return ""
+        return (self._memory_block_text() + self._your_profile_block()).strip()
 
     @staticmethod
     def _your_name(cfg: Dict[str, Any]) -> str:
@@ -160,7 +173,7 @@ class KokoroMemoryProvider(MemoryProvider):
         except Exception:
             return ""
         term = self._address_term(self._cfg)
-        return f"\n\nAbout {term} (profile maintained in the app; a per-turn note says who is talking to you right now):\n" + text[:2000] if text else ""
+        return f"\n\n關於{term}（每一回合另有一行說現在是誰在跟你說話）：\n" + text[:2000] if text else ""
 
     # -- counterparts (0.7.0): her session with you, or a session 556d keyed 556:agent:<name> ---------
     def _counterpart_of(self, session_id: str) -> str:
@@ -225,13 +238,10 @@ class KokoroMemoryProvider(MemoryProvider):
 
     def _memory_block_text(self) -> str:
         return (self._cfg.get("system_prompt_block") or
-                "Memory about the user is injected per turn as a 'Memory' block: 'Facts (long-term)' with "
-                "trust labels ([high] = certain, plain = likely) and 'Notes (recent, dated)' — one line per "
-                "past turn that seemed worth keeping. Priority when they disagree: the conversation itself is "
-                "ground truth; otherwise the NEWEST entry wins, whatever its kind; a fact beats a note only "
-                "on a tie. '[archived: …]' lines are topics the user asked not to bring up — never recite "
-                "them, offer to talk about them only if the user touches the topic. Use kokoro_search for "
-                "anything not in the block.")
+                "記憶：每一回合會附上一段「Memory」。「Facts (long-term)」是你記得的事（標 [high] 的很確定，沒標的很可能對）；"
+                "「Notes (recent, dated)」是近期的紀錄，一行一件、帶日期。對不上的時候：對話本身最準；其次是最新的一條，不分種類；"
+                "事實和紀錄平手時事實優先。「[archived: …]」是對方不想被提起的話題——絕不說出內容，只有對方自己碰到時才問一句要不要聊。"
+                "記憶裡沒有的事就是不知道，不編、不猜；可以用 kokoro_search 再找。")
 
     # -- per turn ------------------------------------------------------------
     def prefetch(self, query: str, *, session_id: str = "") -> str:
@@ -345,4 +355,10 @@ class KokoroMemoryProvider(MemoryProvider):
 
 
 def register(ctx) -> None:
-    ctx.register_memory_provider(KokoroMemoryProvider())
+    provider = KokoroMemoryProvider()
+    ctx.register_memory_provider(provider)
+    try:  # the memory rule + 關於你 as a frozen prompt section (after the memory tier), no longer tied to the toolset gate
+        ctx.register_system_prompt_section("kokoro.memory", provider.prompt_section, position="after_memory", max_chars=4000)
+    except Exception as exc:  # noqa: BLE001 — an older Hermes without sections: fall back to the provider block
+        logger.warning("kokoro: prompt section not registered (%s); using system_prompt_block", exc)
+        provider.system_prompt_block = lambda: (provider._memory_block_text() + provider._your_profile_block())  # type: ignore[method-assign]
