@@ -53,13 +53,13 @@ Platform: api_server`
 func TestFilterSystemDropsVendorTextKeepsHers(t *testing.T) {
 	got := filterSystem(sampleSystem)
 	for _, gone := range []string{"Nous Research", "Finishing the job", "Parallel tool calls", "Mid-turn user steering",
-		"User home directory", "git-bash", "Python toolchain", "Active Hermes profile", "Model: auto/556", "Provider: custom", "Platform: api_server"} {
+		"User home directory", "git-bash", "Python toolchain", "Active Hermes profile", "Model: auto/556", "Provider: custom", "Platform: api_server",
+		"Conversation started", "Today's date"} {
 		if strings.Contains(got, gone) {
 			t.Errorf("still contains %q", gone)
 		}
 	}
-	for _, keep := range []string{"# 西", "你是西，三十歲", "## 說話的方式", "你在聊天視窗裡說話", "記憶：每一回合", "關於製作人", "名字：（尚未設定）",
-		"Conversation started: Monday, October 13, 2026", "Today's date (as of the last context rebuild)"} {
+	for _, keep := range []string{"# 西", "你是西，三十歲", "## 說話的方式", "你在聊天視窗裡說話", "記憶：每一回合", "關於製作人", "名字：（尚未設定）"} {
 		if !strings.Contains(got, keep) {
 			t.Errorf("lost %q", keep)
 		}

@@ -280,6 +280,7 @@ func (s *Shim) chat(w http.ResponseWriter, r *http.Request) {
 					}
 					log.Printf("[shim] lane=%s -> %s tools_in=%d tool_calls_out=%d attempt=%d %.1fs",
 						lane, p.name, nTools, len(calls), att, time.Since(t0).Seconds())
+					logToolNames(raw)
 				}
 			}
 			if err != nil {

@@ -70,8 +70,11 @@ one zh-TW line per platform, 2, 5, 6, 8 and the trailer of 12 are dropped by the
 paragraph shape; a log line names what was dropped and warns once if a Hermes prompt arrives without the help
 paragraph), 11 is a zh-TW plugin prompt section no longer tied to the toolset gate, 13's preamble no longer calls
 her a function calling AI model, and the proxy's `openmini_reply` text call is unwrapped into reply text. The
-clock line (§2.7) sits under the block's title and `HERMES_TIMEZONE` is set at spawn. Still open: the tools at
-baseline (`around-the-soul.md` §2, after the 真音 test) and Hermes's memory-context note, kept as is.
+clock line (§2.7) sits under the block's title and `HERMES_TIMEZONE` is set at spawn; since 0.8.5 the Hermes date
+paragraph is dropped whole (its weekday was wrong on the first live check). A resumed session keeps the prompt pieces
+and the tool list it was born with, so the config half reaches new sessions and the shim half covers the cast's
+endless ones. Still open: the tools at baseline (`around-the-soul.md` §2: the 真音 test passed, the switch is the
+user's call) and Hermes's memory-context note, kept as is.
 
 **Verdict (as found, 2026-10-14).** She opens with her SOUL and is then told, in English, that she runs on a Nous Research product
 with a docs URL, must ship working artifacts, which Windows machine and user home she runs on, where her

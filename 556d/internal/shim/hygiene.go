@@ -3,6 +3,7 @@ package shim
 import (
 	"encoding/json"
 	"log"
+	"os"
 	"strings"
 	"sync"
 )
@@ -33,8 +34,10 @@ var vendorParagraphPrefixes = []string{
 	"Active Hermes profile: ",                    // profile paths: no switch
 }
 
-// Lines dropped from the timestamp paragraph (the date itself stays until the clock line replaces it).
-var vendorTrailerPrefixes = []string{"Session ID: ", "Model: ", "Provider: ", "Platform: "}
+// The timestamp paragraph ("Conversation started: …", "Today's date …", the Model / Provider / Platform trailer) is
+// dropped whole: its weekday came out wrong in the first live check (Hermes said Monday for a Tuesday) and the
+// clock line at the top of the state block carries date, weekday and time on every turn (prompt.md §2.7).
+var vendorDateParagraphPrefixes = []string{"Conversation started:", "Today's date", "Timezone: ", "Session ID: ", "Model: "}
 
 var (
 	hygieneMu       sync.Mutex
@@ -47,32 +50,25 @@ func filterSystem(content string) string {
 	if content == "" || !strings.Contains(content, "\n") {
 		return content
 	}
+	if dump := os.Getenv("X556_SHIM_DUMP"); dump != "" && len(content) > 2000 { // debugging aid: her prompt as received, before the filter
+		_ = os.WriteFile(dump, []byte(content), 0o644)
+	}
 	paras := strings.Split(content, "\n\n")
 	kept := make([]string, 0, len(paras))
 	var dropped []string
 	sawHermes := false
 	for _, p := range paras {
 		t := strings.TrimSpace(p)
-		if strings.HasPrefix(t, "Conversation started:") || strings.HasPrefix(t, "Today's date") || strings.HasPrefix(t, "Timezone: ") {
+		isDate := false
+		for _, pre := range vendorDateParagraphPrefixes {
+			if strings.HasPrefix(t, pre) {
+				isDate = true
+				break
+			}
+		}
+		if isDate {
 			sawHermes = true
-			lines := strings.Split(p, "\n")
-			out := lines[:0]
-			for _, ln := range lines {
-				drop := false
-				for _, pre := range vendorTrailerPrefixes {
-					if strings.HasPrefix(strings.TrimSpace(ln), pre) {
-						drop = true
-						break
-					}
-				}
-				if !drop {
-					out = append(out, ln)
-				}
-			}
-			if len(out) != len(lines) {
-				dropped = append(dropped, "trailer")
-			}
-			kept = append(kept, strings.Join(out, "\n"))
+			dropped = append(dropped, "date")
 			continue
 		}
 		isVendor := ""
@@ -204,4 +200,35 @@ func unwrapReplyFunction(calls []map[string]any, cleaned string) ([]map[string]a
 		log.Printf("[shim] unwrapped %d reply-function call(s) (openmini_reply) into plain text", n)
 	}
 	return kept, strings.Join(parts, "\n")
+}
+
+
+var toolNamesLast string
+
+// logToolNames prints the tool names of a request once per distinct set — what the model is actually offered.
+func logToolNames(raw rawParts) {
+	names := make([]string, 0, len(raw.Tools))
+	for _, t := range raw.Tools {
+		var v struct {
+			Function struct {
+				Name string `json:"name"`
+			} `json:"function"`
+			Name string `json:"name"`
+		}
+		if json.Unmarshal(t, &v) == nil {
+			if v.Function.Name != "" {
+				names = append(names, v.Function.Name)
+			} else if v.Name != "" {
+				names = append(names, v.Name)
+			}
+		}
+	}
+	sig := strings.Join(names, ",")
+	hygieneMu.Lock()
+	changed := sig != toolNamesLast
+	toolNamesLast = sig
+	hygieneMu.Unlock()
+	if changed {
+		log.Printf("[shim] tools offered (%d): %s", len(names), sig)
+	}
 }

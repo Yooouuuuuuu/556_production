@@ -106,8 +106,17 @@ Design: `inner-life/inner-life.md` (its §0 lists every decision applied).
   (long-term)`, `Notes (recent, dated)`) stay English: they are the pinned library's, explained in zh-TW.
 - The clock is the first line under 【她現在】, from the engine's own zone; the block's cap counts state lines, the
   clock is extra. `HERMES_TIMEZONE` comes from `556d.toml` (default Asia/Taipei) so Hermes's date line agrees.
-- Not done here: the tools-at-baseline decision (needs the live 真音 test), Hermes's memory-context note (kept), the
-  cast's relative dates (the cast is untouched until the skill rewrites it).
+- Live check on a second daemon (new binary, spare ports, 真音): a resumed session keeps the tool list and the
+  prompt pieces it was born with — 真音's 2026-10-03 session still offered seventeen tools and the switched-off
+  guidance; on a fresh session the config switches took and `[memory]` gave exactly the two kokoro tools. So the
+  config half applies to new sessions, and the shim half is what protects the cast's endless sessions. Hermes's
+  own date line came out wrong (Monday for 2026-10-13, a Tuesday), so the whole date paragraph is dropped now
+  rather than after a week; the clock line carries date, weekday and time.
+- The 真音 tools test passed: with `platform_toolsets: []` she answers with zero tools and no preamble; with
+  `[web]` she gets `web_search` / `web_extract` under the reworded preamble and really searches. Option C is
+  viable; switching the baseline is the user's call.
+- Not done here: the tools-at-baseline switch itself, Hermes's memory-context note (kept), the cast's relative
+  dates (the cast is untouched until the skill rewrites it).
 
 ## Decided (2026-10-16) — authoring: the soul skill, a test character first, the slider path as backup [prompt]
 - A character is written in two layers: inputs the person owns (`describe/*.md` in their own words, `profile.json`

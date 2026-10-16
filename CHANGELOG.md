@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.5 — 2026-10-16
+
+- Prompt hygiene, checked live on a second daemon with 真音 (the app untouched). Findings and fixes:
+  - a resumed session keeps the tool list and prompt pieces it was born with: 真音's 2026-10-03 session still carried
+    seventeen tools and the switched-off guidance; a fresh session got the switches and exactly the two kokoro tools.
+    The shim filter is therefore what protects the cast's endless sessions; the config switches reach new ones;
+  - Hermes's own date line was wrong (Monday for a Tuesday). The shim now drops the whole date paragraph; the clock
+    line under 【她現在】 carries date, weekday and time;
+  - the shim logs the tool names it is offered whenever the set changes, and `X556_SHIM_DUMP=<file>` writes her
+    system message as received, for the next audit;
+  - the tools test: `platform_toolsets: []` → zero tools and a normal reply; `[web]` → `web_search` / `web_extract`
+    under the reworded preamble and a real search. Option C (no tools at baseline) is viable; not switched yet.
+- 真音's old session was ended for the test; her next start opens a fresh one.
+
 ## 0.8.4 — 2026-10-16
 
 - **Prompt hygiene, first pass** (`docs/prompt/prompt.md` §2.7–2.8, `around-the-soul.md`, DECISIONS 2026-10-16). Her
