@@ -363,8 +363,24 @@ def phase_parts(llm, d: Path) -> Dict[str, Any]:
 
 
 # ----------------------------------------------------------------------------- assemble (no LLM)
+_LEADNUM = re.compile(r"^\s*\d+\s*[.、)]\s*")
+
+
 def _bullets(items: Any) -> str:
-    return "\n".join(f"- {strip_notes(fix_simplified(str(x).strip()))}" for x in (items or []) if str(x).strip() and not _NOTE_LINE.search(str(x)))
+    """Items become bullets; a short item ending in a colon is a sub-heading the model put in the list and stays a
+    plain line."""
+    out = []
+    for x in (items or []):
+        raw = str(x).strip()
+        if not raw or _NOTE_LINE.search(raw):
+            continue
+        txt = strip_notes(fix_simplified(_LEADNUM.sub("", raw)))
+        out.append(txt if (txt.endswith("：") or txt.endswith(":")) and len(txt) <= 16 else f"- {txt}")
+    return "\n".join(out)
+
+
+def _bullets_old(items: Any) -> str:
+    return "\n".join(f"- {strip_notes(fix_simplified(_LEADNUM.sub('', str(x).strip())))}" for x in (items or []) if str(x).strip() and not _NOTE_LINE.search(str(x)))
 
 
 _NOTE = re.compile(r"[（(【\[][^（）()【】\[\]]*(?:未提及|沒提到|未說明|沒有提到|描述未|未提供)[^（）()【】\[\]]*[）)】\]]")
@@ -548,7 +564,7 @@ def checks(soul: str, allowed: str = "") -> List[str]:
         if n:
             found.append(f"含理論字或機器字「{w}」×{n}")
     # list numbering ("1. …", "2、…") is fine; digits inside sentences are not (ages, dates, scales)
-    body_no_lists = re.sub(r"(?m)^\s*\d+[.、)]\s*", "", body)
+    body_no_lists = re.sub(r"(?m)^\s*(?:[-・•]\s*)?\d+\s*[.、)]\s*", "", body)
     digits = re.findall(r"\d+", body_no_lists)
     if digits:
         found.append(f"含阿拉伯數字 {len(digits)} 處（{', '.join(digits[:6])}…）：年齡用中文數字，日期不進設定")

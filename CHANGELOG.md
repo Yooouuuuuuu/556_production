@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.3 — 2026-10-16
+
+- The skill's assembler: a list the model numbered itself (「1. …」) loses the numbers before it becomes bullets, a
+  short item ending in a colon stays a sub-heading, and the digit check no longer counts list numbering after a
+  bullet — the rerun of 阿呆 had failed on sixteen such digits. A banned word the author used in the description
+  (AI, when she dislikes AI) passes the check and the prompt. Gemini is the model for every later test (the proxy's
+  claude lane is running out); the page defaults to it.
+
 ## 0.8.2 — 2026-10-16
 
 - Found by the first character made on the page (阿呆, a ten-line description on gemini):
