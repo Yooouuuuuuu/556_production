@@ -92,6 +92,31 @@ Design: `inner-life/inner-life.md` (its §0 lists every decision applied).
 - The narrator cue behind a proactive turn is never the user's words: 556d tags it, the app hides it by default and
   can show it as a note (設定 → 全域 → 程式).
 
+## Decided (2026-10-16) — authoring: the soul skill, a test character first, the slider path as backup [prompt]
+- A character is written in two layers: inputs the person owns (`describe/*.md` in their own words, `profile.json`
+  with the numbers and choices the engine reads, `companion.json`, `kokoro.json`) and outputs a skill generates
+  (SOUL.md in six parts, dated seeds, person files, psyche.json, a lock file naming the inputs that produced them).
+  The LLM is used in exactly two places: here, at authoring time, under review; and at runtime to write her reply.
+  Everything between is deterministic code. Nothing regenerates on its own. The 2026-10-14 "human-owned SOUL" rule
+  becomes "inputs human-owned, output generated".
+- The skill runs in phases, each stopping for review, a part regenerable alone, never the whole SOUL in one request:
+  intake (what is missing, follow-up questions), structure (dated events and the trait each left, seeds, stances,
+  refusals, tensions, cares_about, a vagueness audit), thinking (the five meters and the dial 1 / 6 choices proposed
+  with one line of evidence each; the person confirms), voice, reactions, parts, assemble (code), verify (a blind
+  read-back of the SOUL compared to the confirmed meters and choices). Mechanical checks gate the write: theory and
+  machine words, digits, simplified characters, size 2,500–4,000, the six sections.
+- Dials 1, 4 and 6 are written from the description, not compiled from a choice; the choice is still recorded as a
+  label, for the scratch instruction and the blind validation, and never reaches the model. Dials 2, 3 and 5 keep
+  their numbers because the engine reads them; the numbers never come from the model alone.
+- The slider-only path (§2.10) is the backup for people who will not write ten sections: the same outputs from
+  sliders, choices and three short boxes, with template sentences, no LLM; the two paths compose. Built with the app
+  button (0.8.1), not before.
+- The cast is untouched. The schema is tried on a new disposable character (阿凜, `templates/character/example`) on
+  both lanes, gemini flash and claude sonnet, with the same description, so the gap between the two can be seen before
+  a lane is chosen for the button. 西, 子晴 and 子睿 move only when a generated character beats them on the fidelity probe.
+- Version order set by the user: 0.8.0 the skill, 0.8.1 the create-character button wired to it, everything else in
+  `prompt.md` §3 after that.
+
 ## Decided (2026-10-15) — the prompt: what she reads before she speaks [prompt] [structure] [inner-life]
 - New part `docs/prompt/` (`prompt.md`, `prompt.d2`): one request verified block by block, and the design
   that reshapes it. Replaces the 2026-10-02 "prompt layer" entry, which promised this design pass.

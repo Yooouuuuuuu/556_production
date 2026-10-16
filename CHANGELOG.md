@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.8.0 — 2026-10-16
+
+- **The soul skill** (`tools/soul_writer.py`, `docs/prompt/prompt.md` §2.9, DECISIONS 2026-10-16). A character is now
+  written in two layers: inputs the person owns — `characters/<id>/describe/*.md`, ten short files in their own words
+  (who she is, background, what happened and when, how she talks, how she thinks, how she relates, likes, stances, the
+  people around her, other), plus `profile.json` with the numbers and choices the engine reads — and outputs the skill
+  generates: the six-part `SOUL.md` (background; likes and dislikes; 怎麼聽、怎麼想、怎麼回; 怎麼判斷、怎麼決定; 說話的方式
+  with five lines she would say and five she would not; 遇到事情的時候 with a fallback table; 誰在跟你說話), `seeds.jsonl`
+  with dates, `people/*.md`, `psyche.json` (Big Five, the six constants, cares_about, and the recorded `thinking` meters
+  and `thinking_choices` for the coming module), and `soul.lock.json` naming the inputs that produced them. Seven
+  phases, each stopping for review and regenerable alone (intake → structure → thinking → voice → reactions → parts →
+  verify), `--yes` to accept the proposals; the thinking phase proposes every number and choice with one line of
+  evidence from the description. `assemble` is code, not a model, and refuses to write a SOUL that fails the checks:
+  theory or machine words, Arabic digits, simplified characters (the common slips are repaired mechanically), size
+  outside 2,500–4,000 characters, a missing section; third-person drift is a warning. `verify` is a blind read-back —
+  the model reads only the finished SOUL and names the dials, compared to the confirmed values. The models come
+  straight from the proxy at :18765 (`--model gemini | claude | opus | <name>`); 556d need not run.
+- `templates/character/`: the blank `describe/` template and `profile.json`; `example/` is 阿凜, a disposable test
+  character (twenty-seven, convenience-store night shift in 台中, draws a four-panel comic), used for the first runs.
+  `characters/README.md` describes the layout. The cast (西, 子晴, 子睿) is untouched.
+- First runs on the same description, both lanes. gemini flash: about 6.5 minutes for the seven phases, every check
+  passed after the mechanical repairs (one simplified character, a list quoted as text), blind read-back 8 of 9.
+  claude sonnet: about 11 minutes (the parts phase alone 151 s, which is why the per-call timeout is now 900 s), checks
+  passed, read-back 9 of 9, a secondary medium of thought found, finer "what it left" sentences, one warning for
+  third-person drift in the thinking section. Both are faithful to the description; the difference is nuance.
+- `tools/seed-memories.py`: a seed with `at` (YYYY, YYYY-MM or YYYY-MM-DD) is stored at that date, not at seeding time.
+- Tests: `tests/test_soul_writer.py` (pytest from the KeepsakeDB venv) covers the deterministic parts with a scripted
+  model: reading `describe/`, the six-part order, seeds with dates and dedupe, person files, psyche.json, the checks,
+  the lock, the read-back comparison.
+- Docs: `prompt.md` §2.9–2.10 decided (the slider-only path is the backup, built with the app button in 0.8.1);
+  `around-the-soul.md` unchanged; STACK and the docs map updated. Roadmap order set by the user: 0.8.0 the skill,
+  0.8.1 the create-character button, the rest of `prompt.md` §3 after that.
+
 ## 0.7.9 — 2026-10-15
 
 - **Docs: `docs/prompt/`** — what she reads before she speaks, verified block by block against Hermes

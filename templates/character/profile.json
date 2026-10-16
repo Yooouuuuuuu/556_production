@@ -1,0 +1,9 @@
+{
+  "pronoun": "她",
+  "big5": {"openness": null, "conscientiousness": null, "extraversion": null, "agreeableness": null, "neuroticism": null},
+  "constants": {"self_esteem_stability": null, "expressiveness": null, "humor_coping": null, "clinginess_cap": null, "tsundere_tendency": null, "assertiveness": null, "chronotype": null},
+  "thinking": {"rationality": null, "experientiality": null, "promotion": null, "prevention": null, "maximizing": null},
+  "choices": {"medium_primary": null, "medium_secondary": null, "first_look": null, "contradiction": null, "cause": null},
+  "schedule": null,
+  "proposed": null
+}

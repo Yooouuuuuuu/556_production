@@ -4,7 +4,8 @@ Run while 556d is up (the embedder at :55602) and the character is NOT running (
     python tools/seed-memories.py chihiro [--replace]
 
 Memories about you keep the subject word 你 (rendered as your name when injected); memories about the
-other characters name them. Existing seeds (same text) are skipped unless --replace.
+other characters name them. A seed with `at` (YYYY[-MM[-DD]]) is stored at that date. Existing seeds (same text) are
+skipped unless --replace.
 """
 from __future__ import annotations
 
@@ -14,6 +15,20 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _ts(at) -> float | None:
+    """'2024', '2024-03' or '2024-03-09' -> a timestamp at local noon of that day (month/day default to 1)."""
+    import datetime as dt
+    import re
+    m = re.match(r"^(\d{4})(?:-(\d{1,2}))?(?:-(\d{1,2}))?$", str(at or "").strip())
+    if not m:
+        return None
+    y, mo, d = int(m.group(1)), int(m.group(2) or 1), int(m.group(3) or 1)
+    try:
+        return dt.datetime(y, mo, d, 12, 0).timestamp()
+    except ValueError:
+        return None
 
 
 def main() -> int:
@@ -46,7 +61,11 @@ def main() -> int:
         item = json.loads(line)
         if item["text"] in existing and not args.replace:
             continue
-        ks.add(item["text"], item.get("tags", []), {"seed": True, "source": "設定"})
+        ts = _ts(item.get("at"))  # a dated seed (YYYY, YYYY-MM or YYYY-MM-DD) is stored at that time, not at seeding time
+        meta = {"seed": True, "source": "設定"}
+        if item.get("at"):
+            meta["at"] = str(item["at"])
+        ks.add(item["text"], item.get("tags", []), meta, ts=ts)
         n += 1
     ks.close()
     print(f"{args.name}: {n} seed memories added to {db}")

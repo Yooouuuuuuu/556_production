@@ -10,7 +10,8 @@ its parts, what Hermes and the shim put around the SOUL, the history, the last m
 the clock, the pinned groups, the thinking dials. The SOUL is its first and largest subject, but the
 folder is named for the whole: the vendor filter, the clock line, the wrapper language and the request
 order are not the SOUL, and nobody would look for them under "soul". §1 is what runs today (0.7.8),
-verified; §2 is decided and not built; §3 is the order to build it in. Decisions are logged in
+verified; §2.1–2.8 are decided and not built, §2.9–2.10 were decided on 2026-10-16 and §2.9 is built (0.8.0);
+§3 is the order to build it in. Decisions are logged in
 `../DECISIONS.md` (2026-10-14 and 2026-10-15, tag `[prompt]`).
 
 ## 1. One request today
@@ -301,26 +302,126 @@ Open: exact-text match versus anchors in the filter; whether the memory manager'
 touching in the shim or left as is; and whether she keeps any tool at baseline (`around-the-soul.md` §2:
 never called in 79 turns, eight calls to a tool that does not exist).
 
+### 2.9 Authoring — the character package and the soul skill (decided 2026-10-16; built in 0.8.0 as `tools/soul_writer.py`)
+
+**Principle.** The LLM is used in exactly two places: once at authoring time, inside a skill a person reviews,
+and once at runtime, to write her reply. Everything between — the files, the numbers, the state, the prompt
+assembly — is deterministic code. Inputs are human-owned, outputs are generated, and nothing regenerates on
+its own. The human-owned rule of §2.1 survives as: inputs human-owned, output generated. This replaces the
+multiple-choice compile of §2.5 for dials 1 and 6 (the choices remain as recorded labels, see below) and the
+band templates for the meters; the simple path (§2.10) keeps both as the backup.
+
+**Not for the current cast.** The schema and the skill are tried on a new, disposable character first. 西, 子晴
+and 子睿 keep their files until the test character scores above them on the fidelity probe (§2.3); then the
+same skill runs on a description of 西 written fresh from her existing files, and her SOUL is replaced by a
+generated one — as a diff, approved.
+
+**The character package** — `characters/<id>/`, two kinds of content:
+
+| Kind | Files | Who writes | What |
+| --- | --- | --- | --- |
+| inputs, written | `describe/*.md` | the person, in their own words, any shape | who she is; her background as a story; what happened to her, each event dated with what it left behind; how she talks; six short answers on how she thinks (§2.5's prompts); how she relates — anger, sadness, jealousy, being teased, being flattered, how she apologizes and makes up, what she refuses to do or promise; likes, dislikes, interests, pet peeves; stances she would argue about (ten is the target, some the user disagrees with); how she sees the user and each other character; optional: daily rhythm and current project, lines she actually said |
+| inputs, confirmed | `profile.json` | the skill proposes, the person confirms or moves a slider | Big Five and the six constants; the five thinking meters, each with the skill's one line of evidence; the dial 1 and 6 choices; pronoun; schedule |
+| outputs, generated and versioned | `SOUL.md`, `seeds.jsonl` (with `at`), `people/*.md`, `build/` (one file per phase), `soul.lock.json` (input hashes + skill version) | the skill, then code | a regeneration is always explicit and shows a diff; the lock file says which inputs produced the current outputs |
+
+**The soul skill** — a script in `tools/` on the memory lane first, the app page later. Phases, each writing
+into `build/` and stopping for review (nuwa's checkpoints in companion form); a part can be regenerated alone,
+so the whole SOUL is never one request:
+
+1. **Intake.** Read `describe/`, list what is missing, print follow-up questions — especially for the voice
+   and for part 5 (ex-skill's intake questions are the model: how she shows anger, how she apologizes, what she
+   never says out loud).
+2. **Structure.** Dated events → seeds plus the "what it left behind" sentences for part 1; stances, refusals,
+   tensions; a vagueness audit — every line that cannot predict behaviour is flagged (有主見 fails, 被放鴿子會記住，
+   雖然嘴上說沒關係 passes).
+3. **Thinking.** Proposed meters with one line of evidence each; proposed dial 1 and 6 choices; proposed Big Five
+   and constants if blank. Into `profile.json` after confirmation. The number never comes from the LLM alone.
+4. **Voice.** Expression DNA, 口頭禪 and particles, words she never uses; the sample lines (五句會說、五句不會說)
+   generated last, from the finished voice section.
+5. **Reactions.** Part 5 from the intake answers: the engine decides when (strategy, timing, whether a topic is
+   open); the SOUL says what it looks like on her.
+6. **Assemble.** The six-part SOUL in zh-TW, then two mechanical checks: no theory words, no numbers, no scales;
+   size inside the 2,500–4,000 character budget.
+7. **Verify.** The fidelity probe (§2.3) and the blind questionnaire (§2.5), with their own prompts, never the
+   writer's — the writer must not grade itself. Fix the inputs, never the output, and rerun from the phase that
+   changed.
+
+**The non-meter dials under the skill.** Dials 1, 4 and 6 are no longer multiple choice with canned text: the
+skill reads the description and writes those sections in her voice. The labels do not disappear — the skill
+outputs its reading of each choice as a structured field, because two things still need a label: the scratch
+instruction for dials 1 and 6 (§2.6) and the blind validation, which needs an intended answer to compare
+against. Dials 2, 3 and 5 still need numbers because the engine reads them.
+
+**What the person gives.** Written, any shape: the ten items of the inputs table. Confirmed, not written: the
+proposals in `profile.json`, any flagged sentence rewritten or dropped, and the generated files approved as a
+diff before install. Not needed at all: questionnaires, invented numbers, SOUL text, a seed file, dates copied
+twice, labels, theory. A hand-written SOUL stays possible; it is then an input, and the skill's job is only to
+check it.
+
+**Install.** `install-character.ps1` as today, extended to merge `profile.json` into `psyche.json` (the
+`thinking` block included) and to pass seed dates as `ts`. It compiles nothing by LLM. Later it also writes
+the scratch instruction from the recorded choices.
+
+**Runtime.** Unchanged by authoring: the SOUL enters the system prompt (tier 1), the meters enter the engine,
+the 想法 line is rendered by the engine. The skill never runs while she is live; the engine never writes a word
+of the SOUL. The app page (設定 → 角色 → 新角色) runs the same skill behind 556d on the lane once the phase
+prompts are stable; script first, like every other feature here.
+
+### 2.10 The simple path (decided 2026-10-16 as the backup — sliders and choices, no skill; built with the app button)
+
+The full path asks for ten written sections; some people will not write them. The backup is the deterministic
+compile of §2.5 kept as a first-class route, so a character exists after five minutes in Settings:
+
+- **Sliders and choices** in 設定 → 角色: the Big Five and the six constants (exist today), the five thinking
+  meters, the dial 1 and 6 choices.
+- **Three short boxes**: who she is in three lines; how she talks in three lines; what she refuses.
+- **Compile, no LLM**: one template sentence per band (low / mid / high) per meter and one per choice, written
+  once by us in zh-TW; the three boxes placed verbatim in the six-part order; `seeds.jsonl` and `people/` empty
+  or hand-written. The output files are the same as the full path's, so install and runtime do not care which
+  path produced them.
+- **What it costs**: flatter text (a band sentence, not her voice), no sample lines, no stances, no vagueness
+  audit — the fidelity probe will score lower, and that is stated, not hidden.
+- **The two paths compose.** The skill accepts sliders as confirmed input, so a person can start on the simple
+  path and run the skill later on the same inputs plus a short description; the skill fills the rest and
+  proposes nothing the person already set. A sentence the simple path produced can be replaced by an override
+  field without touching the band that drives the engine.
+
+| Dial | Simple path control | Compiled text |
+| --- | --- | --- |
+| 1 思考媒介 | primary + secondary from six choices | two or three lines per option, written once by us |
+| 2 深思預算 | two sliders | one sentence per band per slider, plus the failure-mode sentence |
+| 3 調節焦點 | two sliders, defaults from E and N | one sentence per band; the context split only as free text |
+| 4 解讀偏向 | nothing new (attachment prior, self-esteem stability) | one sentence chosen from those bands |
+| 5 事後處理 | one slider (maximizing); rumination with the emotion sliders | one sentence per band |
+| 6 情境權重 | three choices | one line per choice |
+
 ## 3. The order to build it in
 
-1. **Prompt hygiene** — §2.8 items 1–3, the clock line and timezone (§2.7), absolute dates and seed `at`.
-   Small, no new behaviour, and every later eval runs on a clean prompt.
-2. **The SOUL rewrite** — §2.3 for 西 as the pilot: six parts, expression DNA, sample lines, ten stances,
-   the fallback table, the vagueness audit; the fidelity probe in `tests/`; then 子晴 and 子睿.
+1. **Prompt hygiene** — §2.8 items 1–3, the clock line and timezone (§2.7), absolute dates and seed `at`; the
+   tools decision after the 真音 test (`around-the-soul.md` §2). Small, no new behaviour, and every later eval
+   runs on a clean prompt.
+2. **Authoring groundwork** — the `describe/` template and `profile.json` schema (§2.9), the skill's phase
+   prompts, the simple-path templates (§2.10), `install-character.ps1` merging `profile.json` and seed dates;
+   the fidelity probe and the blind questionnaire in `tests/` (zh-TW instruments cut to the subscales the
+   meters use). A new disposable character is written through the skill, installed, and scored.
 3. **Pinned groups** — §2.4: reserved tags in `kokoro.json`, the observe prompt names them, the static block
    renders them; seeds for timeline and influences.
-4. **The thinking module** — §2.5: the `thinking` block with five meters and the two choice sets, the compile
-   step in `install-character.ps1`, the 想法 renderer, rumination as a knob, the questionnaire authoring and
-   the blind validation.
-5. **The hidden scratch** — §2.6, after its four checks pass.
-6. **Keyword triggers** — tier 3 (§2.2), when a store has enough named things to need them.
+4. **The thinking module** — §2.5: the `thinking` block with five meters and the two recorded choices, the
+   想法 renderer, rumination as a knob, dial 4's rendered line, and the reading-care scalar (2.2 below) inside
+   it. Each meter ships with a simulator scenario. Then the blind validation on the test character.
+5. **The five conversation mechanisms** (checked 2026-10-14 against the engine; they belong to `inner-life.md`
+   when built), by cost: rendering the disclosure depth per counterpart and letting the 表現 line cap what she
+   opens up about (the number exists and nothing reads it); trust variance from the Beta pair weighting 玩笑／反話
+   (uncertainty → indirectness); pleasure weighting 直說 and the length hint (good mood = more direct, less
+   polite — absent today, nothing points the wrong way); a withheld-things register shaped like `share_backlog`
+   feeding rumination and the proactive urge (the most valuable; the appraisal reads her own reply for what she
+   sidestepped, the precedent being the 2026-10-14 promise rule); the reading-care scalar in the theory of mind
+   (closer and tired = less careful), rendered only at extremes, folded into step 4. The first three touch the
+   same strategy selector as dial 3 and come after step 4.
+6. **The cast** — when the test character scores above 西 on the probe: 西 through the skill from a fresh
+   description, approved as a diff; then 子晴 and 子睿.
+7. **The hidden scratch** — §2.6, after its four checks pass.
+8. **Keyword triggers** — tier 3 (§2.2), when a store has enough named things to need them.
 
-Beside this, in the inner life and in this order by cost (checked 2026-10-14 against the engine; they
-belong to `inner-life.md` when built): rendering the disclosure depth per counterpart and letting the 表現
-line cap what she opens up about (the number exists and nothing reads it); trust variance from the Beta pair
-weighting 玩笑/反話 (uncertainty → indirectness); pleasure weighting 直說 and the length hint (good mood =
-more direct, less polite — absent today, nothing points the wrong way); a withheld-things register shaped
-like `share_backlog` feeding rumination and the proactive urge (the most valuable of the five; the
-appraisal reads her own reply for what she sidestepped, the precedent being the 2026-10-14 promise rule);
-a reading-care scalar in the theory of mind (closer and tired = less careful), rendered only at extremes.
-Items 2–4 touch the same strategy selector as dial 3 and come after step 4.
+The 0.7.x manual checklist (one tick in fifty-five) is run on the clean prompt inside this cycle, not after
+it: the mailbox, forgetting, the two kinds of promise and the relay all touch the paths these changes touch.

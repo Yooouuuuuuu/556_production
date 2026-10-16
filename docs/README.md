@@ -13,7 +13,7 @@ picture). A part gets a second file only when its design is replaced wholesale, 
 | `app/` | `app.md` | — | the Electron app: windows, pages, the hub rule, what landed per version |
 | `voice/` | `voice.md` | `voice` | press-to-record and conversation mode, connectors (Fish Audio), what is next |
 | `inner-life/` | `inner-life.md` | `psyche`, `proactive` | her inner life: engine as a plugin, layers L0–L6, appraisal A and impact model B, memory and open loops, expression, proactive, multi-agent, guardrails, roadmap by stage, parameter glossary |
-| `prompt/` | `prompt.md`, `around-the-soul.md` | `prompt` | what she reads before she speaks: one request verified block by block (the SOUL, Hermes's vendor text around it, kokoro's block, the shim's tools, history replay and its cost, the last message's three pieces); the design — three homes by cost, the six-part SOUL, pinned groups, the clock, the thinking dials, the vendor-text filter, build order; `around-the-soul.md` is the block-by-block decision brief for the vendor and shim text (keep / off / replace / drop, with the tool-usage data) |
+| `prompt/` | `prompt.md`, `around-the-soul.md` | `prompt` | what she reads before she speaks: one request verified block by block (the SOUL, Hermes's vendor text around it, kokoro's block, the shim's tools, history replay and its cost, the last message's three pieces); the design — three homes by cost, the six-part SOUL, pinned groups, the clock, the thinking dials, the vendor-text filter, the authoring path (the character package and the soul skill, with a slider-only backup; proposed), build order; `around-the-soul.md` is the block-by-block decision brief for the vendor and shim text (keep / off / replace / drop, with the tool-usage data) |
 
 At the docs root:
 
