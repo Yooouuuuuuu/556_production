@@ -37,6 +37,7 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
   const [notice, setNotice] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ id: '', display_name: '', pronoun: '她', from_example: false });
+  const [thenRest, setThenRest] = useState(false); // 「全部」: after a clean intake, continue from structure
   const logRef = useRef<HTMLPreElement>(null);
 
   const refreshList = () => chars.list().then((r) => { setList(r.characters); setTemplate(r.template); if (r.models?.length) setModels(r.models); }).catch((e) => setNotice({ kind: 'err', text: String(e) }));
@@ -53,7 +54,14 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
       try {
         const { job } = await chars.job(id);
         setDetail((d) => (d ? { ...d, job } : d));
-        if (!job.running) { await load(id); refreshList(); }
+        if (!job.running) {
+          await load(id); refreshList();
+          if (thenRest && job.kind === 'run' && job.phase === 'intake') {
+            setThenRest(false);
+            if (job.exit_code === 0) await run('structure', true, false, 'structure');
+            else setNotice({ kind: 'err', text: t('newchar.thin') });
+          }
+        }
       } catch { /* backend hiccup: keep polling */ }
     }, 2000);
     return () => clearInterval(tick);
@@ -75,12 +83,14 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
     try { await chars.saveDescribe(id, describe); setNotice({ kind: 'ok', text: t('newchar.saved') }); await load(id); refreshList(); }
     catch (e) { setNotice({ kind: 'err', text: String(e) }); } finally { setBusy(false); }
   }
-  async function run(phase: string, yes: boolean, force = false) {
+  async function run(phase: string, yes: boolean, force = false, from?: string) {
     if (!id) return;
     setNotice(null);
-    try { const r = await chars.run(id, { phase, model, yes, force }); setDetail((d) => (d ? { ...d, job: r.job } : d)); }
+    try { const r = await chars.run(id, { phase, from, model, yes, force }); setDetail((d) => (d ? { ...d, job: r.job } : d)); }
     catch (e) { setNotice({ kind: 'err', text: String(e) }); }
   }
+  function runAll() { setThenRest(true); run('intake', false); }
+  function continueThin() { run('structure', true, false, 'structure'); }
   async function saveProfile() {
     if (!id || !profile) return;
     setBusy(true); setNotice(null);
@@ -90,9 +100,11 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
     } catch (e) { setNotice({ kind: 'err', text: String(e) }); } finally { setBusy(false); }
   }
   async function install() {
-    if (!id) return;
+    if (!id || !detail) return;
     setNotice(null);
-    try { const r = await chars.install(id); setDetail((d) => (d ? { ...d, job: r.job } : d)); }
+    const stale = detail.character.stale?.length > 0;
+    if (stale && !window.confirm(t('newchar.stale_install'))) return;
+    try { const r = await chars.install(id, stale); setDetail((d) => (d ? { ...d, job: r.job } : d)); }
     catch (e) { setNotice({ kind: 'err', text: String(e) }); }
   }
   function acceptProposals() {
@@ -168,7 +180,8 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
             <div className="flex flex-wrap items-center gap-2">
               <label className="text-sm">{t('newchar.model')}</label>
               <select className={`${field} w-auto`} value={model} onChange={(e) => setModel(e.target.value)}>{models.map((m) => <option key={m} value={m}>{m}</option>)}</select>
-              <button className={primary} disabled={running} onClick={() => run('all', true)}>{t('newchar.run_all')}</button>
+              <button className={primary} disabled={running} onClick={runAll}>{t('newchar.run_all')}</button>
+              <button className={btn} disabled={running || !detail.character.phases.includes('intake')} onClick={continueThin} title={t('newchar.continue_note')}>{t('newchar.continue')}</button>
             </div>
             <div className="flex flex-wrap gap-2">
               {PHASES.map((ph) => (
@@ -260,6 +273,9 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
           {/* 結果 */}
           <section className="space-y-3">
             <h2 className="font-semibold">{t('newchar.result')}</h2>
+            {detail.character.stale?.length > 0 && (
+              <p className="text-sm text-amber-300">{t('newchar.stale').replace('{what}', detail.character.stale.join('、'))}</p>
+            )}
             {detail.check && <pre className="rounded-lg bg-white/5 p-3 text-xs whitespace-pre-wrap">{detail.check}</pre>}
             {detail.verify && <pre className="rounded-lg bg-white/5 p-3 text-xs whitespace-pre-wrap max-h-64 overflow-y-auto">{detail.verify}</pre>}
             {detail.soul ? (

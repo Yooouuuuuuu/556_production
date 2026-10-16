@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.8.2 — 2026-10-16
+
+- Found by the first character made on the page (阿呆, a ten-line description on gemini):
+  - the `你` person file described the character's own past as if it were yours (the description's 我 is the
+    person talking to her; the prompt now says so, and the people instruction names who is who);
+  - an undated event was given an invented year (`at` is filled only when the description gives a date);
+  - the model's notes about missing material (「【描述未提及…】」, 「（…習慣未提及）」) leaked into the SOUL — the prompts
+    now say omit, and the assembler strips such notes anyway;
+  - the page did not say when the description or the confirmed numbers had changed after the files were generated.
+    The list and the detail carry `stale` (inputs whose hash differs from `soul.lock.json`), the 結果 section warns and
+    names them, and 安裝 asks before installing stale files (`force`).
+- 「全部」 now runs the intake alone first and stops on a thin description with the questions on the page; 「仍然繼續」
+  runs from step 2 to the end (`--from <phase>` in the skill, `from` in `POST …/run`).
+- `tools/soul_writer.py run --from <phase>`; `stale_inputs()`; the note stripper.
+
 ## 0.8.1 — 2026-10-16
 
 - **設定 → 角色 → 新角色**: the soul skill in the app (`docs/app/app.md`, `docs/prompt/prompt.md` §2.9). Create a

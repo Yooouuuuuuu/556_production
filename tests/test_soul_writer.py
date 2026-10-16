@@ -148,3 +148,9 @@ def test_assemble_never_overwrites_a_hand_written_soul(tmp_path, monkeypatch):
     assert (d / 'SOUL.md').read_text(encoding='utf-8') == '# 手寫的' + chr(10)
     sw.phase_assemble(d, force=True)
     assert (d / 'SOUL.md').read_text(encoding='utf-8').startswith('# 阿凜')
+
+
+def test_checks_allow_words_the_author_used():
+    soul = '# x' + chr(10) * 2 + '你不喜歡 AI，覺得它比你聰明。' + chr(10) * 2 + '## 說話的方式' + chr(10) + chr(10).join(sw.GUARDRAILS)
+    assert any('AI' in f for f in sw.checks(soul))
+    assert not any('AI' in f for f in sw.checks(soul, allowed='不喜歡AI 因為感覺比他聰明'))

@@ -173,7 +173,7 @@ declare global {
 
 // The create-character page: packages under characters/<id> (describe/ in the person's words, profile.json,
 // the generated SOUL and files) and the soul skill run as a 556d job. See docs/prompt/prompt.md §2.9.
-export type CharPackage = { id: string; display_name: string; avatar_model: string; describe_filled: number; describe_total: number; phases: string[]; has_soul: boolean; installed: boolean; running: boolean; job_kind: string; lock: any };
+export type CharPackage = { id: string; display_name: string; avatar_model: string; describe_filled: number; describe_total: number; phases: string[]; has_soul: boolean; installed: boolean; running: boolean; job_kind: string; lock: any; stale: string[] };
 export type CharJob = { running: boolean; kind: string; phase: string; model: string; started_at: number | null; exit_code: number; error: string; log: string };
 export type CharProfile = { pronoun?: string; big5?: Record<string, number | null>; constants?: Record<string, number | null>; thinking?: Record<string, number | null>; choices?: Record<string, string | null>; schedule?: any; proposed?: { big5?: Record<string, number | null>; constants?: Record<string, number | null>; thinking?: Record<string, number | null>; choices?: Record<string, string | null>; evidence?: Record<string, string>; model?: string; at?: string } | null };
 export type CharDetail = { character: CharPackage; describe: Record<string, string>; profile: CharProfile | null; build: Record<string, any>; check: string; verify: string; soul: string; seeds: number; people: string[]; job: CharJob };
@@ -190,7 +190,7 @@ export const chars = {
   detail: (id: string) => get<CharDetail>(`/api/characters/${encodeURIComponent(id)}`),
   saveDescribe: (id: string, files: Record<string, string>) => send<{ saved: number; character: CharPackage }>(`/api/characters/${encodeURIComponent(id)}/describe`, 'PUT', { files }),
   saveProfile: (id: string, profile: Partial<CharProfile>) => send<{ profile: CharProfile }>(`/api/characters/${encodeURIComponent(id)}/profile`, 'PUT', { profile }),
-  run: (id: string, body: { phase: string; model: string; yes?: boolean; force?: boolean }) => send<{ started: boolean; job: CharJob }>(`/api/characters/${encodeURIComponent(id)}/run`, 'POST', body),
-  install: (id: string) => send<{ started: boolean; job: CharJob }>(`/api/characters/${encodeURIComponent(id)}/install`, 'POST'),
+  run: (id: string, body: { phase: string; from?: string; model: string; yes?: boolean; force?: boolean }) => send<{ started: boolean; job: CharJob }>(`/api/characters/${encodeURIComponent(id)}/run`, 'POST', body),
+  install: (id: string, force = false) => send<{ started: boolean; job: CharJob }>(`/api/characters/${encodeURIComponent(id)}/install`, 'POST', { force }),
   job: (id: string) => get<{ job: CharJob }>(`/api/characters/${encodeURIComponent(id)}/job`),
 };

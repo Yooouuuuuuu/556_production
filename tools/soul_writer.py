@@ -79,9 +79,9 @@ WHO_LINE = "- 每一回合會附上「現在跟你說話的是誰」的人物檔
 SYSTEM = """你是「556」陪伴角色的設定撰寫者。你會拿到一個人用自己的話寫的角色描述，任務是把它整理成這個角色的設定，給一個會扮演{pr}的語言模型讀。
 
 規則：
-1. 只用描述裡有的材料。描述沒提到的事實不要編：可以用描述的語氣和細節把句子寫順，但不要發明新的經歷、家人、地名、作品。缺的東西標出來，不要補。
+1. 只用描述裡有的材料。描述沒提到的事實不要編：可以用描述的語氣和細節把句子寫順，但不要發明新的經歷、家人、地名、作品。缺的東西直接省略那一項，不要寫「未提及」「描述沒提到」之類的註記（只有 intake 那一步才列缺的部分）。描述裡的「我」是作者，也就是跟{pr}說話的那個人（對方）；「你」在描述裡若出現，也多半指那個人。
 2. 全部用繁體中文、台灣用法。設定用第二人稱「你」稱呼角色本人（「你是…」「你會…」）；引用{pr}說的話時用{pr}的口吻。
-3. 不出現理論名詞、量表、分數、數字（年齡用中文數字；日期不寫進設定，日期另外放）。不提 AI、模型、程式、系統、引擎、設定檔這些字。
+3. 不出現理論名詞、量表、分數、數字（年齡用中文數字；日期不寫進設定，日期另外放）。不提 AI、模型、程式、系統、引擎、設定檔這些字——除非描述裡作者自己就用了那個詞（例如{pr}不喜歡 AI），那就照用，不要換成繞口的說法。
 4. 寫行為，不寫形容詞：「有主見」不算，「被放鴿子會記住，雖然嘴上說沒關係」才算。每一句都要能讓人猜到{pr}在新情況下會怎麼做。
 5. {pr}不是助理，不寫任何服務用語。
 6. 只輸出一個 JSON 物件，不加任何說明文字。"""
@@ -93,7 +93,7 @@ P_INTAKE = """下面是角色描述。請列出缺少或太薄、會讓扮演失
 {describe}"""
 
 P_STRUCTURE = """從描述整理出下面幾樣，輸出 JSON：
-- "events": 發生過的事，每件 {{"at": "YYYY-MM-DD" 或 "YYYY-MM" 或 "YYYY", "text": "一句話，第三人稱，用{pr}的名字或「{pr}」", "left": "這件事留在{pr}身上的痕跡，寫成設定裡的一句，第二人稱「你」，不帶日期", "tags": ["一到三個英文小寫標籤"]}}
+- "events": 發生過的事，每件 {{"at": "YYYY-MM-DD" 或 "YYYY-MM" 或 "YYYY"——只在描述有寫日期時填，沒有就 null，不要猜年份, "text": "一句話，第三人稱，用{pr}的名字或「{pr}」", "left": "這件事留在{pr}身上的痕跡，寫成設定裡的一句，第二人稱「你」，不帶日期", "tags": ["一到三個英文小寫標籤"]}}
 - "seeds": 要載入記憶庫的事實，每條 {{"text": "一句話", "tags": ["..."], "at": "可省略"}}：包含{pr}自己的經歷與生活事實（主詞用{pr}的名字）、{pr}知道的關於跟{pr}說話的人的事（主詞寫「你」）、關於其他人的事（用名字）。十到二十條。
 - "stances": {pr}會為之爭的看法，十條左右，一條一句。
 - "refusals": {pr}不會答應、不會做的事。
@@ -140,7 +140,7 @@ P_PARTS = """寫設定的前三部分與人物檔。材料：描述、整理出�
  "part2": "喜歡與不喜歡：五到十條，條列，含著迷的事和受不了的事，具體。",
  "thinking": "「怎麼聽、怎麼想、怎麼回」六到八行：想事情時腦中是什麼、先回還是先想（想太久會怎樣）、找機會還是防出錯（哪些事上不一樣）、看不清楚時往哪想、聊完會不會一直想與找答案找到哪、第一眼看什麼、遇到矛盾怎麼辦。照已確認的習慣寫，用{pr}的行為寫，不用理論字。",
  "judging": "「怎麼判斷、怎麼決定」：{pr}看事情的三到五種方式（每種一句，加一個會失準的情況）；五到八條做決定的規則（「遇到…就…」）；在乎的事的順序；不會答應的事；兩三條{pr}自己沒想清楚的矛盾。條列。",
- "people": {{"你": "跟{pr}說話的人：{pr}怎麼看他、怎麼稱呼他、認識多久、還沒跟他說過什麼。兩三句，第三人稱寫{pr}、第二人稱寫對方。", "<其他人的名字>": "同樣兩三句；沒有就省略"}}
+ "people": {{"你": "這一條寫的是跟{pr}說話的那個人（描述裡的「我」），不是{pr}：{pr}怎麼看他、怎麼稱呼他、認識多久、{pr}還沒跟他說過什麼。兩三句；稱{pr}用{pr}的名字或「{pr}」，稱那個人用「你」；不要把{pr}自己的經歷寫成「你」的。", "<其他人的名字>": "同樣兩三句；沒有就省略"}}
 }}
 
 ## 描述
@@ -364,7 +364,24 @@ def phase_parts(llm, d: Path) -> Dict[str, Any]:
 
 # ----------------------------------------------------------------------------- assemble (no LLM)
 def _bullets(items: Any) -> str:
-    return "\n".join(f"- {fix_simplified(str(x).strip())}" for x in (items or []) if str(x).strip())
+    return "\n".join(f"- {strip_notes(fix_simplified(str(x).strip()))}" for x in (items or []) if str(x).strip() and not _NOTE_LINE.search(str(x)))
+
+
+_NOTE = re.compile(r"[（(【\[][^（）()【】\[\]]*(?:未提及|沒提到|未說明|沒有提到|描述未|未提供)[^（）()【】\[\]]*[）)】\]]")
+_NOTE_LINE = re.compile(r"(?:未提及|沒提到|未說明|沒有提到|描述未|未提供)")
+
+
+def strip_notes(text: str) -> str:
+    """The model sometimes annotates a gap inline (「（出事時看原因的習慣未提及）」, 「【描述未提及…】」). Those notes belong
+    to build/, never to the SOUL: bracketed ones are cut, a line that is only such a note is dropped."""
+    text = _NOTE.sub("", text)
+    out = []
+    for ln in text.split(chr(10)):
+        core = ln.strip().lstrip("-・•").strip()
+        if core and _NOTE_LINE.search(core) and len(core) <= 40:
+            continue
+        out.append(ln)
+    return chr(10).join(out)
 
 
 def _para(s: Any) -> str:
@@ -380,7 +397,7 @@ def _para(s: Any) -> str:
         return _bullets(s)
     if isinstance(s, dict):
         return "\n".join(f"- {k}：{_para(v)}" for k, v in s.items())
-    return fix_simplified(str(s or "").strip())
+    return strip_notes(fix_simplified(str(s or "").strip())).strip()
 
 
 # the simplified forms a zh-TW model slips in most often, mapped to the common traditional form in this register
@@ -516,8 +533,9 @@ def build_psyche(d: Path) -> Dict[str, Any]:
     return base
 
 
-def checks(soul: str) -> List[str]:
-    """Mechanical checks on the generated text (the fixed guardrail bullets are exempt)."""
+def checks(soul: str, allowed: str = "") -> List[str]:
+    """Mechanical checks on the generated text (the fixed guardrail bullets are exempt; a banned word the author
+    used in the description — `allowed` — is hers to use)."""
     body = soul
     for g in GUARDRAILS:
         body = body.replace(g, "")
@@ -525,6 +543,8 @@ def checks(soul: str) -> List[str]:
     found: List[str] = []
     for w in BANNED:
         n = body.count(w)
+        if n and w in allowed:
+            continue
         if n:
             found.append(f"含理論字或機器字「{w}」×{n}")
     # list numbering ("1. …", "2、…") is fine; digits inside sentences are not (ages, dates, scales)
@@ -557,6 +577,15 @@ def lock_data(d: Path, model: Optional[str]) -> Dict[str, Any]:
             "outputs": {f: sha(d / f) for f in ("SOUL.md", "seeds.jsonl", "psyche.json")}}
 
 
+def stale_inputs(d: Path) -> List[str]:
+    """Inputs that changed since the lock was written (so SOUL.md / psyche.json no longer match them)."""
+    lock = read_json(d / "soul.lock.json")
+    if not lock:
+        return []
+    cur = lock_data(d, lock.get("model"))["inputs"]
+    return [k for k, v in (lock.get("inputs") or {}).items() if cur.get(k) != v]
+
+
 def phase_assemble(d: Path, force: bool, model: Optional[str] = None) -> List[str]:
     for f in ("parts.json", "voice.json", "reactions.json", "structure.json"):
         if not (d / "build" / f).exists():
@@ -565,7 +594,7 @@ def phase_assemble(d: Path, force: bool, model: Optional[str] = None) -> List[st
         print("assemble: SOUL.md here is hand-written (no soul.lock.json) — the cast stays untouched; --force to replace it with the generated one")
         return ["手寫的 SOUL.md 不覆蓋（沒有 soul.lock.json）；要用產生的取代請 --force"]
     soul = build_soul(d)
-    found = checks(soul)
+    found = checks(soul, describe_text(read_describe(d)))
     write_text(d / "build" / "check.md", "# 檢查\n" + ("\n".join(f"- {x}" for x in found) if found else "- 通過"))
     blocking = [x for x in found if not x.startswith("注意：")]
     if blocking and not force:
@@ -619,7 +648,7 @@ def phase_verify(llm, d: Path) -> Dict[str, Any]:
         rows.append(f"| {k} | {band(want)} | {got} | {'✓' if ok else '✗'} |")
     report = ["# 盲讀回推（只給設定，不給描述）", f"模型：{data.get('_meta', {}).get('model')}", "",
               "| 項目 | 設定值 | 讀回 | |", "| --- | --- | --- | --- |", *rows, "",
-              f"一致：{hits}/{total}", f"依據：{data.get('note', '')}", "", "## 機械檢查", *(f"- {x}" for x in (checks(soul) or ["通過"]))]
+              f"一致：{hits}/{total}", f"依據：{data.get('note', '')}", "", "## 機械檢查", *(f"- {x}" for x in (checks(soul, describe_text(read_describe(d))) or ["通過"]))]
     write_text(d / "build" / "verify.md", "\n".join(report))
     write_json(d / "build" / "verify.json", {**data, "matches": hits, "total": total})
     print(f"verify: {hits}/{total} consistent; report in build/verify.md")
@@ -651,6 +680,8 @@ def cmd_run(args: argparse.Namespace) -> int:
     if not (d / "describe").exists():
         raise SystemExit(f"no describe/ under {d} — run init first")
     phases = PHASES if args.phase == "all" else [args.phase]
+    if getattr(args, "from_phase", None):
+        phases = PHASES[PHASES.index(args.from_phase):]
     llm = None
     if any(p in LLM_PHASES for p in phases):
         llm = make_llm(args.model, args.base_url, args.temperature, args.timeout)
@@ -665,7 +696,7 @@ def cmd_run(args: argparse.Namespace) -> int:
                 print(f"  - {m.get('part')}: {m.get('why')}")
                 for q in m.get("questions") or []:
                     print(f"      ? {q}")
-            if args.phase == "all" and not data.get("enough", True) and not args.yes:
+            if (args.phase == "all" or getattr(args, "from_phase", None)) and not data.get("enough", True) and not args.yes:
                 print("intake: the description is thin; answer the questions in describe/ or rerun with --yes to continue anyway")
                 return 2
         elif ph == "structure":
@@ -679,7 +710,7 @@ def cmd_run(args: argparse.Namespace) -> int:
             print("  proposed:", json.dumps(prof.get("proposed", {}).get("thinking"), ensure_ascii=False), json.dumps(prof.get("proposed", {}).get("choices"), ensure_ascii=False))
             if not args.yes:
                 print("  review profile.json (proposed → confirm by filling the null fields, or rerun with --yes)")
-                if args.phase == "all":
+                if args.phase == "all" or getattr(args, "from_phase", None):
                     return 2
         elif ph == "voice":
             data = phase_voice(llm, d)
@@ -706,7 +737,7 @@ def cmd_check(args: argparse.Namespace) -> int:
     p = d / "SOUL.md"
     if not p.exists():
         raise SystemExit("no SOUL.md")
-    found = checks(p.read_text(encoding="utf-8"))
+    found = checks(p.read_text(encoding="utf-8"), describe_text(read_describe(d)))
     print("\n".join(f"- {x}" for x in found) if found else "通過")
     return 1 if found else 0
 
@@ -718,8 +749,7 @@ def cmd_status(args: argparse.Namespace) -> int:
     print("build:", ", ".join(p for p in PHASES if (d / "build" / f"{p}.json").exists() or (p == "assemble" and (d / "SOUL.md").exists())) or "-")
     lock = read_json(d / "soul.lock.json")
     if lock:
-        cur = lock_data(d, lock.get("model"))
-        stale = [k for k, v in lock["inputs"].items() if cur["inputs"].get(k) != v]
+        stale = stale_inputs(d)
         print(f"lock: {lock.get('at')} model={lock.get('model')} " + (f"STALE inputs: {', '.join(stale)}" if stale else "inputs unchanged"))
     else:
         print("lock: none (not assembled)")
@@ -739,6 +769,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     r = sub.add_parser("run")
     r.add_argument("name")
     r.add_argument("--phase", default="all", choices=["all", *PHASES])
+    r.add_argument("--from", dest="from_phase", default=None, choices=PHASES, help="run from this phase to the end (overrides --phase)")
     r.add_argument("--model", default="gemini", help="gemini | gemini-pro | claude | opus | a model name on the proxy")
     r.add_argument("--base-url", default=PROXY)
     r.add_argument("--temperature", type=float, default=0.4)

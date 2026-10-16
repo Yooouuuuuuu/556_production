@@ -2,6 +2,8 @@ package api
 
 import (
 	"bufio"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -139,6 +141,37 @@ func fileExists(p string) bool {
 	return err == nil && !st.IsDir()
 }
 
+func shortSHA(p string) string {
+	b, err := os.ReadFile(p)
+	if err != nil {
+		return ""
+	}
+	h := sha256.Sum256(b)
+	return hex.EncodeToString(h[:])[:16]
+}
+
+// staleInputs lists the inputs that changed since soul.lock.json was written: the SOUL, seeds and psyche.json
+// on disk were made from an older description or older confirmed numbers.
+func staleInputs(dir string) []string {
+	lock, _ := readJSONFile(filepath.Join(dir, "soul.lock.json")).(map[string]any)
+	inputs, _ := lock["inputs"].(map[string]any)
+	if inputs == nil {
+		return []string{}
+	}
+	var out []string
+	for rel, v := range inputs {
+		want, _ := v.(string)
+		if shortSHA(filepath.Join(dir, filepath.FromSlash(rel))) != want {
+			out = append(out, rel)
+		}
+	}
+	sort.Strings(out)
+	if out == nil {
+		out = []string{}
+	}
+	return out
+}
+
 // packageSummary is one row of the list: what is filled, which phases ran, whether she is installed.
 func (a *API) packageSummary(id string) map[string]any {
 	dir := filepath.Join(a.charactersDir(), id)
@@ -175,6 +208,7 @@ func (a *API) packageSummary(id string) map[string]any {
 		"id": id, "display_name": display, "avatar_model": avatar, "describe_filled": filled, "describe_total": len(describeStems),
 		"phases": phases, "has_soul": fileExists(filepath.Join(dir, "SOUL.md")), "installed": a.mgr.Exists(id),
 		"running": running, "job_kind": kind, "lock": readJSONFile(filepath.Join(dir, "soul.lock.json")),
+		"stale": staleInputs(dir),
 	}
 }
 
@@ -270,6 +304,7 @@ func (a *API) charactersHandler(w http.ResponseWriter, r *http.Request) {
 	case action == "run" && r.Method == http.MethodPost:
 		var body struct {
 			Phase string `json:"phase"`
+			From  string `json:"from"` // run from this phase to the end (the page: intake alone, then the rest)
 			Model string `json:"model"`
 			Yes   bool   `json:"yes"`
 			Force bool   `json:"force"`
@@ -282,9 +317,12 @@ func (a *API) charactersHandler(w http.ResponseWriter, r *http.Request) {
 			body.Phase = "all"
 		}
 		ok := body.Phase == "all"
+		fromOK := body.From == ""
 		for _, ph := range skillPhases {
 			ok = ok || ph == body.Phase
+			fromOK = fromOK || ph == body.From
 		}
+		ok = ok && fromOK
 		if !ok || (body.Model != "" && !regexp.MustCompile(`^[A-Za-z0-9./_-]+$`).MatchString(body.Model)) {
 			writeJSON(w, 400, map[string]any{"error": "bad phase or model"})
 			return
@@ -293,6 +331,9 @@ func (a *API) charactersHandler(w http.ResponseWriter, r *http.Request) {
 			body.Model = "gemini"
 		}
 		args := []string{filepath.Join(a.mgr.Root(), "tools", "soul_writer.py"), "run", id, "--phase", body.Phase, "--model", body.Model}
+		if body.From != "" {
+			args = append(args, "--from", body.From)
+		}
 		if body.Yes {
 			args = append(args, "--yes")
 		}
@@ -307,6 +348,14 @@ func (a *API) charactersHandler(w http.ResponseWriter, r *http.Request) {
 	case action == "install" && r.Method == http.MethodPost:
 		if !fileExists(filepath.Join(dir, "SOUL.md")) {
 			writeJSON(w, 400, map[string]any{"error": "no SOUL.md yet — run the skill first"})
+			return
+		}
+		var ib struct {
+			Force bool `json:"force"`
+		}
+		_ = decodeJSON(r, &ib)
+		if st := staleInputs(dir); len(st) > 0 && !ib.Force {
+			writeJSON(w, 409, map[string]any{"error": "inputs changed since the files were generated (" + strings.Join(st, ", ") + ") — rerun 6 and 7 first, or force", "stale": st})
 			return
 		}
 		if a.mgr.Info(id).Active {
