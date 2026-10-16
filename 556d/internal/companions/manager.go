@@ -74,6 +74,11 @@ func New(parent context.Context, home, hermesExe, root string, sup *supervisor.S
 
 func (m *Manager) profilesDir() string { return filepath.Join(m.home, "profiles") }
 
+// Root is the repository root (characters/, tools/, templates/ live under it); HermesExe the venv's hermes.exe,
+// beside which the venv's python.exe runs our tools (the soul skill, the seed loader).
+func (m *Manager) Root() string      { return m.root }
+func (m *Manager) HermesExe() string { return m.hermesExe }
+
 // Dir is a companion's HERMES_HOME.
 func (m *Manager) Dir(name string) string { return filepath.Join(m.profilesDir(), name) }
 

@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.8.1 — 2026-10-16
+
+- **設定 → 角色 → 新角色**: the soul skill in the app (`docs/app/app.md`, `docs/prompt/prompt.md` §2.9). Create a
+  package (id, name, 她／他, optionally from the example 阿凜), write the ten 描述 boxes with the template prompts as
+  grey text, run the skill on gemini or claude — 「全部」 or one phase at a time — and follow its log live; the intake's
+  questions show on the page. 確認 lists every proposed thinking meter and choice with the skill's one-line evidence
+  (Big Five and the six constants under a fold); a slider or a select is your decision, 「全部接受提案」 fills what you
+  left blank; numbers never enter her text. 結果 shows the checks, the blind read-back and the SOUL; 安裝 creates her
+  profile, copies the files and loads the seed memories, then she is on 名單 to start. Packages whose SOUL is
+  hand-written (the cast) are marked 手寫 and the skill refuses to overwrite them without `--force`.
+- 556d: `/api/characters` (list with the template prompts, create, detail, describe, profile, run, install, job),
+  the skill and the install as one background job per package with its output in `build/run.log`, hub event
+  `character.job`. The roster's empty note points to the page instead of `new-companion.ps1`.
+- `tools/soul_writer.py`: a hand-written SOUL (no `soul.lock.json`) is never overwritten unless `--force`; the
+  per-call timeout defaults to 900 s. Six unit tests.
+
 ## 0.8.0 — 2026-10-16
 
 - **The soul skill** (`tools/soul_writer.py`, `docs/prompt/prompt.md` §2.9, DECISIONS 2026-10-16). A character is now

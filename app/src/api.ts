@@ -170,3 +170,27 @@ declare global {
     desktop?: { toggleAvatar(): void; dragStart(x: number, y: number): void; dragEnd(): void };
   }
 }
+
+// The create-character page: packages under characters/<id> (describe/ in the person's words, profile.json,
+// the generated SOUL and files) and the soul skill run as a 556d job. See docs/prompt/prompt.md §2.9.
+export type CharPackage = { id: string; display_name: string; avatar_model: string; describe_filled: number; describe_total: number; phases: string[]; has_soul: boolean; installed: boolean; running: boolean; job_kind: string; lock: any };
+export type CharJob = { running: boolean; kind: string; phase: string; model: string; started_at: number | null; exit_code: number; error: string; log: string };
+export type CharProfile = { pronoun?: string; big5?: Record<string, number | null>; constants?: Record<string, number | null>; thinking?: Record<string, number | null>; choices?: Record<string, string | null>; schedule?: any; proposed?: { big5?: Record<string, number | null>; constants?: Record<string, number | null>; thinking?: Record<string, number | null>; choices?: Record<string, string | null>; evidence?: Record<string, string>; model?: string; at?: string } | null };
+export type CharDetail = { character: CharPackage; describe: Record<string, string>; profile: CharProfile | null; build: Record<string, any>; check: string; verify: string; soul: string; seeds: number; people: string[]; job: CharJob };
+
+async function send<T>(path: string, method: 'POST' | 'PUT', body?: any): Promise<T> {
+  const r = await fetch(BASE + path, { method, headers: { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+  if (!r.ok) throw new Error(await errorOf(r));
+  return r.json() as Promise<T>;
+}
+
+export const chars = {
+  list: () => get<{ characters: CharPackage[]; template: Record<string, string>; models: string[]; phases: string[] }>('/api/characters'),
+  create: (body: { id: string; display_name: string; pronoun: string; avatar?: string; from_example: boolean }) => send<{ character: CharPackage; output: string }>('/api/characters', 'POST', body),
+  detail: (id: string) => get<CharDetail>(`/api/characters/${encodeURIComponent(id)}`),
+  saveDescribe: (id: string, files: Record<string, string>) => send<{ saved: number; character: CharPackage }>(`/api/characters/${encodeURIComponent(id)}/describe`, 'PUT', { files }),
+  saveProfile: (id: string, profile: Partial<CharProfile>) => send<{ profile: CharProfile }>(`/api/characters/${encodeURIComponent(id)}/profile`, 'PUT', { profile }),
+  run: (id: string, body: { phase: string; model: string; yes?: boolean; force?: boolean }) => send<{ started: boolean; job: CharJob }>(`/api/characters/${encodeURIComponent(id)}/run`, 'POST', body),
+  install: (id: string) => send<{ started: boolean; job: CharJob }>(`/api/characters/${encodeURIComponent(id)}/install`, 'POST'),
+  job: (id: string) => get<{ job: CharJob }>(`/api/characters/${encodeURIComponent(id)}/job`),
+};

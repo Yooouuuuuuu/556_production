@@ -364,8 +364,9 @@ the scratch instruction from the recorded choices.
 
 **Runtime.** Unchanged by authoring: the SOUL enters the system prompt (tier 1), the meters enter the engine,
 the 想法 line is rendered by the engine. The skill never runs while she is live; the engine never writes a word
-of the SOUL. The app page (設定 → 角色 → 新角色) runs the same skill behind 556d on the lane once the phase
-prompts are stable; script first, like every other feature here.
+of the SOUL. The app page (設定 → 角色 → 新角色, 0.8.1) runs the same skill behind 556d as a job, phase by phase, shows
+the proposals with their evidence for confirmation, and installs from the page; a package whose SOUL is hand-written
+(no lock file) is marked and never overwritten.
 
 ### 2.10 The simple path (decided 2026-10-16 as the backup — sliders and choices, no skill; built with the app button)
 

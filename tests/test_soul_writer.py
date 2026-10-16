@@ -136,3 +136,15 @@ def test_date_zh_and_band():
     assert sw._date_zh("2024") == "2024 年" and sw._date_zh("2024-03") == "2024 年 3 月" and sw._date_zh("2024-03-09") == "2024 年 3 月 9 日"
     assert sw._date_zh("sometime") == ""
     assert sw.band(0.1) == "偏低" and sw.band(0.5) == "中等" and sw.band(0.9) == "偏高" and sw.band(None) == "沒說"
+
+
+def test_assemble_never_overwrites_a_hand_written_soul(tmp_path, monkeypatch):
+    d = _make_char(tmp_path, monkeypatch)
+    for name, data in (('structure', STRUCTURE), ('voice', VOICE), ('reactions', REACTIONS), ('parts', PARTS)):
+        sw.write_json(d / 'build' / f'{name}.json', data)
+    (d / 'SOUL.md').write_text('# 手寫的' + chr(10), encoding='utf-8')
+    found = sw.phase_assemble(d, force=False)
+    assert found and '手寫' in found[0]
+    assert (d / 'SOUL.md').read_text(encoding='utf-8') == '# 手寫的' + chr(10)
+    sw.phase_assemble(d, force=True)
+    assert (d / 'SOUL.md').read_text(encoding='utf-8').startswith('# 阿凜')

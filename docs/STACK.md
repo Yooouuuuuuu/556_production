@@ -66,6 +66,9 @@ instead of spawning if one already serves :55600.
   `GET /api/companion`, `GET /api/models`, `POST /api/restart-hermes`, static (`/` = the app
   bundle, `/hiyori/...` models, `/live2dcubismcore.min.js`). OpenAI-compatible
   `/v1/chat/completions` (streaming) for third-party clients.
+  The create-character page: `GET/POST /api/characters`, `GET /api/characters/{id}`, `PUT …/describe`, `PUT …/profile`,
+  `POST …/run` (the soul skill as a subprocess of the venv's python, one job per package, log in `build/run.log`),
+  `POST …/install` (`install-character.ps1` + `seed-memories.py`), `GET …/job`; hub event `character.job`.
 - **556d ↔ her gateway** (`internal/hermesapi`): the gateway's API server platform, enabled per start
   through `API_SERVER_KEY/HOST/PORT` in her environment (key generated once into her `companion.json`,
   port free at start; her `.env` can pin both). One non-stream `POST /v1/chat/completions` per turn with

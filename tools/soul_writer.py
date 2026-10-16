@@ -561,6 +561,9 @@ def phase_assemble(d: Path, force: bool, model: Optional[str] = None) -> List[st
     for f in ("parts.json", "voice.json", "reactions.json", "structure.json"):
         if not (d / "build" / f).exists():
             raise SystemExit(f"assemble: build/{f} missing — run the earlier phases first")
+    if (d / "SOUL.md").exists() and not (d / "soul.lock.json").exists() and not force:
+        print("assemble: SOUL.md here is hand-written (no soul.lock.json) — the cast stays untouched; --force to replace it with the generated one")
+        return ["手寫的 SOUL.md 不覆蓋（沒有 soul.lock.json）；要用產生的取代請 --force"]
     soul = build_soul(d)
     found = checks(soul)
     write_text(d / "build" / "check.md", "# 檢查\n" + ("\n".join(f"- {x}" for x in found) if found else "- 通過"))

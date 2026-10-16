@@ -3,6 +3,7 @@ import { api, CompanionInfo, Settings as S } from '../api';
 import { VoiceSettings } from './VoiceSettings';
 import { DevSettings } from './DevSettings';
 import { Character } from './Character';
+import { NewCharacter } from './NewCharacter';
 import { useStore } from '../store';
 import { TIME_FORMATS, fmtDateTime } from '../fmt';
 import { t } from '../i18n';
@@ -16,6 +17,7 @@ import { t } from '../i18n';
 export function Settings() {
   const [tab, setTab] = useState<'global' | 'characters'>('global');
   const [open, setOpen] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const [items, setItems] = useState<CompanionInfo[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const { selected, setSelected } = useStore();
@@ -41,13 +43,16 @@ export function Settings() {
   return (
     <div className="h-full flex flex-col">
       <div className="flex gap-1 px-5 pt-4">
-        <button className={seg(tab === 'global')} onClick={() => { setTab('global'); setOpen(null); }}>{t('settings.tab_global')}</button>
+        <button className={seg(tab === 'global')} onClick={() => { setTab('global'); setOpen(null); setCreating(false); }}>{t('settings.tab_global')}</button>
         <button className={seg(tab === 'characters')} onClick={() => setTab('characters')}>{t('settings.tab_characters')}</button>
       </div>
       <div className="flex-1 overflow-hidden">
-        {tab === 'global' ? <GlobalSettings /> : open && current ? <Character info={current} onBack={() => setOpen(null)} /> : (
+        {tab === 'global' ? <GlobalSettings /> : creating ? <NewCharacter onBack={() => setCreating(false)} /> : open && current ? <Character info={current} onBack={() => setOpen(null)} /> : (
           <div className="h-full overflow-y-auto p-5 max-w-2xl space-y-4">
-            <p className="text-xs opacity-60">{t('settings.characters_note')}</p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs opacity-60">{t('settings.characters_note')}</p>
+              <button className="shrink-0 px-3 py-1.5 rounded-lg text-sm bg-pink-500/80 hover:bg-pink-500 text-white" onClick={() => setCreating(true)}>{t('newchar.button')}</button>
+            </div>
             {notice && <p className="text-sm text-red-300">{notice}</p>}
             {items.length === 0 && <p className="opacity-60">{t('roster.empty')}</p>}
             <ul className="space-y-2">

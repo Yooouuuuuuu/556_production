@@ -42,6 +42,13 @@ What landed since:
 - **0.7.8** (2026-10-15): no UI change. Fix (data): a conversation with another character rewrote that character's
   memory store (counterpart pipelines no longer pass a subject word; KeepsakeDB 1.0.1). `vendor/` is two git
   submodules (Hermes at its pinned commit, KeepsakeDB at `v1.0.1`); the repo is plain git.
+- **0.8.1** (2026-10-16): 設定 → 角色 → **新角色** — the soul skill behind 556d (`../prompt/prompt.md` §2.9). One page per
+  character package: 描述 (ten boxes in your own words, the template prompts as grey text), 產生 (model gemini / claude,
+  「全部」 or one phase at a time, the job's log live, the intake's questions), 確認 (the proposed thinking meters and
+  choices with the skill's one-line evidence, Big Five and constants under a fold; sliders are your decision), 結果
+  (the checks, the blind read-back, the SOUL, 安裝 → profile created, files copied, seeds loaded → start her on 名單).
+  Packages with a hand-written SOUL (the cast) are marked and never overwritten. Backend: `/api/characters` and the
+  skill as a 556d job (`internal/api/characters.go`). 0.8.0 was the skill itself (`tools/soul_writer.py`, no UI).
 - **0.7.9** (2026-10-15): no UI change. `docs/prompt/` — the request she answers, verified, and the 0.8.0 design
   (six-part SOUL, thinking dials, pinned groups, clock line, vendor-text filter).
 - **Coming**: see

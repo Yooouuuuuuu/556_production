@@ -26,7 +26,8 @@ Outputs (regenerate explicitly; `soul.lock.json` records which inputs produced t
 - `build/` — one JSON per phase (intake, structure, thinking, voice, reactions, parts, verify), `check.md`, `verify.md`,
   and the raw model replies under `build/raw/`.
 
-The skill:
+The skill, from the app: 設定 → 角色 → 新角色 (0.8.1) — the same phases as a 556d job, proposals confirmed on the page,
+install from the page. From the terminal:
 ```
 python tools/soul_writer.py init <id> --display 名字 [--from-example]
 python tools/soul_writer.py run <id> --phase all --model gemini|claude [--yes]   # or one phase at a time

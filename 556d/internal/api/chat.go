@@ -65,6 +65,7 @@ type API struct {
 	openMu    sync.Mutex           // one conversation is opened at a time (start vs. a racing first turn)
 	sessions  map[string]*session  // per companion (app-only conversations)
 	followers map[string]*follower // per companion: the shared conversation's live tail
+	jobs      map[string]*charJob  // per character package: the soul skill / install subprocess (characters.go)
 }
 
 // New wires the hub API. defaultSelected (556d.toml daemon.profile) is the companion the
@@ -114,6 +115,8 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/psyche/command", a.psycheCommandHandler)   // close a loop / add a reminder / add a life event — queued for the engine
 	mux.HandleFunc("/api/psyche", a.psycheHandler)       // 狀態: read-only view of her psyche.db (the engine in her process writes it)
 	mux.HandleFunc("/api/tools", a.toolsHandler)         // what she can do: baseline memory + extensions (restart applies)
+	mux.HandleFunc("/api/characters", a.charactersHandler)  // the create-character page: packages under characters/, the soul skill as a job
+	mux.HandleFunc("/api/characters/", a.charactersHandler)
 }
 
 func (a *API) shutdownHandler(w http.ResponseWriter, r *http.Request) {
