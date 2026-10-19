@@ -1,6 +1,6 @@
 # 她的內在生命：完整設計（v2）
 
-- 日期：2026-10-07。合併自 `inner-life-design-v2.md` 與 `parameter-glossary.md`（草稿與當日的審查表已刪除，歷史在 git 紀錄裡），並套用當日的決定（§0）。
+- 日期：2026-10-07；最後核對 2026-10-19（0.10.0），對照 `plugins/psyche` 在 HEAD 的實作。合併自 `inner-life-design-v2.md` 與 `parameter-glossary.md`（草稿與當日的審查表已刪除，歷史在 git 紀錄裡），並套用當日的決定（§0）。
 - 狀態：設計定稿，從 0.5.0 開始實作；§21 有階段與版本的對應。
 - 讀法：每節固定分成「目的／機制／參數／指標／可刪程度／值得討論」。參數以 `code_name` 標示，完整對照表在附錄 E。專有名詞第一次出現時附英文，之後直接用中文。「你」= 跟她說話的人（記憶的主體字；顯示時是她對你的稱呼）。
 
@@ -221,7 +221,7 @@ dX = θ_X·(μ_X(t) − X)·dt + σ_X·dW + Σ ΔX_i·δ(t − t_i)
 
 - **誕生**：由影響模型 B 產生（§11、附錄 A）。
 - **衰減**：各自的半衰期。相對長短依 Verduyn & Lavrijsen 2014（悲傷最長、憤怒與煩躁短、羞愧最短）；絕對值是起點，待校準。
-- **反芻（rumination）**：Verduyn 2009 發現反芻是持續時間的最強預測因子。閒置時以機率 ∝ `rumination × intensity × N × (1 − attention_load)` 想起未解決的負向實例，強度小幅回升、到期延長。上限：單一實例最多 `rumination_max_count = 3` 次、總延長不超過 `rumination_max_extension = 2` 倍半衰期。注意力佔用 `attention_load` 來自活動狀態（§14）；睡前躺著佔用為 0，是反芻高峰，且會延後入睡（Harvey 2002）。
+- **反芻（rumination）**：Verduyn 2009 發現反芻是持續時間的最強預測因子。閒置時每小時以機率 `0.6 × intensity × 反芻係數 × (1 − attention_load)` 想起未解決的負向實例（反芻係數 = `character.rumination`，空白＝神經質），強度 ×1.15 回升、到期延長。上限：單一實例最多 `rumination_max_count = 3` 次、總延長不超過 `rumination_max_extension = 2` 倍半衰期。注意力佔用 `attention_load` 來自活動狀態（§14）；睡前躺著佔用為 0，是反芻高峰，且會延後入睡（Harvey 2002）。
 - **線索觸發（cue-triggered recall）**與自發反芻分開：對話中提到相關的事，由 A 判斷相關性，刷新該實例；不受閒忙影響。
 - **回味（savoring, Bryant 2003）**：正向實例的對應機制，機率較低。
 - **壓抑（suppression）**：表達層決定不說；依 Gross & John 2003，被壓抑的實例不加速衰減。
@@ -297,7 +297,7 @@ dX = θ_X·(μ_X(t) − X)·dt + σ_X·dW + Σ ΔX_i·δ(t − t_i)
 
 **3. 依附工作模型**：焦慮 `attachment_anxiety[p]`、迴避 `attachment_avoidance[p]`（ECR，Brennan, Clark & Shaver 1998）。有 L0 基線，隨關係經驗以月為單位移動（依附可隨關係改變：Davila, Burge & Hammen 1997；穩定性的量：Fraley 2002）。作用是調節器：焦慮高時沉默更容易被評為關係貶值。
 
-**4. 信任 `trust[p]`**：可預測性、可依賴性、信念（Rempel, Holmes & Zanna 1985）。前兩者用 Beta 分布記承諾兌現／違約：`Beta(α0 + kept, β0 + broken)`，舊紀錄以 `trust_forget_lambda` 遺忘。新關係一次失約影響大，舊關係小。
+**4. 信任 `trust[p]`**：可預測性、可依賴性、信念（Rempel, Holmes & Zanna 1985）。前兩者用 Beta 分布記承諾兌現／違約：`Beta(α0 + kept, β0 + broken)`，舊紀錄以 `relation.trust_forget_days`（60 天）為時間常數指數地忘回先驗。新關係一次失約影響大，舊關係小。
 
 **5. 承諾 `commitment[p]`**：投資模型（Rusbult 1980）：滿意度 + 投入 − 替代品。多代理後替代品真的存在（情侶的一方可能把你視為替代），不另設規則，由投資模型自然算出。承諾高 → 寬恕斜率陡（Finkel et al. 2002）。
 
@@ -335,7 +335,7 @@ dX = θ_X·(μ_X(t) − X)·dt + σ_X·dW + Σ ΔX_i·δ(t − t_i)
 
 **表達**：有預警（話少、語氣淡）；不追討（demand-withdraw，Christensen & Heavey 1990）；自己給台階 `olive_branch_delay_h = f(實際黏人, Avo)`，初值黏人 1.0 時 8 小時、0 時 36 小時，再乘迴避係數；委屈強時反話關閉，只能收斂或否認；你很累時先不提（壓抑，延後不取消）。
 
-**帳與記憶（2026-10-14 決定）**：一筆帳只有兩種存在：在帳上，或過了變舊帳。算出來的迴避低於 `relation.hurt_open_min`（0.1）就根本不開（沒有「開了但不寫進 prompt」的中間地帶）；開著的每一回合都在狀態區塊裡（「心裡還記著一筆」）。開帳那一回合寫進記憶的東西由引擎透過記憶引擎的命令佇列標成 hold（留著、不注入、不提示；observe 仍當候選以免重複），評估也看得到開著的帳：對方再提起而不認 → `revisited_hurt`，那筆抬回開帳時的一半；認錯 → apology，整本帳砍一截並標 repaired。時間消退關閉的：解除 hold，加 tag `舊帳`，meta 帶發生日期與注入前綴「（舊帳 2026/10/13）」——她記得那件事，刺沒了，提起來她會有反應；道歉或誤會更正關掉的：解除 hold，當普通記憶，不是舊帳。KeepsakeDB 0.3.1 加了 `hold` / `patch` 命令與 `meta.prefix` 渲染。
+**帳與記憶（2026-10-14 決定）**：一筆帳只有兩種存在：在帳上，或過了變舊帳。算出來的迴避低於 `relation.hurt_open_min`（0.1）就根本不開（沒有「開了但不寫進 prompt」的中間地帶）；開著的每一回合都在狀態區塊裡（「心裡還記著一筆」）。開帳那一回合寫進記憶的東西由引擎透過記憶引擎的命令佇列標成 hold（留著、不注入、不提示；observe 仍當候選以免重複），評估也看得到開著的帳：對方再提起而不認 → `revisited_hurt`，那筆抬回開帳時的一半；認錯 → apology，整本帳砍一截並標 repaired。時間消退關閉的：解除 hold，加 tag `舊帳`，meta 帶發生日期與注入前綴「（舊帳 2026/10/13）」——她記得那件事，刺沒了，提起來她會有反應；道歉或誤會更正關掉的：解除 hold，當普通記憶，不是舊帳。用的是 KeepsakeDB 的 `hold` / `patch` 命令與 `meta.prefix` 渲染（`vendor/keepsakedb`，1.0.1）。
 
 **指標**：每週開帳數與強度；帳的存活時間（有無修復）；道歉後 24 小時內降到 30% 以下；台階觸發率；不滿峰值 < 上限；台階時間 vs 黏人與迴避。
 
@@ -385,7 +385,7 @@ dX = θ_X·(μ_X(t) − X)·dt + σ_X·dW + Σ ΔX_i·δ(t − t_i)
 
 **四步**
 
-1. **原型比對（prototype matching）**：每種情緒一個原型向量（Scherer 2001 的預測評估剖面；GENESE，Scherer 1993），只在原型指定的欄位算加權距離，`sim = exp(−d²/2s²)`，門檻 `prototype_threshold = 0.5`，一個事件最多 `max_instances_per_event = 3`，次要實例 × `secondary_factor = 0.7`。符號相反直接排除。預期類情緒（滿足、失望、如釋重負）需關聯到先前的希望／擔心／承諾。
+1. **原型比對（prototype matching）**：每種情緒一個原型向量（Scherer 2001 的預測評估剖面；GENESE，Scherer 1993），只在原型指定的欄位算加權距離，`sim = exp(−d²/2s²)`，門檻 `prototype_threshold = 0.6`（設計初值 0.5，第一次實測後改：一句道歉也生出了一個弱的喜悅），一個事件最多 `max_instances_per_event = 3`，次要實例 × `secondary_factor = 0.7`。符號相反直接排除。預期類情緒（滿足、失望、如釋重負）需關聯到先前的希望／擔心／承諾。
 2. **強度**：`I = clip(sim × R × |v*| × (1 + α·u) × π(cert) × g_k × m_k × ρ_k)`。g 人格增益、m 狀態調節（睡眠債、社交疲勞、依附焦慮，乘積封頂 [0.6, 1.5]）、ρ 堆疊。心情一致性不乘在強度上，而是比對前修正 v：`v ← v + 0.2 × ambiguity × mood_valence`（Forgas 1995 AIM，只對模糊事件）。
 3. **半衰期與 PAD**：`T½ = T_base × (0.5 + R) × (0.75 + 0.5·I)`；PAD 座標查表。
 4. **路由與記帳**：委屈 → L6 帳本；希望／擔心綁 loop；自豪／羞愧同時動能力需求；結構性更新（信任 Beta、親和缺口、親近時數、PPR、道歉扣減、loop 關閉、能力與自主需求、重逢、道別模式）全部是規則。
@@ -525,26 +525,42 @@ expressed_i = felt_i × g_expressiveness × g_disclosure(B[p]) × g_context × (
 
 脆弱成本：想念、不捨、被誇的開心高；一般開心、無聊低。安全門 B 低於門檻接近 0。委屈強時反話關閉。反話必須留破綻（off-record markers 的推論，Keltner et al. 2001；Dews & Winner 1995）。主見決定不同意用直說還是收斂；內在的不認同都存在。
 
-5. 狀態區塊（state block）：固定格式、全部是詞、不超過八行：
+5. 狀態區塊（state block）：固定格式、全部是詞。第一行是標題「【她現在】」（代名詞依 `character.pronoun`），第二行是時鐘「現在：YYYY/MM/DD（週幾）HH:MM」（0.8.4；引擎自己的時區 `time.timezone_offset_h`，Hermes 自己的日期行由 shim 拿掉），之後才是狀態行，順序固定：
+
+| 行 | 何時出現 | 內容 |
+| --- | --- | --- |
+| 在做 | 一定 | 活動（跟別的角色說話時寫「正在跟 X 說話（不是跟你），本來…」）＋精神詞 |
+| 心情 | 一定 | 「整體」＋象限詞；之後最多兩個可表達的實例，各「強度詞＋情緒詞（原因）」 |
+| 心裡 | 需求有話可說時 | 想找他／好幾天沒說到話有點悶／有點無聊／最近沒進展／聊得有點累（§7） |
+| 表現 | 一定 | 策略句（含愉悅給的語氣、不同意時的做法）；揭露上限句（第四層沒有；策略是 suppress 時不加）；長度提示；工作中的「等我一下」；矛盾情感的先後；剛道別 |
+| 想法 | 偶爾 | 思考模組的一行（§22，0.8.8） |
+| 對〈稱呼〉 | 有時數或親近，或對方是別的角色 | 親近詞、信任、依賴；帳上有開著的委屈時加「心裡還記著一筆（…）」 |
+| 掛念 | 有 loop，或有解鎖的沒說出口 | 最多兩條 loop（到了、已去問、問到了各有標記）＋最多一條「有件事還沒跟他說（…）」 |
+| 轉變 | 主導情緒跟上一次區塊不同 | 「剛才…，現在…」，蓋過對話歷史的慣性 |
+| 原則 | 一定 | 情緒是底色，內容以對方的話題為主；不提沒做過的事；有自己的看法，不用附和 |
+
+`expression.max_lines`（8）只算狀態行，標題與時鐘另計（0.9.0 修正：以前連標題一起算，塞滿時掉的是轉變和原則）。還是超過時依序丟轉變、心裡、想法、掛念；原則永遠留著。例（「他」處是她對你的稱呼）：
 
 ```
 【她現在】
-在做：剛錄完一段，有點累（昨晚太晚睡）
-心情：又替他高興，又有點捨不得（他下個月要出國半年）
-表現：先恭喜他；捨不得用反話帶過，要留破綻
-對他剛說的：不同意他說那部片無聊（她很喜歡），可以溫和地說
-掛念：他週五的面試
+現在：2026/10/19（一）15:40
+在做：在工作，有點累
+心情：整體有點自在；蠻替他高興（他說面試過了）、有點擔心（他下個月要出國半年）
+表現：直說；不同意時直說自己的看法；可以講感受，最軟的那塊先留著；話少一點；手上在忙，可以回短一點或說等她一下，忙完會回來找他；兩種情緒並存時先回應對方說的，再帶到自己的
+想法：今天沒力氣想，會先回再想
 對他：很熟、很放心
-原則：情緒是底色，內容以他的話題為主；不提沒做過的事；有自己的看法，不用附和
+掛念：他說明早八點要叫他起床、有件事還沒跟他說（其實很在意他上次忘了）
+轉變：剛才有點失望，現在蠻替對方高興
+原則：情緒是底色，內容以對方的話題為主；不提沒做過的事；有自己的看法，不用附和
 ```
 
-「表現」行是防止演過頭的主要輸入端防線；矛盾情感兩條並列並說明先後；轉變要明寫（「剛才有點悶，現在已經消氣了」）以蓋過對話歷史的慣性；多代理下「對他」一行依 counterpart 切換。
+「表現」行是防止演過頭的主要輸入端防線；矛盾情感兩條並列並說明先後；轉變要明寫（「剛才有點悶，現在已經平復了」）以蓋過對話歷史的慣性；多代理下「對〈稱呼〉」一行依 counterpart 切換。
 
 6. 非語言：回覆長度（精神低、迴避高、工作中 → 短；喚醒高 → 長）；回覆延遲只在 Telegram 且不在委屈時刻意延遲；TTS 依 Scherer 1986（喚醒高 → 音高高、語速快；悲傷 → 低、慢）；Live2D 心情為底色、實例為短暫動作、精神低 → 眨眼慢、偏頭；被壓抑的實例可在臉上漏一點（微表情）。
 
 **黏人在這一層**：想念的外放度；黏人表達乘揭露深度；黏人 × 傲嬌 = 很想你但不承認。
 
-**指標**：表達落差 ≈ 0；情緒提及率低；策略分布符合性格；反話破綻缺失 0；壓抑後再浮現比例；狀態區塊 ≤ 8 行；剛認識時撒嬌率低。
+**指標**：表達落差 ≈ 0；情緒提及率低；策略分布符合性格；反話破綻缺失 0；壓抑後再浮現比例；狀態行 ≤ 8（標題與時鐘另計）；剛認識時撒嬌率低。
 
 **可刪程度**：狀態區塊不可刪；調節、顯示規則、策略中；TTS、Live2D 後做。
 
@@ -561,13 +577,13 @@ expressed_i = felt_i × g_expressiveness × g_disclosure(B[p]) × g_context × (
 觸發機率 = 1 − exp(−λ·Δt)
 ```
 
-- W：對特定人的需求缺口（含三階段）、新奇缺口、想分享清單、委屈非單調（小升大降）、焦慮略升、迴避下降。黏人權重 `urge_will_clinginess_gain` 0.5–1.8。
-- O：到期 loop、專案里程碑、生活事件、紀念日、她的「等我一下」到期、該給台階。無理由時 O 只有底值 `urge_occasion_floor`。
+- W：對特定人的需求缺口（含三階段）、新奇缺口、想分享清單、沒說出口的事（+0.4 × min(1, 重要性總和)，§23 第 4 項）、委屈非單調（小升大降）、焦慮略升、迴避下降。黏人權重 `urge_will_clinginess_gain` 0.5–1.8。實作上 λ 再乘 `proactive.urge_gain`（2.5）。
+- O：到期 loop、回報、該給台階、關心、解鎖的沒說出口的事、想分享（專案里程碑與生活事件由此進來）。無理由時 O 只有底值 `proactive.occasion_floor`（0.1）。紀念日還沒做（階段 7）。
 - p̂：心智理論；已知對方在忙 × 0.1。
 - D：未回一則 → 等很久；未回兩則 → 等對方；永不第三則。過去 14 天主動訊息回覆率低 → 整體下調。
-- 硬門：對方的免打擾；她在睡或專注；對話中或語音中；今日上限 `proactive_daily_cap`；對方今天已聊很久 `usage_threshold_min`。
+- 硬門：對方的免打擾；她在睡或專注；對話中或語音中；今日上限 `proactive.daily_cap`（3）；兩則之間至少 `proactive.min_gap_min`（90 分）；對方今天已聊很久 `proactive.usage_threshold_min`（90 分）。
 
-**類型**：回來找你 `return_promise`（優先度最高，到期硬推）、提醒 `reminder`（硬推）、去問別的角色 `ask_other`（對那個角色，走角色之間對話的閘門）、回報 `report_back`（對你，只看她醒著、你的免打擾與作息）、關心 `care`、分享 `share`、台階 `olive_branch`、紀念 `anniversary`、想念 `longing`（少見）。
+**類型**：回來找你 `return_promise`（優先度最高，到期硬推）、提醒 `reminder`（硬推）、去問別的角色 `ask_other`（對那個角色，走角色之間對話的閘門）、回報 `report_back`（對你，只看她醒著、你的免打擾與作息）、關心 `care`、沒說出口的事 `unsaid`（解鎖後；排在 care 之後、share 之前）、分享 `share`、台階 `olive_branch`、想念 `longing`（少見）。旁白句型在 `events.py` 的 `REASONS`，就這九種。
 
 **事件 turn**：引擎組事實（以旁白口吻，不寫成「傳一則訊息」的指令——那樣模型會自己發明一個回覆工具）→ 帶 `X-556-Event` 標頭送她自己的 API（進她唯一的那段對話）→ 她寫或決定不說（平台錯誤也算不說）→ 送出前檢查（只記錄）→ 這一列在對話裡：app 的 follower 顯示，556d 把文字用她的 bot 送到 Telegram（與 app→Telegram 鏡像同一條路；管道偏好只決定要不要多送、要不要唸出來）→ 等回覆計時；超過 p90 未回 → 小失望（受焦慮調節），絕不追問。
 
@@ -599,7 +615,7 @@ expressed_i = felt_i × g_expressiveness × g_disclosure(B[p]) × g_context × (
 | events | 所有輸入事件，append-only | 引擎（回合、tick、生活模擬、556d 轉來的訊息） |
 | appraisals | A 的結果，append-only | 引擎的 A 佇列 |
 | instances | 情緒實例、委屈帳、open loops（可重建） | 引擎 |
-| snapshots | 每 15 分鐘完整狀態 | 引擎 |
+| snapshots | 每 5 分鐘完整狀態（`time.snapshot_interval_min`） | 引擎 |
 | params | 參數版本 | 引擎（啟動時從她 profile 的 `psyche.json` 記一版；設定頁經 556d 改 `psyche.json`，重啟生效，與工具擴充同一條規則） |
 
 556d 與狀態頁只唯讀 `psyche.db`（與 `state.db`、記憶庫同一種讀法）。
@@ -608,7 +624,7 @@ expressed_i = felt_i × g_expressiveness × g_disclosure(B[p]) × g_context × (
 
 **停機：世界時間連續（已決定）**：啟動時以小時為步補算睡眠、活動、專案、生活事件、反芻；停機期間的預期接觸對所有對象只算 `offline_expected_contact_ratio = 0.3`（換算下來疏離門檻 5 天變約 16 天）；不補發主動訊息；處理未兌現的「等我一下」與到期的 loop；產生「這幾天」摘要給狀態區塊。
 
-**真的對話無法快轉**（多代理）：見 §18 與 §22。
+**真的對話無法快轉**（多代理）：見 §18 與 §24。
 
 **指標**：重播一致性（完全相同）；快轉 vs 即時相同；一個月停機 1 秒內補完；摘要 ≤ 三件事；重逢強度 vs 停機天數與黏人；未兌現承諾提起率。
 
@@ -772,29 +788,43 @@ expressed_i = felt_i × g_expressiveness × g_disclosure(B[p]) × g_context × (
 - 文獻數值核對清單（附錄 D）在階段 2 前完成第一輪；參數對照表是附錄 E。
 - 每階段結束用重播比對新舊版本。
 
+### 0.8.x 之後（2026-10-16 → 10-19）
+
+0.8.x 做了思考模組（§22，0.8.8）、五個對話機制（§23，0.8.9）、狀態區塊的時鐘（0.8.4）與 prompt 衛生（0.8.4–0.8.6：她的 system prompt 不再出現產品、機器、模型或 app 的名字；基線不掛工具）。她是誰的那些帶日期的部分（時間線、影響過她的人與事）住在 SOUL 裡，由靈魂技能從描述寫出，不是記憶列（DECISIONS 2026-10-19）；角色包 `characters/<id>/` 就是角色，每次啟動前 556d 把 SOUL.md、psyche.json、people/*.md 複製進 profile。
+
 ---
 
-## 23. 思考模組（0.8.8，設計在 `../prompt/prompt.md` §2.5）
+## 22. 思考模組（0.8.8，設計在 `../prompt/prompt.md` §2.5）
 
-與情緒引擎分開的一個小模組（`thinking.py`）：它讀情緒側的狀態（精神、社交疲勞、喚醒、心情的愉悅、依附焦慮、委屈閘、親近），
-不寫任何一項；它的五個刻度（想好再回 `rationality`、憑感覺 `experientiality`、先看機會 `promotion`、先看會不會出錯
-`prevention`、找更好答案找到哪 `maximizing`，`psyche.json` 的 `thinking`，空白時由五大人格給預設）不改任何情緒的強度或半衰期。
-輸出只有一行、只在這一回合跟她的習慣不一樣時出現：狀態區塊「表現」之後的「想法：…」——解讀偏向（焦慮高又有事懸著→
-今天特別容易往壞處想）、事情不小（有委屈在帳上→先回型的人會想一下再回）、沒力氣（精神低或社交疲勞→想好再回型的先回再想、
-憑感覺型的直接問）、心情把預設翻過來（防出錯型心情好→先看能變成什麼；找機會型心情差→先看會不會出錯）、讀對方的用心
-（親近又累→懶得猜；想好再回又事情大→多想一下）、極大化型有精神時先問清楚。順序固定、一次最多一行；其餘時候 SOUL 的那句
-話就是她的習慣。思考媒介與情境權重（dial 1、6）只記錄選項（`thinking_choices`），文字由 SOUL 承載，引擎不讀。反芻改為
-可設的 `character.rumination`（空白＝神經質）。
+與情緒引擎分開的一個小模組（`thinking.py`）：它讀情緒側的狀態（精神 energy、社交疲勞 fatigue、喚醒 arousal、心情的愉悅 pleasure、對這個人的依附焦慮 anxiety、委屈閘 hurt_gate、親近 bond、帳上有沒有開著的委屈），不寫任何一項；它的五個刻度（想好再回 `thinking.rationality`、憑感覺 `thinking.experientiality`、先看機會 `thinking.promotion`、先看會不會出錯 `thinking.prevention`、找更好答案找到哪 `thinking.maximizing`，各 0–1，空白時由五大人格給預設：rationality ＝ 盡責性、promotion ＝ 外向性、prevention ＝ 神經質、其餘 0.5）不改任何情緒的強度或半衰期。
 
-## 24. 五個對話機制（0.8.9，設計在 `../prompt/prompt.md` §3 第 5 項；2026-10-14 的簡報第二部分）
+輸出只有一行、只在這一回合跟她的習慣不一樣時出現：狀態區塊「表現」之後的「想法：…」。規則依序檢查，第一條成立就停（一次最多一行）。其中「累」＝ 精神 < 0.35 或社交疲勞 > 0.6；「事情不小」＝ 委屈閘 ≥ 0.15。句子就是引擎印出的字：
+
+| 順序 | 條件 | 這一行 |
+| --- | --- | --- |
+| 1 解讀偏向（dial 4，情緒側） | 焦慮 ≥ 0.6，且（帳上有開著的委屈，或愉悅 < −0.3） | 想法：今天特別容易往壞處想 |
+| 2 事情不小 | 委屈閘 ≥ 0.15，且想好再回 ≤ 0.45（先回型） | 想法：這件事不小，會想一下再回 |
+| 3 沒力氣 | 累，且想好再回 ≥ 0.6 | 想法：今天沒力氣想，會先回再想 |
+| 3′ | 累，且憑感覺 ≥ 0.6，且焦慮 < 0.6 | 想法：今天沒力氣猜，直接問對方 |
+| 4 心情把預設翻過來（dial 3） | 先看會不會出錯 ≥ 0.6，且愉悅 > 0.4 | 想法：心情好，先看能變成什麼 |
+| 4′ | 先看機會 ≥ 0.6，且（愉悅 < −0.3 或焦慮 ≥ 0.6） | 想法：這題先看會不會出錯 |
+| 5 讀對方的用心（2.2） | care < 0.25 | 想法：懶得猜對方的意思，直接當對方懂 |
+| 5′ | care > 0.85 | 想法：會多想一下對方是什麼意思 |
+| 6 極大化（dial 5） | 找更好答案 ≥ 0.6，且精神 ≥ 0.5，且喚醒 ≥ 0.6 | 想法：會問清楚再答，不想隨便 |
+
+讀對方的用心 `care = clip(0.5 + 0.3 × 想好再回 − 0.3 × 親近 − 0.3 × 社交疲勞 + 0.3 × 事情不小)`，0–1：人先用自己的讀法當錨再往外調，累或親近時調得早停（熟人被當成「懂」），事情大或想好再回型的人調得久。其餘時候這一行不出現，SOUL 的那句話就是她的習慣。狀態行超過八行時這一行排在轉變、心裡之後第三個被丟（§15）。
+
+思考媒介與情境權重（dial 1、6）只記錄選項（`thinking_choices.medium_primary / medium_secondary / first_look / contradiction / cause`），文字由 SOUL 承載，引擎不讀（靈魂技能與 0.8.10 的隱藏草稿指令會讀）。反芻改為可設的 `character.rumination`（空白＝神經質），是情緒側的旋鈕，不是思考刻度。參數對照見附錄 E.17。測試：`tests/test_thinking.py`。
+
+## 23. 五個對話機制（0.8.9，設計在 `../prompt/prompt.md` §3 第 5 項；2026-10-14 的簡報第二部分）
 
 五個小機制，都只動「表現」與「掛念」兩行和主動行為，不新增刻度、不改情緒的強度或半衰期：
 
-1. **揭露深度有人讀了（2.4）。** `disclosure_depth[p]`（§13，1 喜好 → 2 看法 → 3 感受 → 4 脆弱處）之前算了沒人用。現在
-   `relation.depth_now`：親近給的層數，對方剛敞開過一天內加一層，迴避高減一層。「表現」行在第四層以下多一句上限
+1. **揭露深度有人讀了（2.4）。** `disclosure_depth[p]`（§8，1 喜好 → 2 看法 → 3 感受 → 4 脆弱處）之前算了沒人用。現在
+   `relation.depth_now`：親近給的層數（羈絆 0.25／0.5／0.75 各解鎖一層），對方剛敞開過一天內加一層，迴避 > 0.6 減一層。「表現」行在第四層以下多一句上限
    （自己的事先不多講，聊喜好跟日常就好／可以講自己的看法，感受先留著／可以講感受，最軟的那塊先留著），第四層沒有這句。
    靈魂技能從描述判斷「一開始多熟」（剛認識／還不算熟／朋友／很熟／很親近，`profile.json` 的 `closeness` 可改），寫成
-   `psyche.json` 的 `relationships.你` 起始親近與時數，所以新角色不會一律從陌生人開始。
+   `psyche.json` 的 `relationships.你` 起始羈絆與時數（bond／hours：剛認識 0.05／2、還不算熟 0.2／30、朋友 0.4／70、很熟 0.6／150、很親近 0.8／250），所以新角色不會一律從陌生人開始。
 2. **信任的不確定度進玩笑與反話（2.5）。** Beta 信任對的變異數 αβ/((α+β)²(α+β+1))，乘十二壓到 0–1（`trust_uncertainty`：
    平先驗 1，預設先驗 (2, 1) 是三分之二，承諾守或破之後往 0）。以預設先驗為中性點：比預設更摸不準他會怎麼接，反話的機率乘
    到 1.2、幽默門檻降到 0.53；證據累積後反話乘到 0.6、門檻升到 0.73。沒有歷史的角色跟以前一模一樣。
@@ -802,16 +832,19 @@ expressed_i = felt_i × g_expressiveness × g_disclosure(B[p]) × g_context × (
    外放邊緣的人推回收斂；極端時點名語氣（愉悅 > 0.4：直說，話可以隨便一點；< −0.3：直說，但客氣一點）。長度提示多兩條：
    愉悅 > 0.5 且有精神 → 可以多說一點；愉悅 < −0.4 → 話少一點（在很睏、沒精神、迴避高之後判斷）。
 4. **沒說出口的事（2.3，最值錢的一個）。** 評估管線 A 讀她自己的回覆，找她明顯吞下去的——換話題、答非所問、「沒事」「算了」、
-   句子起頭又收掉——每回合最多兩條（`withheld.new`，附重要性），和 2026-10-14 的承諾規則一樣是「A 讀她的回覆」。引擎的
-   `withheld` 登錄（每對象，最多六條，相似的合併並加重）：閒著的時候跟負向實例一樣會回來（反芻係數 × 重要性 × 閒置注意力，
-   每次 ×1.2，最多三次），不回來就三天半衰、低於十分之一消失；拉主動意願（+0.4 × 重要性總和）；揭露深度到第三層（感受）或
-   重要性漲到 0.9 時解鎖——「掛念」行多一條「有件事還沒跟他說（…）」，主動時機多一種 `unsaid`（排在 care 之後、share 之前）；
-   她說出來（A 回報 `withheld.said` 的 id，或主動訊息送出）就從登錄移除。沒解鎖時她照樣放在心裡、照樣被拉，只是不說。
-5. **讀對方的用心（2.2）** 已在 §23 的思考模組：親近又累就懶得猜，想好再回又事情大就多想一下，只在兩端出現一行。
+   句子起頭又收掉——每回合最多兩條（`withheld.new`，附重要性 0–1），和 2026-10-14 的承諾規則一樣是「A 讀她的回覆」。引擎的
+   `withheld` 登錄**每個對象各最多六條**（0.9.0 修正：以前是全部共六條，別的角色的事會把你的擠掉；相似的合併，重要性取大者 +0.1）：
+   閒著的時候跟負向實例一樣會回來（每小時機率 = 0.5 × 重要性 × 反芻係數 × (1 − 注意力佔用)；實例那條是 0.6 × 強度），回來一次
+   重要性 ×1.2，最多三次；不論回不回來，重要性都以 72 小時的半衰期衰減（×0.5^(Δt/72 h)），低於 0.1 就消失；拉主動意願
+   （W += 0.4 × min(1, 重要性總和)）；對這個人的 `depth_now` 到第三層（感受）或重要性漲到 0.9 時解鎖——「掛念」行在最多兩條 loop
+   之後多一條「有件事還沒跟他說（…）」，主動時機多一種 `unsaid`（O = 0.5 + 0.5 × 重要性，排在 care 之後、share 之前）。離開登錄
+   只有兩條路：評估回報她說出來了（`withheld.said` 的 id），或主動訊息**真的送出**（`sent`）——決定要說不等於說了，沉默的那一回合
+   或送失敗都留著，等下一次時機。沒解鎖時她照樣放在心裡、照樣被拉，只是不說。沒有設定鍵，數字都在 `engine.py`。
+5. **讀對方的用心（2.2）** 已在 §22 的思考模組：親近又累就「懶得猜對方的意思，直接當對方懂」，想好再回又事情大就「會多想一下對方是什麼意思」，只在兩端出現一行。
 
-測試：`tests/test_mechanisms.py`（十三個情境）。
+測試：`tests/test_mechanisms.py`（十四個測試）。狀態頁列出「沒說出口」。
 
-## 22. 值得討論（實作時參考）
+## 24. 值得討論（實作時參考）
 
 依影響範圍排序。
 
@@ -819,7 +852,7 @@ expressed_i = felt_i × g_expressiveness × g_disclosure(B[p]) × g_context × (
 
 1. **停機期間角色之間的對話。** ✅ 決定（2026-10-14）：不補跑，用留言箱——送不到的訊息等對方啟動再送，對話從斷掉的地方接下去。原文：已傾向「開機時補跑」。要決定：補哪些（依兩人的需求缺口與到期 loop 選幾段）、補多少（成本上限）、補跑的對話與快轉的生活如何一致（先快轉生活再補對話，對話可引用生活事件）、補跑的對話是否進入記憶（應該要，否則不存在）、以及替代方案「三個角色的 556d 常駐」是否可接受。
 2. **角色間對話的發起與結束。** 發起由對特定人的 urge 決定即可；結束需要工程判定（雙方都說了結束語、或超過回合上限）。回合上限是硬性成本控制，不是劇本。
-3. **評估向量欄位數。** 完整 15 欄 vs 8 個核心欄（v、R、u、cert、agent、intent、devalue、ambiguity，另加 event_kind 與 loop_id）。建議先 8，A 填得準比欄位齊全重要。
+3. **評估向量欄位數。** ✅ 實作走完整欄位（0.5.0 起）：`appraisal.py` 每個事件 21 個鍵——event_kind、cause、v、R、u、cert、agent、intent、devalue、ambiguity、other_focus、other_v、appeal、q、loop_id、ledger_id、she_disclosed、other_disclosed、ppr、apology_components、other_tired——缺的補中性值。原先「先 8 個核心欄」的建議沒有採用；「A 填得準比欄位齊全重要」靠的是 prompt 裡的量級錨點（magnitude anchors），不是減欄。
 4. **原型共用或每角色一份。** 建議共用，人格差異由 B 的增益表達；文化差異（例如台灣角色對「直接拒絕」的評估）如需，再開角色層覆寫。
 5. **心情一致性放 A 或 B。** 建議 B（修正 v，可控、可關）。
 6. **Dependent 象限偏移。** 建議啟用但很小（−0.1 × 實際黏人），可關。
@@ -873,7 +906,7 @@ expressed_i = felt_i × g_expressiveness × g_disclosure(B[p]) × g_context × (
 
 `event_kind` 初版：promise_kept, promise_broken, ignored, dismissed, praised_her, criticized_her, shared_news_good, shared_news_bad, apology, disclosed_personal, asked_about_her, remembered_detail, forgot_detail, compared_her, farewell, return_after_absence, life_event, project_progress, loop_resolved, other。
 
-8 欄精簡版（待決策）：v, R, u, cert, agent(one-hot), intent, devalue, ambiguity + event_kind, loop_id。
+8 欄精簡版（未採用，見 §24 第 3 項）：v, R, u, cert, agent(one-hot), intent, devalue, ambiguity + event_kind, loop_id。實作的每事件 21 個鍵見 `appraisal.py` `normalize`。
 
 ### A.2 原型表（prototypes，初版；空格 = 不在乎）
 
@@ -905,7 +938,7 @@ d_k² = Σ_{j∈S_k} w_j (x_j − p_kj)² / Σ w_j
 sim_k = exp(−d_k² / 2s²),   s = prototype_width = 0.35
 ```
 
-符號門：v 與原型符號相反直接排除。預期類只在有 loop_id 且關聯到先前的希望／擔心／承諾時檢查。門檻 0.5；一事件最多 3 個；第一名之後 × 0.7；喜悅／苦惱、希望／擔心不從同一事件同時產生。
+符號門：v 與原型符號相反直接排除。預期類只在有 loop_id 且關聯到先前的希望／擔心／承諾時檢查。門檻 0.6（設計初值 0.5）；一事件最多 3 個；第一名之後 × 0.7；喜悅／苦惱、希望／擔心不從同一事件同時產生。
 
 ### A.4 強度
 
@@ -1138,11 +1171,15 @@ PAD 值為記憶中的 ALMA 對照表，實作前核對原文。實例貢獻：�
 | 傲嬌度 | tsundere (contrary-expression) tendency | `tsundere_tendency` | const | 0–1 | 設計 |
 | 主見 | assertiveness | `assertiveness` | const | 0–1 | 設計 |
 | 作息型（晨型／夜型） | chronotype | `chronotype` | const | −1…1 | 角色設定 |
+| 代名詞 | pronoun | `character.pronoun` | const | 她／他，預設 她；狀態區塊的標題與事件旁白用它 | 設計（0.8.x） |
+| 會忘記到期的事 | may forget a due item | `character.forgets` | const | bool，預設 true | 決定 2026-10-14 |
+| 記性 | memory reliability | `character.memory_reliability` | const | 0–1，預設 0.8；記得的機率 = 記性 + 0.3（重要）− 0.3 × 心情比平常差的程度 | 決定 2026-10-14 |
+| 反芻傾向（角色旋鈕） | rumination tendency | `character.rumination` | const | 0–1；空白＝神經質（實例上的 `rumination` 是次數，見 E.4） | 0.8.8 |
 | 正向情感基線 | positive affect baseline | `mu_pos_base` | derived | 0–1 | 文獻（E） |
 | 負向情感基線 | negative affect baseline | `mu_neg_base` | derived | 0–1 | 文獻（N） |
 | 情感波動 | affect volatility (OU σ) | `sigma_affect` | derived | >0 | 文獻（N） |
 | 拉回力／韌性 | attractor strength (OU θ) | `theta_affect` | derived | >0 | 設計（1−N），可覆寫 |
-| 核心情感半衰期 | affect half-life | `affect_half_life_h` | param | 2–6 h | 設計 |
+| 核心情感半衰期 | affect half-life | `time.affect_half_life_h` | param | 空白＝由 N 推（2–6 h） | 設計 |
 | PAD 預設心情 | default mood (PAD) | `mood_default_pad` | derived | 各 −1…1 | 文獻（Mehrabian 1996 經 ALMA） |
 | 正向事件增益 | positive event gain | `gain_pos` | derived | 0.7+0.6E | 文獻方向，數值設計 |
 | 負向事件增益 | negative event gain | `gain_neg` | derived | 0.7+0.6N | 文獻方向，數值設計 |
@@ -1211,13 +1248,13 @@ PAD 值為記憶中的 ALMA 對照表，實作前核對原文。實例貢獻：�
 | PAD 位置 | PAD position | `pad` | 欄位 | [P,A,D] | ALMA（待核對） |
 | 半衰期 | half-life | `half_life_h` | 欄位 | h | Verduyn 相對比例 |
 | 衰減形狀 | decay shape | `decay` | 欄位 | exp | 設計 |
-| 反芻傾向 | rumination | `rumination` | 欄位 | 0–1 | — |
+| 已反芻次數 | rumination count | `rumination`（實例欄位） | 欄位 | 0–3 整數，到 3 不再回來；傾向本身是 `character.rumination`（E.1） | 設計 |
 | 堆疊鍵 | stack key | `stack_key` | 欄位 | type:event_kind | RimWorld |
 | 可被解決於 | resolved by | `resolved_by` | 欄位 | event kinds | 設計 |
 | 被壓抑 | suppressed | `suppressed` | 欄位 | bool | Gross |
 | 堆疊乘數 | stack multiplier | `stack_multiplier` | param | 正 0.7／負 0.8／委屈 0.85 | 設計 |
 | 堆疊上限 | stack limit | `stack_limit` | param | 4 | 設計 |
-| 反芻次數上限 | max rumination count | `rumination_max_count` | param | 3 | 設計 |
+| 反芻次數上限 | max rumination count | `rumination_max_count` | param | 3（引擎寫死，實例與沒說出口的事都是） | 設計 |
 | 反芻總延長上限 | max rumination extension | `rumination_max_extension` | param | 2× | 設計 |
 | 回味 | savoring | `savoring_prob` | param | 低 | Bryant 2003 |
 | 線索觸發回想 | cue-triggered recall | — | 機制 | — | 設計 |
@@ -1251,18 +1288,21 @@ PAD 值為記憶中的 ALMA 對照表，實作前核對原文。實例貢獻：�
 | --- | --- | --- | --- | --- | --- |
 | 近期熱度 | warmth (recent heat) | `warmth[p]` | state | 0–1 | Roberts & Dunbar 2011 |
 | 長期羈絆 | bond (long-term) | `bond[p]` | state | 0–1 | 同上（親人型） |
-| 熱度半衰期 | warmth half-life | `warmth_half_life_d` | param | 14–28 d | 設計 |
+| 熱度半衰期 | warmth half-life | `warmth_half_life_d` | param | 21 d（`relation.py` 常數） | 設計 |
 | 品質加權親近時數 | quality-weighted closeness hours | `closeness_hours[p]` | state | h | Hall 2019 |
 | 里程碑 | milestones | `milestone_hours` | param | 50／90／200 | 文獻 |
 | 閒聊權重 | small-talk weight | `q_small_talk` | param | 0.2 | 設計 |
 | 深談權重 | deep-talk weight | `q_deep_talk` | param | 1.5 | 設計 |
-| 文字聊天折扣 | text-chat hours factor | `text_hours_factor` | param | <1 | 設計 |
+| 文字聊天折扣 | text-chat hours factor | `text_hours_factor` | param | 0.7（常數） | 設計 |
 | 揭露深度 | disclosure depth | `disclosure_depth[p]` | state | 1–4 | Altman & Taylor |
 | 依附強度 | attachment strength | `attachment_strength[p]` | state | 0–1，從 0 | Hazan & Zeifman 1994 |
 | 依附焦慮 | attachment anxiety | `attachment_anxiety[p]` | state | 0–1 | ECR |
 | 依附迴避 | attachment avoidance | `attachment_avoidance[p]` | state | 0–1 | ECR |
 | 信任（可預測／可依賴） | trust (Beta posterior) | `trust[p].alpha`, `trust[p].beta` | state | Beta | Rempel et al. 1985 |
-| 信任遺忘係數 | trust forgetting λ | `trust_forget_lambda` | param | /day | 設計 |
+| 信任遺忘時間常數 | trust forgetting time constant | `relation.trust_forget_days` | param | 60 d（信任對指數地回到先驗） | 設計 |
+| 羈絆追上熱度的速率 | bond rate | `relation.k_bond` | param | 0.004 /h | 設計 |
+| 依附成長速率 | attachment rate | `relation.k_attachment` | param | 0.0004 /h（× 羈絆 × 平均回應性） | 設計 |
+| 關係先驗（每對象） | per-counterpart priors | `relationships.<p>.{bond, hours, warmth, disclosure, attachment_strength, anxiety, avoidance, trust_alpha, trust_beta}` | 設定 | 未給時 0／0／0／1／0／由 N 推的焦慮基線／由 A 推的迴避基線／2／1；靈魂技能依「一開始多熟」只寫 bond 與 hours（剛認識 0.05／2、還不算熟 0.2／30、朋友 0.4／70、很熟 0.6／150、很親近 0.8／250） | 0.8.9 |
 | 承諾 | commitment | `commitment[p]` | state | 0–1 | Rusbult 1980 |
 | 被感知的回應性 | perceived partner responsiveness | `ppr[p].understood`, `.validated`, `.cared` | 評估欄位 | 0–1 | Reis & Shaver 1988 |
 | 慢變數週變化上限 | weekly change cap (slow vars) | `slow_var_weekly_cap` | param | — | 設計 |
@@ -1275,7 +1315,7 @@ PAD 值為記憶中的 ALMA 對照表，實作前核對原文。實例貢獻：�
 | 委屈帳 | hurt ledger | `hurt_ledger[p][]` | data | — | TRIM |
 | 迴避 | avoidance | `avoidance` | 欄位 | 0–1 | McCullough |
 | 不滿（取代報復） | resentment (in place of revenge) | `resentment` | 欄位 | 0–`resentment_cap` | 設計 |
-| 不滿封頂 | resentment cap | `resentment_cap` | param | 低 | 設計 |
+| 不滿封頂 | resentment cap | `resentment_cap` | param | 0.5（引擎寫死） | 設計 |
 | 善意 | benevolence | `benevolence` | 欄位 | 0–1 | McCullough |
 | 關係貶值 | relational devaluation | `devalue` | 評估欄位 | 0–1 | Leary 1998 |
 | 嚴重度 | severity | `severity` | 計算 | R × 效價絕對值 | 設計 |
@@ -1286,6 +1326,7 @@ PAD 值為記憶中的 ALMA 對照表，實作前核對原文。實例貢獻：�
 | 給台階延遲 | olive-branch delay | `olive_branch_delay_h` | derived | 8–36 h，f(黏人, Avo) | 設計 |
 | 委屈閘（反話關閉） | hurt gate | `hurt_gate` | state | 0–1 | 設計 |
 | 帳的最長存活 | ledger max lifetime | `ledger_max_lifetime_d` | param | 3 d（反芻延長上限） | 設計 |
+| 開帳門檻 | hurt open minimum | `relation.hurt_open_min` | param | 0.1：算出來的迴避低於此就不開帳 | 決定 2026-10-14 |
 
 ### E.8 評估管線 A 與影響模型 B
 
@@ -1310,7 +1351,7 @@ PAD 值為記憶中的 ALMA 對照表，實作前核對原文。實例貢獻：�
 | 原型向量 | prototype vector | `prototype[k]` | param | 見附錄 A | Scherer 2001 |
 | 原型寬度 | prototype width | `prototype_width` | param | 0.35 | 設計 |
 | 欄位權重 | field weights | `prototype_field_weights` | param | v、責任方最重 | 設計 |
-| 原型門檻 | prototype threshold | `prototype_threshold` | param | 0.5 | 設計 |
+| 原型門檻 | prototype threshold | `impact.prototype_threshold` | param | 0.6（設計 0.5，首次實測後改） | 設計 |
 | 每事件最多實例 | max instances per event | `max_instances_per_event` | param | 3 | 設計 |
 | 次要實例係數 | secondary instance factor | `secondary_factor` | param | 0.7 | 設計 |
 | 意外放大係數 | unexpectedness amplifier | `alpha_u` | param | 0.6 | OCC 方向 |
@@ -1353,7 +1394,7 @@ PAD 值為記憶中的 ALMA 對照表，實作前核對原文。實例貢獻：�
 | loop 來源 | loop origin | `origin` | 欄位 | counterpart_said（含明講的提醒）/ her_life / her_promise / counterpart_promise | 設計 |
 | loop 線索 | cue | `cue.time`, `cue.event` | 欄位 | — | 前瞻記憶 |
 | loop 重要性 | importance | `importance` | 欄位 | 0–1 | — |
-| loop 狀態 | loop state | `state` | 欄位 | waiting / due / asked / closed / expired | 設計 |
+| loop 狀態 | loop state | `state` | 欄位 | waiting / due / asked / asking / answered / closed / expired / forgot | 設計 |
 | loop 門檻 | loop creation threshold | `loop_threshold` | derived | 由 O | 設計 |
 | 想分享清單 | share backlog | `share_backlog[p]` | state | list | 設計 |
 | 立場 | stance | `stance` | 長期事實 subject=self | — | 反諂媚 |
@@ -1397,7 +1438,10 @@ PAD 值為記憶中的 ALMA 對照表，實作前核對原文。實例貢獻：�
 | 脆弱成本 | vulnerability cost | `vulnerability_cost[k]` | param | 想念、不捨高 | 設計 |
 | 安全門 | safety gate | `safety_gate(B)` | 函數 | B 低 → 0 | 設計 |
 | 破綻 | tell (off-record marker) | `tell_required` | 檢查 | 必要 | 設計推論 |
-| 狀態區塊 | state block | `state_block` | 輸出 | ≤ 8 行 | 設計 |
+| 狀態區塊 | state block | `state_block` | 輸出 | 標題＋時鐘＋≤ `expression.max_lines` 行狀態行（§15） | 設計 |
+| 狀態行上限 | state-line cap | `expression.max_lines` | param | 8；只算狀態行；超出時依序丟轉變、心裡、想法、掛念，原則永遠留著 | 0.8.4 計法、0.9.0 修正 |
+| 時鐘行 | clock line | `現在：YYYY/MM/DD（週幾）HH:MM` | 輸出 | 引擎的時區 `time.timezone_offset_h`；不計入上限 | 0.8.4 |
+| 想法行 | thought line | `想法：…` | 輸出 | 思考模組，最多一行（§22，E.17） | 0.8.8 |
 | 回覆長度 | reply length | `reply_length_hint` | 輸出 | — | 設計 |
 | 回覆延遲 | reply delay (Telegram only) | `reply_delay_s` | 輸出 | — | 設計 |
 | TTS 參數 | TTS prosody (pitch, rate, volume) | `tts.pitch`, `tts.rate`, `tts.volume` | 輸出 | — | Scherer 1986 |
@@ -1412,13 +1456,15 @@ PAD 值為記憶中的 ALMA 對照表，實作前核對原文。實例貢獻：�
 | 意願 | willingness | `urge_will` | state | — | 設計 |
 | 黏人意願增益 | clinginess willingness gain | `urge_will_clinginess_gain` | derived | 0.5–1.8 | 設計 |
 | 時機 | occasion | `urge_occasion` | state | — | 設計 |
-| 時機底值 | occasion floor | `urge_occasion_floor` | param | 小 | 設計 |
+| 時機底值 | occasion floor | `proactive.occasion_floor` | param | 0.1 | 設計 |
+| λ 增益 | urge gain | `proactive.urge_gain` | param | 2.5（乘在 W × O × p̂ × D 上） | 設計 |
 | 會被回的機率 | reply probability | `p_reply[p]` | state | 0–1 | 心智理論 |
 | 阻尼 | damping | `urge_damping` | state | 0–1 | 原設計 + ElliQ 經驗 |
-| 每日上限 | proactive daily cap | `proactive_daily_cap` | param | 使用者設定 | 設計 |
-| 使用量門檻 | usage threshold | `usage_threshold_min` | param | 分鐘 | Fang 2025 方向 |
-| 主動類型 | proactive types | `return_promise / care / unsaid / share / olive_branch / anniversary / longing` | 列舉 | — | 設計 |
-| 沒說出口的事 | withheld register | `withheld[]` | state | 每對象 ≤ 6 條，三天半衰，反芻 ×1.2 ≤ 3 次 | 設計（0.8.9） |
+| 每日上限 | proactive daily cap | `proactive.daily_cap` | param | 3，使用者可設 | 設計 |
+| 最短間隔 | minimum gap | `proactive.min_gap_min` | param | 90 分（硬推的提醒不受限） | 設計 |
+| 使用量門檻 | usage threshold | `proactive.usage_threshold_min` | param | 90 分 | Fang 2025 方向 |
+| 主動類型 | proactive types | `return_promise / reminder / ask_other / report_back / care / unsaid / share / olive_branch / longing` | 列舉 | `events.py` `REASONS` 的九種 | 設計 |
+| 沒說出口的事 | withheld register | `withheld[]` | state | 每對象 ≤ 6 條（相似者合併 +0.1）；重要性以 72 h 半衰期衰減，< 0.1 消失；閒置時回來的機率/h = 0.5 × 重要性 × 反芻係數 × (1 − 注意力佔用)，每次 ×1.2，≤ 3 次；解鎖 depth_now ≥ 3 或重要性 ≥ 0.9；W += 0.4 × min(1, Σ重要性)；時機 `unsaid` O = 0.5 + 0.5 × 重要性；離開：`withheld.said` 或真的送出（`sent`）。沒有設定鍵 | 設計（0.8.9；0.9.0 修正） |
 | 事件 turn | event turn | `X-556-Event` | 標頭 | 引擎送進她自己的 API；556d 送 Telegram | 決定 2026-10-07 |
 | 時間抖動 | timing jitter | `timing_jitter_min` | param | 分鐘 | 設計 |
 
@@ -1430,7 +1476,8 @@ PAD 值為記憶中的 ALMA 對照表，實作前核對原文。實例貢獻：�
 | 引擎設定檔 | engine settings file | `psyche.json` | 檔案 | 她的 profile；設定頁經 556d 寫，重啟生效 | 設計 |
 | tick | tick | `tick_s` | param | 60 s 固定（背景執行緒） | 設計 |
 | 每日種子 | daily seed | `daily_seed` | 計算 | hash(角色 id, 日期) | 設計 |
-| 快照間隔 | snapshot interval | `snapshot_interval_min` | param | 15 | 設計 |
+| 快照間隔 | snapshot interval | `time.snapshot_interval_min` | param | 5 | 設計 |
+| 時區偏移 | timezone offset | `time.timezone_offset_h` | param | 預設 8；每次啟動前 556d 依 `home/models.json` 的 timezone 寫入（0.9.0）；時鐘行與精神曲線都用它 | 決定 2026-10-19 |
 | 事件表 | events table | `psyche.events` | 表 | append-only | 事件溯源 |
 | 評估表 | appraisals table | `psyche.appraisals` | 表 | append-only | — |
 | 實例表 | instances table | `psyche.instances` | 表 | 可重建 | — |
@@ -1473,3 +1520,21 @@ PAD 值為記憶中的 ALMA 對照表，實作前核對原文。實例貢獻：�
 | 重播 | replay | `psychesim replay` | 工具 | 事件溯源 |
 | 黏人度掃描 | clinginess sweep | `scenario.clinginess_sweep` | 腳本 | — |
 | 傲嬌度掃描 | tsundere sweep | `scenario.tsundere_sweep` | 腳本 | — |
+
+### E.17 思考模組（0.8.8；§22）
+
+| 中文 | English | code | 類型 | 範圍／初值 | 來源 |
+| --- | --- | --- | --- | --- | --- |
+| 想好再回 | rationality | `thinking.rationality` | const | 0–1；空白＝盡責性 | 設計（0.8.8） |
+| 憑感覺 | experientiality | `thinking.experientiality` | const | 0–1；空白＝0.5 | 設計（0.8.8） |
+| 先看機會 | promotion focus | `thinking.promotion` | const | 0–1；空白＝外向性 | 設計（0.8.8） |
+| 先看會不會出錯 | prevention focus | `thinking.prevention` | const | 0–1；空白＝神經質 | 設計（0.8.8） |
+| 找更好答案找到哪 | maximizing | `thinking.maximizing` | const | 0–1；空白＝0.5 | 設計（0.8.8） |
+| 思考媒介（主／副） | medium of thought | `thinking_choices.medium_primary`, `.medium_secondary` | 選項 | 字串或空；只記錄，引擎不讀，文字由 SOUL 承載 | 0.8.8 |
+| 第一眼看什麼 | first look | `thinking_choices.first_look` | 選項 | 同上 | 0.8.8 |
+| 遇到矛盾 | contradiction | `thinking_choices.contradiction` | 選項 | 同上 | 0.8.8 |
+| 找原因 | cause attribution | `thinking_choices.cause` | 選項 | 同上 | 0.8.8 |
+| 累 | tired | — | 條件 | 精神 < 0.35 或社交疲勞 > 0.6 | 0.8.8 |
+| 事情不小 | stakes | — | 條件 | 委屈閘 ≥ 0.15 → 1，否則 0 | 0.8.8 |
+| 讀對方的用心 | reading care | `reading_care` | derived | clip(0.5 + 0.3 × 想好再回 − 0.3 × 親近 − 0.3 × 社交疲勞 + 0.3 × 事情不小)；< 0.25 懶得猜、> 0.85 多想一下 | 0.8.8（機制 2.2） |
+| 想法行 | thought line | `想法：…` | 輸出 | 一回合最多一行，九句之一，依序第一條成立就停（§22） | 0.8.8 |

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.10.0 — 2026-10-19
+
+- **Docs brought current (last verified 2026-10-19).** `docs/prompt/` (prompt.md §1 is what runs today, §2–§3 carry
+  built / unbuilt status, around-the-soul.md records the outcome, prompt.d2 is solid, new `character-files.d2`);
+  `docs/inner-life/` (the state block's lines and cap, the withheld register, 附錄 E completed with the 0.8.x parameters
+  and corrected keys and defaults; renumbered — thinking §22, the five mechanisms §23, 值得討論 §24); `docs/memory/`
+  (KeepsakeDB 1.0.1 submodule, no tools, the kokoro section, By name triggers, where the dated self lives; memory-layers.d2);
+  `docs/STACK.md`, `docs/structure/` and its four graphs, `docs/app/app.md` (versions 0.8.2–0.10.0), `docs/README.md`,
+  `README.md`, `characters/README.md`; DECISIONS sorted newest-first. No code change beyond the two items above.
+- **The dated part of who she is lives in the SOUL; the package is the character** (DECISIONS 2026-10-19). The soul skill
+  writes `## 時間線` (absolute dates, oldest first) and `## 影響過你的人與事` into SOUL.md from the description (code, not a
+  model); dates are allowed there and that section is left out of the digit check and the 2,500–4,000 prose budget. The
+  0.8.7 pinned groups — reserved tags rendered as 一直記著的 — are retired: `render_pinned`, `pinned_tags` / `pinned_per_tag`
+  and the test are gone, kokoro's section is the memory rule and 關於你. Before every start 556d copies SOUL.md,
+  psyche.json and people/*.md from `characters/<id>/` into her profile (people/你.md only when missing), and the app's
+  主動 sliders write the package's psyche.json as well, so a profile is rebuildable from nothing; backup = the package +
+  `memory/<id>.db` + `psyche.db` + `state.db` (`characters/README.md`). Graph: `docs/prompt/character-files.d2`.
+- Stale wording: the 能力 page no longer says the baseline is memory search / forget; code comments that dated the scratch and
+  the triggers "0.9.0" say 0.8.10; the shim's header no longer claims a Python shim; the tools route comment matches 0.8.6.
+
 ## 0.9.0 — 2026-10-19
 
 - **Model connections in the app; no hidden defaults.** 設定 → 全域 → **模型連線** (`home/models.json`, ignored): one master
@@ -56,7 +76,7 @@
 
 ## 0.8.9 — 2026-10-19
 
-- **The five conversation mechanisms** (`docs/inner-life/inner-life.md` §24; `docs/prompt/prompt.md` §3 item 5). The
+- **The five conversation mechanisms** (`docs/inner-life/inner-life.md` §23 after the 0.10.0 renumbering; `docs/prompt/prompt.md` §3 item 5). The
   disclosure depth per counterpart is read at last: the 表現 line caps what she opens up about below the fourth layer
   (聊喜好跟日常就好 / 感受先留著 / 最軟的那塊先留著), one layer more for a day after the other person opened up, one less
   while her avoidance is high; the soul skill now reads 一開始多熟 from the description (剛認識 … 很親近; `profile.json`
@@ -70,7 +90,7 @@
 
 ## 0.8.8 — 2026-10-19
 
-- **The thinking module** (`plugins/psyche/thinking.py`; `docs/prompt/prompt.md` §2.5, `inner-life.md` §23). Five meters in
+- **The thinking module** (`plugins/psyche/thinking.py`; `docs/prompt/prompt.md` §2.5, `inner-life.md` §22 after the 0.10.0 renumbering). Five meters in
   `psyche.json` `thinking` — 想好再回, 憑感覺, 先看機會, 先看會不會出錯, 找更好答案找到哪 — with Big Five defaults for
   blanks; the engine reads them against the moment and renders one optional line after 表現, 想法：…, only when this turn
   differs from her trait: 今天特別容易往壞處想 (anxious with something open), 這件事不小，會想一下再回, 今天沒力氣想，會先回再想

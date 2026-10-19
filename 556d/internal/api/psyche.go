@@ -191,6 +191,9 @@ func (a *API) psycheSettingsHandler(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, http.StatusInternalServerError, map[string]any{"error": werr.Error()})
 			return
 		}
+		if pkg := a.packageFile(name, "psyche.json"); pkg != "" { // the package is the character: the sliders write it too
+			_ = os.WriteFile(pkg, append(out, '\n'), 0o644)
+		}
 		writeJSON(w, http.StatusOK, map[string]any{"companion": name, "settings": cur, "restart_required": restart})
 	default:
 		http.Error(w, "GET or PUT", http.StatusMethodNotAllowed)

@@ -118,7 +118,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/psyche/settings", a.psycheSettingsHandler) // psyche.json: 主動 gates apply at the next tick, the rest at her next start
 	mux.HandleFunc("/api/psyche/command", a.psycheCommandHandler)   // close a loop / add a reminder / add a life event — queued for the engine
 	mux.HandleFunc("/api/psyche", a.psycheHandler)       // 狀態: read-only view of her psyche.db (the engine in her process writes it)
-	mux.HandleFunc("/api/tools", a.toolsHandler)         // what she can do: baseline memory + extensions (restart applies)
+	mux.HandleFunc("/api/tools", a.toolsHandler)         // what she can do: no tools at baseline (0.8.6) + extensions (restart applies)
 	mux.HandleFunc("/api/characters", a.charactersHandler)  // the create-character page: packages under characters/, the soul skill as a job
 	mux.HandleFunc("/api/characters/", a.charactersHandler)
 }

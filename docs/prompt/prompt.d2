@@ -1,6 +1,6 @@
 direction: down
 
-title: "556 Production — the prompt (0.7.9): one request, top to bottom, who writes each piece and how many copies it costs" {
+title: "556 Production — the prompt (0.10.0): one request, top to bottom, who writes each piece and how many copies it costs" {
   shape: text
   near: top-center
   style.font-size: 20
@@ -16,6 +16,12 @@ classes: {
     style.stroke: "#999999"
     style.font-color: "#555555"
   }
+  dropped: {
+    style.fill: "#f3f3f3"
+    style.stroke: "#999999"
+    style.font-color: "#999999"
+    style.stroke-dash: 2
+  }
   proposed: {
     style.stroke-dash: 4
     style.stroke: "#c2185b"
@@ -29,81 +35,77 @@ classes: {
 }
 
 legend: |md
-  **green** = ours (author, kokoro, psyche, 556d) · **grey** = Hermes vendor text, never edited · **dashed pink** = decided, not built
+  **green** = ours (author or the soul skill, kokoro, psyche, 556d, the shim) · **grey, dotted** = Hermes vendor text, never edited — written by Hermes and dropped by the shim before the request leaves · **dashed pink** = decided, not built (nothing on this graph at 0.10.0)
 
   copies = how many times the piece is in one request (history replays past rows exactly as sent)
+
+  Verified 2026-10-19 against the code at HEAD; the character counts are the 2026-10-15 measurements.
 | {near: top-left}
 
-system: "1 · System prompt — one copy per request, byte-stable until her restart or a context compression (cached prefix)" {
+system: "1 · System prompt — one copy per request, byte-stable until her restart or a context compression (cached prefix); the shim filters every system message on every platform" {
   cost: "×1, cached" {class: cost}
 
   stable: "stable tier" {
-    soul: "SOUL.md — her identity, first\n西: 2,871 chars, 4 sections today; 6 parts in the design" {class: ours}
-    help: "Help guidance · 466 chars\n\"You run on Hermes Agent (by Nous Research)… docs URL…\"\nno switch" {class: vendor}
-    finish: "Finishing the job · 769 chars\nagent.task_completion_guidance: false" {class: vendor}
-    parallel: "Parallel tool calls · 618 chars\nagent.parallel_tool_call_guidance: false" {class: vendor}
-    steer: "Mid-turn user steering · 724 chars\nno switch while tools are loaded" {class: vendor}
-    env: "Environment hints · ~1,600 chars\nHost Windows, your home dir, her cwd, the Windows-shell paragraph\nno switch for a local backend" {class: vendor}
-    probe: "Environment probe · one line (Python toolchain)\nagent.environment_probe: false" {class: vendor}
-    profile: "Active profile line · \"Active Hermes profile: xi. This session reads and writes …\"\nno switch" {class: vendor}
-    hint: "Platform hint · api_server 712 / telegram 617 chars\n\"assume plain text… MEDIA:/absolute/path…\"\nplatform_hints.<platform>: {replace: …}" {class: vendor}
-    soul -> help -> finish -> parallel -> steer -> env -> probe -> profile -> hint
+    soul: "SOUL.md — her identity, first\n西: 2,871 bytes, 4 sections (hand-written, unchanged since 10-15) · a skill-written SOUL: 6 parts with 時間線 and 影響過你的人與事 inside\ncopied from characters/ID/ before every start (556d)" {class: ours}
+    vendor: "2–8 · Hermes's guidance, environment and profile text — not hers, dropped by the shim\nhelp (Nous Research + docs URL) · finishing the job · parallel tool calls · mid-turn steering · host, home, cwd, the Windows-shell paragraph · Python toolchain probe · active profile line\n3, 4 and 7 are also off in config.yaml; 3, 4, 5 appear only with tools anyway" {class: dropped}
+    hint: "9 · Platform hint — one zh-TW line per platform (api_server, telegram, discord)\n「你在聊天視窗裡說話：純文字，不用 markdown…像在傳訊息，簡短自然。」\nplatform_hints.PLATFORM.replace, written by 556d before every start" {class: ours}
+    soul -> vendor -> hint
   }
 
   context: "context tier" {
-    voice: "voice turns only: 556d's hands-free 說話風格 text as system_message\n(injected for that call, never cached)" {class: ours}
+    voice: "10 · voice turns only: 556d's hands-free 說話風格 text as system_message\n(injected for that call, never cached; not re-verified 10-19)" {class: ours}
   }
 
   volatile: "volatile tier" {
-    kokoro: "kokoro static block\nmemory rule (English today) + \"About <your term> …\" + people/你.md\n→ the slot for pinned groups" {class: ours}
-    pinned: "pinned groups · ~1,000 chars\ntimeline (dated), influences, stances, refusals, where she stands with each person\nrendered from reserved tags" {class: proposed}
-    stamp: "timestamp + trailer\n\"Conversation started: …\" (+ \"Today's date (as of the last context rebuild)\")\nModel: auto/556 · Provider: custom · Platform: api_server\nno switch" {class: vendor}
-    kokoro -> pinned -> stamp
+    kokoro: "11 · kokoro's section — a zh-TW plugin prompt section (kokoro.memory, after the memory tier, tied to no toolset)\n記憶：每一回合會附上一段「Memory」… Facts / Notes / [archived] / By name 怎麼讀，記憶裡沒有的事就是不知道\n+ 關於<term>（每一回合另有一行說現在是誰在跟你說話）： + people/你.md\nthe 0.8.7 pinned groups were folded into the SOUL (時間線, 影響過你的人與事) — nothing dated lives here" {class: ours}
+    stamp: "12 · date paragraph — dropped whole by the shim (0.8.5)\n\"Conversation started: …\" · \"Today's date …\" · Timezone · Session ID · Model / Provider / Platform\nits weekday was wrong; the clock is per turn, in the state block" {class: dropped}
+    kokoro -> stamp
   }
 
-  shim: "appended by 556d's shim (lane without native tools)\n\"You are a function calling AI model…\" · 1,086 chars + the two schemas\nkokoro_search, kokoro_forget — ours, reworded freely" {class: ours}
+  shim: "13 · tools preamble by the shim — absent at baseline (no tools: option C, 0.8.6)\nonly when an extension (查網路) adds tools: the reworded preamble (\"Tools are available in this conversation…\") + the schemas\na text <tool_call> to the proxy's openmini_reply is unwrapped into reply text" {class: ours}
 
-  filter: "shim filter: drop the vendor paragraphs that have no switch\n(help, environment, profile line, trailer); wrappers in zh-TW" {class: proposed}
+  filter: "shim filter (556d/internal/shim/hygiene.go) — before the request leaves, on every platform\ndrops the vendor paragraphs by paragraph prefix: help, finish, parallel, steer, host, shell, wsl, probe, profile + the whole date paragraph\nlogs the dropped set when it changes; warns once if a Hermes prompt has no help paragraph" {class: ours}
 
   stable -> context -> volatile -> shim
-  filter -> stable: "removes" {style.stroke-dash: 4; style.stroke: "#c2185b"}
+  filter -> stable.vendor: "removes"
+  filter -> volatile.stamp: "removes"
 }
 
 history: "2 · History — every row in the window, replayed exactly as sent (api_content)" {
   cost: "×20+ rows (compression.protect_last_n: 20); each past user row still carries its memory block and its state block" {class: cost}
-  urow: "past user row = typed text + <memory-context> + <her-state>\n西's newest: 1,147 chars = 9 typed + 685 memory + 422 state" {class: ours}
-  arow: "past assistant row = her reply as stored\n(<think>…</think> pairs stripped before storage)" {class: ours}
+  urow: "past user row = typed text + <memory-context> (+ By name) + <her-state> (clock, state, 想法)\n西's newest on 2026-10-15: 1,147 chars = 9 typed + 685 memory + 422 state" {class: ours}
+  arow: "past assistant row = her reply as stored\nthe shim strips the hidden scratch before Hermes sees the text; Hermes strips closed <think> pairs as a second net" {class: ours}
 }
 
 last: "3 · The last user message — three pieces glued with blank lines" {
   cost: "×1 per turn — but every line here is paid again in each of the next 20+ requests" {class: cost}
   text: "the text: what you typed · or 【事件】 narrator cue · or another character's message with the speaker's name" {class: ours}
-  memory: "<memory-context> (Hermes wrapper, kokoro text)\n[System note: recalled memory context, NOT new user input…]\nFacts (long-term) top 5 · Notes (recent, dated) top 5 · [archived: …]\n+ 現在跟你說話的是<name>… + people/<name>.md when another character talks" {class: ours}
-  triggers: "keyword-triggered groups for names and places\n(the lorebook tier)" {class: proposed}
-  state: "<her-state> (psyche)\n[System note: 【她現在】 is her own inner state… never quote it, never mention it or any numbers]\n【她現在】 ≤ 8 lines: 在做 · 心情 · 心裡 · 表現 · 對他 · 掛念 · 轉變 · 原則" {class: ours}
-  clock: "現在：2026/10/14（二）22:40 — first line of the block, from the engine's clock" {class: proposed}
-  thought: "想法：… — one optional line, only when this turn differs from her trait\n(five thinking meters + the moment; dial 4 from the emotion side)" {class: proposed}
+  memory: "<memory-context> (Hermes wrapper, kokoro text)\n[System note: recalled memory context, NOT new user input…] — Hermes's, kept\nFacts (long-term) top 5 · Notes (recent, dated) top 5 · [archived: …]\n+ 現在跟你說話的是<name>… + people/<name>.md when another character talks" {class: ours}
+  triggers: "By name: — tier 3, names only (0.8.10)\na roster name, a person file's name or your name in the message → exact BM25 rows (trigger_k, default 3), minus what similarity brought\nkokoro _with_triggers; triggers: false turns it off" {class: ours}
+  state: "<her-state> (psyche)\n[旁白：下面的【她現在】是她此刻的狀態，不是對方說的話…不要引用它，不要提到它或任何數字。]\n【她現在】 + the clock + ≤ 8 state lines: 在做 · 心情 · 心裡 · 表現 · 想法 · 對他 · 掛念 · 轉變 · 原則\non overflow 轉變 goes first, then 心裡, 想法, 掛念; 原則 always stays" {class: ours}
+  clock: "現在：2026/10/19（一）22:40 — first line under the title, from the engine's own zone\n(models.json timezone → psyche.json timezone_offset_h and HERMES_TIMEZONE, written before every start)" {class: ours}
+  thought: "想法：… — one optional line after 表現, only when this turn differs from her trait\n(thinking.py: five meters read against the moment; dial 4 from the emotion side; reading care at the extremes)" {class: ours}
   text -> memory -> state
-  triggers -> memory: "adds" {style.stroke-dash: 4; style.stroke: "#c2185b"}
-  clock -> state: "top" {style.stroke-dash: 4; style.stroke: "#c2185b"}
-  thought -> state: "bottom" {style.stroke-dash: 4; style.stroke: "#c2185b"}
+  triggers -> memory: "adds"
+  clock -> state: "top"
+  thought -> state: "after 表現"
 }
 
-model: "the model (shim lane auto/556)" {shape: hexagon}
+model: "the model — the shim's one lane auto/556 → the 對話 connection (home/models.json); 503 until configured" {shape: hexagon}
 
 reply: "her reply" {
-  scratch: "hidden scratch before the words: 2–3 lines in <think>\ndial 1 sets the medium, dial 6 the order\nstripped at storage; never in history, app, Telegram or the observe" {class: proposed}
-  visible: "visible text → transform_llm_output checks (record only) → shim tool-call parser → app / Telegram / voice" {class: ours}
-  scratch -> visible: "conditions" {style.stroke-dash: 4; style.stroke: "#c2185b"}
+  scratch: "hidden scratch before the words: 2–3 lines in <think> (opt-in: profile.json scratch)\ndial 1 sets the medium, dial 6 the order\nthe shim strips it and logs it before Hermes — never in history, the app, Telegram or the observe" {class: ours}
+  visible: "visible text → shim tool-call parser (openmini_reply unwrapped) → transform_llm_output checks (record only) → app / Telegram / voice" {class: ours}
+  scratch -> visible: "conditions"
 }
 
-homes: "the three homes by cost (design)" {
-  h1: "tier 1 · system prompt · ×1 cached\nSOUL (2,500–4,000 chars) + pinned groups (~1,000) + memory rule + date\n\"must shape every reply\" lives here" {class: proposed}
-  h2: "tier 2 · per turn, tiny\nstate block + clock (+ 想法 when it differs)\nonly what changes minute by minute" {class: proposed}
-  h3: "tier 3 · per turn, only when it hits\nsimilarity recall top 5 + 5, keyword triggers\n\"matters only when the topic comes up\"" {class: proposed}
+homes: "the three homes by cost (built)" {
+  h1: "tier 1 · system prompt · ×1 cached\nSOUL (2,500–4,000 chars of prose + 時間線 and 影響過你的人與事) + kokoro's zh-TW section\n\"must shape every reply\" lives here" {class: ours}
+  h2: "tier 2 · per turn, tiny\nstate block + clock (+ 想法 when it differs)\nonly what changes minute by minute" {class: ours}
+  h3: "tier 3 · per turn, only when it hits\nsimilarity recall top 5 + 5, By name triggers (names only)\n\"matters only when the topic comes up\"" {class: ours}
 }
 
 system -> history -> last -> model -> reply
-homes.h1 -> system.volatile.pinned {style.stroke-dash: 4; style.stroke: "#c2185b"}
-homes.h2 -> last.state {style.stroke-dash: 4; style.stroke: "#c2185b"}
-homes.h3 -> last.memory {style.stroke-dash: 4; style.stroke: "#c2185b"}
+homes.h1 -> system.stable.soul
+homes.h2 -> last.state
+homes.h3 -> last.memory

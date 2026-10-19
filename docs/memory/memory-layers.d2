@@ -1,6 +1,6 @@
 direction: right
 
-title: "History vs memory vs state (v2) — what goes into her prompt, and who wins" {
+title: "History vs memory vs state (0.10.0) — what goes into her prompt, and who wins" {
   shape: text
   near: top-center
   style.font-size: 20
@@ -21,6 +21,17 @@ classes: {
 }
 
 turn: "a turn, from any surface (app, Telegram, voice, event turn)" {shape: oval}
+
+soul: "SOUL.md — who she is (Hermes's identity slot: once, cached)" {
+  class: file
+  desc: |md
+    - voice, habits; stances and refusals (## 怎麼判斷、怎麼決定); the people (## 誰在跟你說話)
+    - **the dated part of who she is**: ## 時間線 (absolute dates, oldest first) and ## 影響過你的人與事,
+      written by the soul skill from the description (code, not a model) or by hand — never grows through conversation
+    - the 0.8.7 pinned groups (reserved tags rendered as 一直記著的) are retired (2026-10-19)
+    - copied from characters/ID/ into the profile before every start — the package is the character
+  |
+}
 
 history: "HISTORY — Hermes session store (state.db)" {
   class: file
@@ -47,16 +58,18 @@ long: "LONG-TERM — KeepsakeDB layer \"long\"" {
   desc: |md
     - facts with tags, trust labels [high] / plain
     - add / update / supersede / archive (+ consent windows)
-    - **subject stored as 你** (fixed word; vector search stays sharp)
+    - held (meta.hold) while a hurt from that turn is on the ledger: kept, embedded, never shown (KeepsakeDB 1.0.1 hold / patch)
+    - **subject stored as 你** (fixed word, the store's; vector search stays sharp)
     - rendered as her term for you (your name, else the character's own default term) when injected or shown
+    - a conversation with another character writes memories with THAT character's name as the subject
+      (one pipeline per counterpart, same file; only the main pipeline may rename the word — 1.0.1 migrate_subject)
     - 0.5.0: source · turn_id · valence · arousal · instance_ids (nullable)
-    - her own stance: subject = self (0.7.0)
+    - seeds (tools/seed-memories.py): meta.seed, source 設定, `at` → created_at — her dated events, for retrieval
   |
 }
 
-psyche: "STATE — psyche.db (engine plugin, 0.5.0)" {
+psyche: "STATE — psyche.db (engine plugin, built 0.5.0)" {
   class: file
-  class: proposed
   desc: |md
     - not memory, not history: how she is *now*, derived from events
     - events · appraisals (append-only) · instances · snapshots · params
@@ -66,36 +79,40 @@ psyche: "STATE — psyche.db (engine plugin, 0.5.0)" {
 
 observe: "observe — ONE LLM call after the reply (background)\nreturns at most two strings" {class: step}
 appraise: "appraisal A — ONE LLM call fired at the same moment (0.5.0)\nevents + appraisal vectors + open loops; result lands for the NEXT turn" {class: step}
-read: "prefetch — ONE embedding, both layers searched AT ONCE (bigger first),\nhybrid (dense + BM25, RRF), top 5 each · subject 你 → her term for you" {class: step}
+read: "prefetch — ONE embedding, both layers searched AT ONCE (bigger first),\nhybrid (dense + BM25, RRF), top context_k / short_k each · subject 你 → her term for you\n+ ONE exact BM25 lookup per name found in the message (By name, 0.8.10)" {class: step}
 stateread: "prefetch — read the latest landed state, NEVER wait (0.5.0)" {class: step}
 
 prompt: "her prompt for this turn" {
   rule: |md
-    **Order**: SOUL · history (Hermes) · memory block (facts, notes) · people/你.md · 【她現在】 state block
+    **Order**: SOUL (incl. 時間線) · kokoro section `kokoro.memory` (記憶規則＋關於你, once per session) ·
+    history (Hermes) · the last message with the per-turn block (memory-context: Facts (long-term) / Notes (recent, dated) /
+    [archived …] / 現在跟你說話的是… / By name) · 【她現在】 state block
     **When layers disagree**
-    1. history is ground truth
+    1. the conversation is ground truth
     2. otherwise the newest entry wins, whatever the layer
-    3. long breaks ties
+    3. a fact beats a note only on a tie
     (the pipeline then supersedes the stale long fact)
     **State vs history**: the state block names transitions explicitly
     (「剛才有點悶，現在已經消氣了」) so the history's tone inertia does not win.
   |
 }
 
+soul -> prompt: "identity slot + kokoro section (記憶規則＋關於你): once per session, cached"
+soul -> long: "the skill's seeds.jsonl → seed-memories.py: the same dated events, for retrieval"
 turn -> history: "appended by Hermes, always"
 turn -> observe: "user + assistant text"
 turn -> appraise: "user + assistant text + open loops + her preferences"
 observe -> short: "string 1 — \"note\": the episode, or null"
 observe -> long: "string 2 — ops with tags, or noop"
 appraise -> psyche: "append; impact model B applies at the next tick"
-long -> read: "top 5, hybrid"
-short -> read: "top 5, hybrid (same embedding)"
+long -> read: "top context_k, hybrid (+ By name rows)"
+short -> read: "top short_k, hybrid (same embedding)"
 psyche -> stateread
-read -> prompt: "memory block"
+read -> prompt: "per-turn block (memory-context)"
 stateread -> prompt: "【她現在】 ≤ 8 lines, words not numbers"
 history -> prompt: "recent turns (Hermes)"
 
-onefile: "one SQLite file per character for memory (memory/<name>.db, layers = a column) and one for state (psyche.db);\n556d reads both read-only (記憶 page, 狀態 page)" {
+onefile: "one SQLite file per character for memory (memory/<id>.db, layers = a column; snapshots backups/, log logs/keepsake.jsonl;\nkokoro.json beside them, llm + embedder written by 556d before every start) and one for state (psyche.db);\n556d reads both read-only (記憶 page, 狀態 page); deletes, holds and patches go through the store's command queue" {
   shape: text
   near: bottom-center
 }

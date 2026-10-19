@@ -1,0 +1,89 @@
+direction: right
+
+title: "556 Production — her files: what the author writes, what the skill makes, what 556d copies before a start, and where each lands in one request" {
+  shape: text
+  near: top-center
+  style.font-size: 20
+}
+
+classes: {
+  authored: {
+    style.fill: "#fff8e1"
+    style.stroke: "#f9a825"
+  }
+  generated: {
+    style.fill: "#e8f5e9"
+    style.stroke: "#2e7d32"
+  }
+  runtime: {
+    style.fill: "#e3f2fd"
+    style.stroke: "#1565c0"
+  }
+  prompt: {
+    style.fill: "#f3e5f5"
+    style.stroke: "#6a1b9a"
+  }
+  file: {
+    shape: page
+  }
+}
+
+legend: |md
+  **yellow** = the author writes it (characters/ID/, git-ignored) · **green** = the soul skill generates it from the description
+  **blue** = her profile at runtime (home/profiles/ID/), rebuilt from the package before every start · **purple** = a piece of one request
+
+  The package IS the character. Backup = the package + memory/ID.db + psyche.db + state.db.
+| {near: top-left}
+
+pkg: "characters/<id>/ — the character package (the character)" {
+  describe: "describe/01…10.md\nwho she is, background, what happened and when, how she talks / thinks / relates, likes, stances, people, other" {class: [authored; file]}
+  profile: "profile.json\nthe numbers and choices the engine reads: Big Five, constants, thinking meters, dial 1 / 6 choices, closeness, scratch" {class: [authored; file]}
+  skill: "tools/soul_writer.py\nintake → structure → thinking → voice → reactions → parts → assemble → verify" {shape: hexagon}
+  soul: "SOUL.md (prose 2,500–4,000 chars)\n1 background · 時間線 (dated, oldest first) · 影響過你的人與事 · 2 likes/dislikes\n3 怎麼聽、怎麼想、怎麼回 + 怎麼判斷、怎麼決定 (stances, refusals, tensions) · 4 說話的方式 · 5 遇到事情的時候 · 誰在跟你說話" {class: [generated; file]}
+  seeds: "seeds.jsonl\none line per memory: text, tags, at (date) — the same events and influences, for retrieval" {class: [generated; file]}
+  people: "people/你.md, people/<name>.md\nwho the person is to her, how she addresses them" {class: [generated; file]}
+  psyche: "psyche.json\nBig Five, constants, cares_about, thinking, thinking_choices, relationships prior\n(the app's 主動 sliders write here too)" {class: [generated; file]}
+  lock: "soul.lock.json\nhashes of the inputs that produced the outputs (stale detection)" {class: [generated; file]}
+
+  describe -> skill
+  profile -> skill
+  skill -> soul
+  skill -> seeds
+  skill -> people
+  skill -> psyche
+  skill -> lock
+}
+
+prof: "home/profiles/<id>/ — her profile (runtime, git-ignored, rebuilt from the package)" {
+  soul: "SOUL.md" {class: [runtime; file]}
+  people: "people/*.md (你.md copied only when missing: Settings maintains it)" {class: [runtime; file]}
+  psyche: "psyche.json (+ time.timezone_offset_h from models.json)" {class: [runtime; file]}
+  kokoro: "kokoro.json (+ llm / embedder from models.json)" {class: [runtime; file]}
+  cfg: "config.yaml (model → shim, memory → kokoro, plugins, toolsets)" {class: [runtime; file]}
+  store: "memory/<id>.db — KeepsakeDB\nlong facts (tags) · short notes · vectors · the seeds" {class: runtime; shape: cylinder}
+  psychedb: "psyche.db — the engine's state: feelings, loops, ledger, withheld, events" {class: runtime; shape: cylinder}
+  statedb: "state.db — Hermes's sessions: the conversation" {class: runtime; shape: cylinder}
+}
+
+pkg.soul -> prof.soul: "556d copies before every start"
+pkg.people -> prof.people: "copies (你.md only when missing)"
+pkg.psyche -> prof.psyche: "copies"
+pkg.seeds -> prof.store: "tools/seed-memories.py loads (embedder up, she is stopped)"
+
+req: "one request — where each file lands" {
+  sys: "system prompt (×1, cached)" {
+    soul: "SOUL.md — first (identity slot), 時間線 and 影響 inside it" {class: prompt}
+    section: "kokoro's prompt section (zh-TW)\n記憶規則 · 關於你 = people/你.md" {class: prompt}
+    soul -> section
+  }
+  turn: "the last user message (×1 per turn, replayed in history)" {
+    memory: "<memory-context>: top 5 facts + 5 notes by similarity, By name rows,\n現在跟你說話的是<name> + people/<name>.md when another character talks" {class: prompt}
+    state: "<her-state>: 【她現在】 — the clock, 在做, 心情, 心裡, 表現, 想法, 對他, 掛念, 轉變, 原則" {class: prompt}
+  }
+}
+
+prof.soul -> req.sys.soul
+prof.people -> req.sys.section: "你.md"
+prof.store -> req.turn.memory: "search per turn"
+prof.people -> req.turn.memory: "<name>.md"
+prof.psychedb -> req.turn.state: "the engine renders words"

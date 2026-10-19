@@ -1,6 +1,6 @@
 shape: sequence_diagram
 
-title: "One turn (v2) — 1 + 2: one reply you wait for, two background calls fired together" {
+title: "One turn (0.10.0) — 1 + 2: one reply you wait for, two background calls fired together" {
   shape: text
   near: top-center
   style.font-size: 20
@@ -15,30 +15,30 @@ agent: "AIAgent"
 state: "state.db (history)"
 kokoro: "kokoro -> KeepsakeDB"
 psyche: "psyche plugin (engine)"
-llm: "LLM (shim lane)"
+llm: "the model (through 556d's shim)"
 telegram: "Telegram"
 
-"A — turn from the app (today + 0.5.0 additions)": {
+"A — turn from the app": {
   you -> app: "question (typed, or a voice turn with X-556-Voice)"
   app -> d: "POST /api/chat"
   d -> api: "/v1/chat/completions, non-stream\nX-Hermes-Session-Id = her ONE session"
   api -> state: "load history (every surface)"
   api -> agent: "run turn"
   agent -> kokoro: "prefetch(question)"
-  kokoro -> kokoro: "1 embedding; long + short searched at once, hybrid top 5 each;\n subject 你 rendered as her term for you"
-  kokoro -> agent: "memory block + people/你.md"
+  kokoro -> kokoro: "1 embedding; long + short searched at once, hybrid top 5 each;\n keyword triggers: a name in the message → exact BM25 rows (0.8.10); subject 你 rendered as her term for you"
+  kokoro -> agent: "memory block (facts · notes · By name rows);\nkokoro's section (記憶規則 + 關於你 = people/你.md) sits in the system prompt"
   agent -> psyche: "prefetch: read the latest landed state (0.5.0)"
-  psyche -> agent: "【她現在】 state block — NEVER waits for this turn's appraisal"
-  agent -> llm: "SOUL + history + memory + state + question  (call 1)"
-  llm -> agent: "reply"
+  psyche -> agent: "【她現在】 — the clock first, then the state lines, one optional 想法 line (0.8.4 / 0.8.8)\n— NEVER waits for this turn's appraisal"
+  agent -> llm: "system prompt (SOUL incl. 時間線 + kokoro's section) + history + memory + state + question  (call 1)\nno tool schemas at baseline; the shim drops Hermes's vendor paragraphs on the way in"
+  llm -> agent: "reply — the shim stripped the hidden <think> scratch before Hermes sees it (0.8.10)"
   agent -> state: "append user + assistant rows"
   api -> d: "final text"
   d -> app: "chat.delta + chat.complete (hub)"
   d -> telegram: "sendMessage 「你問我 q / 我說 a」 — no LLM"
   agent -> kokoro: "sync_turn — fired now"
   agent -> psyche: "appraisal A — fired at the same time (0.5.0)"
-  kokoro -> llm: "observe (call 2a): ops (long) + note (short)"
-  psyche -> llm: "appraisal (call 2b): events + appraisal vectors + loops"
+  kokoro -> llm: "observe (call 2a, the 記憶 connection): ops (long) + note (short)"
+  psyche -> llm: "appraisal (call 2b, the same connection): events + appraisal vectors + loops + withheld"
   kokoro -> kokoro: "write the store (subject 你, source, turn_id, valence, arousal)"
   psyche -> psyche: "append appraisals; impact model B at the next tick -> instances, ledgers, loops\n(result shapes the NEXT turn)"
 }
@@ -67,7 +67,7 @@ telegram: "Telegram"
 }
 
 "D — event turn: she speaks first (built 0.6.0)": {
-  psyche -> psyche: "tick: a due loop (reminder, 「等我一下」) or the urge fires"
+  psyche -> psyche: "tick: a due loop (reminder, 「等我一下」), the urge, or an unsaid thing (0.8.9)"
   psyche -> api: "X-556-Event: facts of the occasion, same session id"
   api -> agent: "run turn"
   agent -> llm: "she writes it, or decides to stay quiet"

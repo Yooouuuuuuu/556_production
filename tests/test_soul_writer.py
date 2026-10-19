@@ -120,6 +120,20 @@ def test_full_pipeline_with_scripted_llm(tmp_path, monkeypatch):
     assert v["matches"] == v["total"] == 9
 
 
+def test_timeline_and_influences_live_in_the_soul():
+    st = {"events": [{"at": "2023-11", "text": "阿凜的漫畫第一次被轉貼"}, {"text": "沒有日期的事"}, {"at": "2019", "text": "搬到台中"}],
+          "influences": [{"text": "高中的美術老師，說你的線條有脾氣"}]}
+    out = "\n".join(sw.timeline_sections(st))
+    assert "## 時間線" in out and out.index("2019 年，搬到台中") < out.index("2023 年 11 月，阿凜的漫畫第一次被轉貼") < out.index("沒有日期的事")
+    assert "## 影響過你的人與事" in out and "美術老師" in out
+    assert sw.timeline_sections({}) == []
+    soul = ("# x\n\n你是她。\n\n" + out + "\n## 喜歡與不喜歡\n- x\n\n## 怎麼聽、怎麼想、怎麼回\n- y\n\n## 怎麼判斷、怎麼決定\n- z\n\n"
+            "## 說話的方式\n" + "\n".join(sw.GUARDRAILS) + "\n\n## 遇到事情的時候\n- w\n\n## 誰在跟你說話\n" + sw.WHO_LINE)
+    found = sw.checks(soul)
+    assert not any("阿拉伯數字" in f for f in found)        # the years in 時間線 are the point
+    assert any("太短" in f for f in found)                    # and they do not count toward the prose budget
+
+
 def test_checks_catch_theory_words_digits_and_missing_sections():
     soul = "# x\n\n她的神經質很高，參數 0.7。\n\n## 說話的方式\n" + "\n".join(sw.GUARDRAILS)
     found = sw.checks(soul)

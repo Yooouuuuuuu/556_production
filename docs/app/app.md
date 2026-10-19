@@ -1,6 +1,6 @@
 # The app — 556 Production (Electron + React)
 
-Living doc; last verified 2026-10-14 (0.7.5). The shape decided on 2026-09-30 (notes below) still holds.
+Living doc; last verified 2026-10-19 (0.10.0). The shape decided on 2026-09-30 (notes below) still holds.
 What landed since:
 
 - **0.3.0** (2026-10-01): one app owns 556d's lifecycle; office window with 聊天, 名單, 記憶, 設定 (two tiers
@@ -42,21 +42,47 @@ What landed since:
 - **0.7.8** (2026-10-15): no UI change. Fix (data): a conversation with another character rewrote that character's
   memory store (counterpart pipelines no longer pass a subject word; KeepsakeDB 1.0.1). `vendor/` is two git
   submodules (Hermes at its pinned commit, KeepsakeDB at `v1.0.1`); the repo is plain git.
+- **0.7.9** (2026-10-15): no UI change. `docs/prompt/` — the request she answers, verified, and the 0.8.0 design
+  (six-part SOUL, thinking dials, clock line, vendor-text filter; the pinned groups proposed there were built in 0.8.7 and
+  retired in 0.10.0).
 - **0.8.1** (2026-10-16): 設定 → 角色 → **新角色** — the soul skill behind 556d (`../prompt/prompt.md` §2.9). One page per
-  character package: 描述 (ten boxes in your own words, the template prompts as grey text), 產生 (model gemini / claude,
-  「全部」 or one phase at a time, the job's log live, the intake's questions), 確認 (the proposed thinking meters and
-  choices with the skill's one-line evidence, Big Five and constants under a fold; sliders are your decision), 結果
-  (the checks, the blind read-back, the SOUL, 安裝 → profile created, files copied, seeds loaded → start her on 名單).
-  Packages with a hand-written SOUL (the cast) are marked and never overwritten. Backend: `/api/characters` and the
-  skill as a 556d job (`internal/api/characters.go`). 0.8.0 was the skill itself (`tools/soul_writer.py`, no UI).
+  character package: 描述 (ten boxes in your own words, the template prompts as grey text), 產生 (the model — the choice
+  offered then was gemini or claude on the proxy; since 0.9.0 the page shows the configured 寫靈魂 model instead — 「全部」
+  or one phase at a time, the job's log live, the intake's questions), 確認 (the proposed thinking meters and choices
+  with the skill's one-line evidence, Big Five and constants under a fold; sliders are your decision), 結果 (the checks,
+  the blind read-back, the SOUL, 安裝 → profile created, files copied, seeds loaded → start her on 名單). Packages with a
+  hand-written SOUL (the cast) are marked 手寫 and never overwritten. Backend: `/api/characters` and the skill as a 556d
+  job (`internal/api/characters.go`, its output in `build/run.log`, hub event `character.job`). 0.8.0 was the skill
+  itself (`tools/soul_writer.py`, no UI).
+- **0.8.2** (2026-10-16): found by the first character made on the page. The list and the detail carry a stale marker
+  (the description or the confirmed numbers changed after the files were generated — the hash differs from
+  `soul.lock.json`), the 結果 section warns and names what changed, and 安裝 asks before installing stale files. 「全部」
+  runs the intake alone first and stops on a thin description with its questions on the page; 「仍然繼續」 runs from
+  step 2 to the end (`--from <phase>` in the skill).
+- **0.8.3** (2026-10-16): the page defaulted to gemini — superseded in 0.9.0: the model comes from the connections and
+  nothing has a default. Backend: the assembler's list and digit fixes.
+- **0.8.4–0.8.5** (2026-10-16): no UI change. Prompt hygiene — the guidance switches written into her `config.yaml`
+  before every start, the shim dropping Hermes's vendor paragraphs — and the clock line in the state block
+  (`../prompt/prompt.md` §2.7–2.8).
+- **0.8.6** (2026-10-19): the avatar window is hidden by default (設定 → 全域 → 程式 → 啟動時顯示角色視窗 off); the avatar
+  is parked until the core is done. 能力: the baseline is no tool at all — memory is injected every turn, not called;
+  查網路 and later extensions still switch on per character.
+- **0.8.8** (2026-10-19): 設定 → 角色 → 主動 gains a **怎麼想** fold with the five thinking sliders and **想不開的程度**;
+  restart applies. Backend: the thinking module (`plugins/psyche/thinking.py`) and its one optional 想法 line in the
+  state block.
+- **0.8.9** (2026-10-19): 狀態 lists **沒說出口** (what she visibly held back, until it is said or fades); the new-character
+  page's 確認 gains **跟你有多熟（一開始）** (剛認識 … 很親近; `profile.json` `closeness` → her starting bond with you).
+  Backend: the five conversation mechanisms (`../inner-life/inner-life.md` §24).
+- **0.8.10** (2026-10-19): 產生 gains the **簡單版** fold (three boxes plus the sliders and choices become the files with
+  template sentences, no model; `POST /api/characters/<id>/simple`); 確認 gains **回覆前先想** (the hidden scratch,
+  `profile.json` `scratch`; the shim strips it from every reply). Backend: keyword triggers in kokoro, the fidelity probe.
 - **0.9.0** (2026-10-19): 設定 → 全域 → **模型連線** — master endpoint with 檢查 (lists the endpoint's models), 對話／記憶／寫靈魂
   follow it or carry their own, the vectors (local llama-server or an embeddings endpoint), the timezone; what is missing is
   listed and a character does not start until it is complete; the new-character page shows the configured model.
-- **0.8.6** (2026-10-19): the avatar window is hidden by default (設定 → 全域 → 啟動時顯示角色 off); the avatar is parked
-  until the core is done. 能力: the baseline is no tool at all — memory is injected every turn, not called; 查網路
-  and later extensions still switch on per character.
-- **0.7.9** (2026-10-15): no UI change. `docs/prompt/` — the request she answers, verified, and the 0.8.0 design
-  (six-part SOUL, thinking dials, pinned groups, clock line, vendor-text filter).
+- **0.10.0** (2026-10-19): no UI change beyond wording — the 能力 page says there are no tools at baseline, the
+  new-character page shows the configured 寫靈魂 model; docs brought current. Backend: the package is the character —
+  556d copies SOUL.md, psyche.json and people/*.md from `characters/<id>/` before every start and the 主動 sliders write
+  the package's psyche.json too; the SOUL carries 時間線 and 影響過你的人與事, the pinned groups are retired.
 - **Coming**: see
   `../inner-life/inner-life.md`.
 - **Parked**: packaging (installer, updater, auto-start), pixel-alpha click-through for the avatar,

@@ -1,6 +1,6 @@
 direction: down
 
-title: "Lifecycle (v2) — nothing auto-starts, every stop is graceful, her time is continuous" {
+title: "Lifecycle (0.10.0) — nothing auto-starts, her folder is rebuilt before every start, every stop is graceful, her time is continuous" {
   shape: text
   near: top-center
   style.font-size: 20
@@ -8,10 +8,13 @@ title: "Lifecycle (v2) — nothing auto-starts, every stop is graceful, her time
 
 classes: {
   proposed: {style.stroke-dash: 4; style.stroke: "#c2185b"; style.font-color: "#c2185b"}
+  prep: {style.fill: "#fff8e1"; style.stroke: "#f9a825"}
 }
 
 start: "roster ▶ start — manual; the only way she comes up (several may be active)" {shape: oval}
-spawn: "supervisor spawns `hermes gateway run`\nAPI_SERVER_KEY / HOST / PORT in her env; job object; toolsets from platform_toolsets"
+prep: "prepareProfile (556d, api/connections.go) — home/models.json complete? else the start is refused (模型連線未設定);\npackage sync (api/package.go): SOUL.md · psyche.json · people/*.md from characters/<id>/ (你.md only when missing);\nconfig.yaml (model → shim, memory → kokoro, plugins [psyche], empty toolsets) · kokoro.json (llm, embedder) · psyche.json (zone) written (0.9.0 / 0.10.0)" {class: prep}
+hyg: "prompt hygiene (api/hygiene.go) — guidance switches off, zh-TW platform hints, the old memory toolset stripped (0.8.4 / 0.8.6)" {class: prep}
+spawn: "supervisor spawns `hermes gateway run`\nAPI_SERVER_KEY / HOST / PORT, HERMES_TIMEZONE, X556_HUB in her env; job object; toolsets from platform_toolsets (none at baseline)"
 ready: "/health 2xx (~5 s) -> 上線中; Telegram connected"
 open: "556d opens her ONE conversation if none is live:\nPOST /api/sessions + Telegram routing stamp\n(never opened by a message, from any surface)"
 ff: "psyche plugin loads the last snapshot and fast-forwards the offline hours:\nsleep, activities, projects, life events, rumination; due loops and unkept 「等我一下」 handled;\n「這幾天」 summary for the state block; no proactive messages back-filled (0.5.0 / 0.6.0)"
@@ -26,7 +29,10 @@ kill: "no exit after 60 s -> kill"
 gone: "process gone (typically 2–13 s) -> 收尾中 ends -> roster shows inactive;\nwhile she is stopped nothing ticks — she is not living, and cannot speak first"
 appexit: "app quit path: 556d exits by itself -> app.exit()"
 
-start -> spawn
+start -> prep
+prep -> hyg
+hyg -> spawn
+prep -> start: "something missing → refused, the roster shows why" {style.stroke-dash: 3}
 spawn -> ready
 ready -> open
 open -> ff

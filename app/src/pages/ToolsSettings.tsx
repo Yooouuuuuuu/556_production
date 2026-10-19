@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, ToolExtension } from '../api';
 import { t } from '../i18n';
 
-// What she can DO besides talking. Baseline = memory (always). Extensions are per character,
+// What she can DO besides talking. Baseline = no tools (0.8.6: memory is injected, not a tool). Extensions are per character,
 // written into her config; a restart applies them (no hot toggling by design).
 export function ToolsSettings({ onChanged }: { onChanged(): void }) {
   const [exts, setExts] = useState<ToolExtension[]>([]);

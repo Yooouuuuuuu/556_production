@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -171,6 +172,11 @@ func (a *API) prepareProfile(name string) error {
 		return models.ErrNotConfigured(c.Missing())
 	}
 	dir := a.mgr.Dir(name)
+	if copied, err := syncProfileFromPackage(a.mgr.Root(), name, dir); err != nil { // the package is the character
+		return fmt.Errorf("characters/%s: %w", name, err)
+	} else if len(copied) > 0 {
+		log.Printf("[package] %s: %s copied from characters/%s", name, strings.Join(copied, ", "), name)
+	}
 	if err := writeProfileConfig(filepath.Join(dir, "config.yaml"), a.ShimPort); err != nil {
 		return fmt.Errorf("config.yaml: %w", err)
 	}

@@ -1,7 +1,7 @@
 # Structure — one process per character, 556d around her
 
-Living doc; last verified 2026-10-07 (0.5.0 tools). Graphs in this folder are D2 sources: solid = what runs
-today (0.7.0, incl. the characters' conversations), dashed pink = later work (Discord, MCP). Discord and MCP stay dashed. Why things are this way: `../DECISIONS.md`.
+Living doc; last verified 2026-10-19 (0.10.0). Graphs in this folder are D2 sources: solid = what runs
+today (0.10.0), dashed pink = later work (Discord, MCP). Discord and MCP stay dashed. Why things are this way: `../DECISIONS.md`.
 
 ## 1. The shape — `structure.d2`
 
@@ -9,12 +9,16 @@ today (0.7.0, incl. the characters' conversations), dashed pink = later work (Di
   her channels (her own accounts). 556d is the hub around her, never a chat participant: it starts and
   stops her, shows her conversation, mirrors app turns into Telegram, and reads her stores read-only (and
   opens her one session at start).
-- Shared across characters: the model shim, the embedder, 556d. Per character: process, API port and key,
+- Shared across characters: the model shim (one lane, `auto/556`, pointed at the 對話 connection), the embedder
+  (started by 556d when the vectors are local), 556d. Nothing has a default: the connections — `home/models.json`,
+  設定 → 全域 → 模型連線 (0.9.0) — must be complete before any character starts, and 556d writes her `config.yaml` /
+  `kokoro.json` / `psyche.json` from them before every start. Per character: process, API port and key,
   `state.db` (history), `memory/<name>.db` (memory), `psyche.db` (state, 0.5.0), SOUL / config / `.env`.
 - Inside her process, two plugins of ours: **kokoro** (memory) and **psyche** (the engine: 1-minute tick,
   appraisal queue, impact model, state block, event turns; single writer of `psyche.db`). 556d only reads
   `psyche.db` (狀態 page) and writes `psyche.json` from Settings, applied by a restart like tool extensions.
-- Tools: baseline toolset per platform = memory only (kokoro_search / kokoro_forget); extensions per
+- Tools: none at baseline (0.8.6; memory is injected every turn, not a tool — 556d strips the old `memory` toolset
+  from every `platform_toolsets` list before a start, so her prompt carries no tools preamble); extensions per
   character in 設定 → 角色 → 能力, written to `platform_toolsets`, applied by a restart. No hot toggling.
 
 ## 2. One turn — `turn-flow.d2`
@@ -45,9 +49,26 @@ today (0.7.0, incl. the characters' conversations), dashed pink = later work (Di
 - Green = ours: SOUL, `people/你.md` (replacing `memories/USER.md`, 0.5.0), `config.yaml`, `.env`,
   `kokoro.json`, `psyche.json`, the two plugin junctions, the three stores. Grey = Hermes vendor code,
   never edited; fixes go in plugins, 556d or upstream.
-- Per turn: history rebuilt from `state.db` → toolsets for this platform from `platform_toolsets` →
-  AIAgent with SOUL + memory block + person file + 【她現在】 state block → LLM via the shim → rows
-  appended → the memory worker fans out to kokoro (observe) and psyche (appraisal).
+- Per turn: history rebuilt from `state.db` → toolsets for this platform from `platform_toolsets` (none at baseline) →
+  AIAgent with the system prompt (SOUL, with 時間線 and 影響過你的人與事 inside it; kokoro's zh-TW section — the memory
+  rule + 關於你 from `people/你.md`) and the last message (the question; the memory block — top facts and notes by
+  similarity, `By name` rows for names in the message; 【她現在】 — the clock first, then state lines and one optional
+  想法 line) → the model through the shim → rows appended → the memory worker fans out to kokoro (observe) and psyche
+  (appraisal).
+- Before every start 556d prepares her folder (`api/connections.go` `prepareProfile`, `api/package.go`,
+  `api/hygiene.go`): the package `characters/<id>/` is copied over (SOUL.md, psyche.json, people/*.md; 你.md only when
+  missing), `config.yaml` is pinned (model → the shim, memory → kokoro, plugins [psyche], empty toolsets), `kokoro.json`
+  gets the 記憶 and embedder endpoints and `psyche.json` the zone from `home/models.json`, and the hygiene switches go in
+  (vendor guidance off, zh-TW platform hints). A profile is rebuildable from nothing; an edit in the package wins at
+  her next start.
+- The shim (`shim/hygiene.go`, `shim/textproto.go`; 0.8.4–0.8.10) is the other half of prompt hygiene: it drops
+  Hermes's vendor paragraphs and the date paragraph from every system message on every platform (a resumed session
+  keeps the prompt pieces it was born with, so the config switches alone would never reach the cast's endless
+  sessions), unwraps the proxy's reply function, and strips the hidden `<think>…</think>` scratch from the reply before
+  the tool-call parser and before Hermes sees the text.
+- The clock: the first line under 【她現在】 is 現在：YYYY/MM/DD（weekday）HH:MM from the engine's own zone
+  (`time.timezone_offset_h`, written from the connections; `HERMES_TIMEZONE` agrees); the eight-line cap counts state
+  lines only.
 - The exact bytes of one request — the system prompt block by block (what Hermes and the shim put around
   the SOUL), the history replay and its cost, the last message's three pieces — are in `../prompt/prompt.md`
   §1; the design that reshapes them is §2 there.
@@ -69,9 +90,18 @@ today (0.7.0, incl. the characters' conversations), dashed pink = later work (Di
 ## 5. Zones
 
 - `vendor/hermes-agent/` — the engine, a git submodule pinned in `.gitmodules`, never edited; `vendor/keepsakedb/` — the memory engine, a submodule at its release tag.
-- `home/` — runtime data and config; `home/profiles/<name>/` is a character. Ignored by VCS.
-- `556d/` (Go daemon), `app/` (Electron + React), `plugins/` (Python, inside Hermes by contract),
-  `templates/companion/` (what `new-companion.ps1` copies), `docs/` (concepts only).
+- `home/` — runtime data and config, ignored by VCS: `models.json` (the model connections, the embedder, the timezone —
+  the only place they live), `settings.json`, `voice.json`, `mailbox/`, and `home/profiles/<id>/` — a character's
+  runtime folder, rebuilt from her package and the connections before every start.
+- `characters/<id>/` — the character package, the character itself (ignored except `characters/README.md`): authored
+  `describe/01…10.md` and `profile.json`; generated `SOUL.md`, `seeds.jsonl`, `people/*.md`, `psyche.json`,
+  `soul.lock.json`, `build/`. Backup = the package + `memory/<id>.db` + `psyche.db` + `state.db` from the profile;
+  everything else is rebuilt. `templates/character/` is the blank template (and 阿凜 as `example/`),
+  `templates/companion/` the profile skeleton `new-companion.ps1` copies.
+- `556d/` (Go daemon), `app/` (Electron + React), `plugins/` (Python, inside Hermes by contract: kokoro, psyche),
+  `tools/` (the soul skill, the fidelity probe, seeds, the simulator, diagnostics), `tests/` (pytest for the skill, the
+  probe and kokoro's triggers; the psyche suite under `plugins/psyche/tests`; Go tests in `556d/internal`), `docs/`
+  (concepts only).
 - Production `D:\Hermes` is a different install and is never touched.
 
 ## 6. Origins — what we took from where
@@ -86,7 +116,7 @@ Artemis patterns and where they landed:
 
 | Pattern | Here |
 | --- | --- |
-| Characters as folders of markdown | Hermes profiles (`home/profiles/<name>`) |
+| Characters as folders of markdown | the character package `characters/<id>/` — authored as `describe/*.md` in the person's words, generated by the soul skill, copied into her Hermes profile before every start |
 | Memory isolation per character | one KeepsakeDB file per character, one process per character |
 | Dual-layer memory with recall priority | long + short layers, priority rule (`../memory/memory.md`) |
 | Compression + memory as one system | Hermes compression keeps history; memory is the pipeline's choice |
@@ -99,4 +129,10 @@ Artemis patterns and where they landed:
 Milestones: 0.2.0 the Go daemon beside an untouched Hermes (2026-09-30); 0.3.0 the one app that owns the
 backend and the Artemis exit (2026-10-01); 0.4.0 one process per character, one conversation shared by
 app and Telegram, two memory layers, graceful stop, two voice modes (2026-10-06); 0.5.0 tools, 你, and the
-inner life's first milestone (`../inner-life/inner-life.md`).
+inner life's first milestone (2026-10-07, `../inner-life/inner-life.md`); 0.6.0 she speaks first (2026-10-08); 0.7.0
+relationships, the hurt ledger, characters talking to each other (2026-10-13); 0.7.x 設定 in two layers, the mailbox,
+forgetting, the submodules (2026-10-14/15); 0.8.0 the soul skill (2026-10-16); 0.8.1 the 新角色 page (2026-10-16);
+0.8.4 prompt hygiene and the clock (2026-10-16); 0.8.6 no tools at baseline (2026-10-19); 0.8.8 the thinking module;
+0.8.9 the five conversation mechanisms; 0.8.10 the hidden scratch, keyword triggers, the simple path, the fidelity
+probe; 0.9.0 the model connections in the app, no hidden defaults (2026-10-19); 0.10.0 the package is the character,
+the dated part of who she is in the SOUL (2026-10-19).

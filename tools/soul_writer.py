@@ -74,7 +74,7 @@ GUARDRAILS = [
 ]
 WHO_LINE = "- 每一回合會附上「現在跟你說話的是誰」的人物檔。對不同的人用不同的距離和稱呼。"
 
-# the hidden scratch (prompt.md §2.6; 0.9.0, after its four checks): one instruction compiled from the dial 1 and 6
+# the hidden scratch (prompt.md §2.6; 0.8.10, after its four checks): one instruction compiled from the dial 1 and 6
 # choices, in the 怎麼聽、怎麼想、怎麼回 section, only when profile.json `scratch` is true. The shim strips the block
 # and logs it; nothing downstream ever sees it.
 SCRATCH_HEAD = "回覆之前，先在 <think> 和 </think> 之間用兩三行寫下你腦子裡先出現的東西，再寫要說的話。那幾行是你自己的，對方看不到；回覆裡不要提到它，也不要解釋你想過什麼。"
@@ -577,8 +577,9 @@ def build_soul(d: Path) -> str:
     voice = read_json(d / "build" / "voice.json", {}) or {}
     react = read_json(d / "build" / "reactions.json", {}) or {}
     prof = read_json(d / "profile.json", {}) or {}
+    st = read_json(d / "build" / "structure.json", {}) or {}
     sc = scratch_line(prof)
-    out = [f"# {name}", "", _para(parts.get("part1")), "", "## 喜歡與不喜歡", _para(parts.get("part2")), "",
+    out = [f"# {name}", "", _para(parts.get("part1")), "", *timeline_sections(st), "## 喜歡與不喜歡", _para(parts.get("part2")), "",
            "## 怎麼聽、怎麼想、怎麼回", _para(parts.get("thinking")) + (("\n- " + sc) if sc else ""), "",
            "## 怎麼判斷、怎麼決定", _para(parts.get("judging")), "",
            "## 說話的方式", _para(voice.get("expression"))]
@@ -638,7 +639,7 @@ def build_seeds(d: Path) -> List[Dict[str, Any]]:
         text = str(e.get("text") or "").strip()
         zh = _date_zh(at)
         tags = [str(t).strip().lower() for t in (e.get("tags") or []) if str(t).strip()]
-        if "timeline" not in tags:  # events are the pinned timeline (prompt.md §2.4)
+        if "timeline" not in tags:  # a dated event: a seed for retrieval; the SOUL's 時間線 carries it too
             tags = ["timeline", *tags]
         add((zh + "，" + text) if zh and text and not text.startswith(zh) else text, tags, at)
     for inf in st.get("influences") or []:
@@ -707,6 +708,39 @@ def build_psyche(d: Path) -> Dict[str, Any]:
     return base
 
 
+def timeline_sections(st: Dict[str, Any]) -> List[str]:
+    """## 時間線 and ## 影響過你的人與事 from the structure phase: the dated, always-on part of who you are, inside the
+    SOUL (DECISIONS 2026-10-19 — the pinned tags of 0.8.7 are retired). Code, not a model; absent when the description
+    gives nothing. Dated events first, oldest first; undated after."""
+    out: List[str] = []
+    events = [e for e in (st.get("events") or []) if isinstance(e, dict) and str(e.get("text") or "").strip()]
+    dated = sorted([e for e in events if _date_zh(e.get("at"))], key=lambda e: str(e.get("at")))
+    lines = []
+    for e in dated + [e for e in events if not _date_zh(e.get("at"))]:
+        zh, text = _date_zh(e.get("at")), str(e.get("text")).strip()
+        lines.append((zh + "，" + text) if zh and not text.startswith(zh) else text)
+    if lines:
+        out += ["## 時間線", _bullets(lines), ""]
+    infl = [str(i.get("text") or "").strip() for i in (st.get("influences") or []) if isinstance(i, dict) and str(i.get("text") or "").strip()]
+    if infl:
+        out += ["## 影響過你的人與事", _bullets(infl), ""]
+    return out
+
+
+DATED_SECTIONS = ("## 時間線", "## 影響過你的人與事")
+
+
+def _without_sections(text: str, heads) -> str:
+    """The text minus the named sections (a heading line to the next '## ' heading)."""
+    lines, out, skip = text.split("\n"), [], False
+    for ln in lines:
+        if ln.startswith("## "):
+            skip = ln.strip() in heads
+        if not skip:
+            out.append(ln)
+    return "\n".join(out)
+
+
 def checks(soul: str, allowed: str = "") -> List[str]:
     """Mechanical checks on the generated text (the fixed guardrail bullets are exempt; a banned word the author
     used in the description — `allowed` — is hers to use)."""
@@ -715,6 +749,7 @@ def checks(soul: str, allowed: str = "") -> List[str]:
         body = body.replace(g, "")
     body = body.replace(SCRATCH_HEAD, "")   # the scratch instruction names its tag on purpose
     body = body.replace(WHO_LINE, "")
+    core = _without_sections(body, DATED_SECTIONS)   # the dated sections carry years on purpose and are not prose
     found: List[str] = []
     for w in BANNED:
         n = body.count(w)
@@ -723,18 +758,18 @@ def checks(soul: str, allowed: str = "") -> List[str]:
         if n:
             found.append(f"含理論字或機器字「{w}」×{n}")
     # list numbering ("1. …", "2、…") is fine; digits inside sentences are not (ages, dates, scales)
-    body_no_lists = re.sub(r"(?m)^\s*(?:[-・•]\s*)?\d+\s*[.、)]\s*", "", body)
+    body_no_lists = re.sub(r"(?m)^\s*(?:[-・•]\s*)?\d+\s*[.、)]\s*", "", core)
     digits = re.findall(r"\d+", body_no_lists)
     if digits:
         found.append(f"含阿拉伯數字 {len(digits)} 處（{', '.join(digits[:6])}…）：年齡用中文數字，日期不進設定")
     drift = len(re.findall(r"(?:^|[，。；：\s])(?:她|他)(?:會|偏向|習慣|不會|常常|覺得|知道|說|先|只|也|很|就)", body, re.M))
     if drift >= 4:
         found.append(f"注意：第三人稱「她／他」當主詞 {drift} 處——設定應以「你」稱呼角色本人（模型的筆誤，可重跑該段）")
-    n = len(soul)
+    n = len(_without_sections(soul, DATED_SECTIONS))   # prose budget; the dated sections are data and not counted
     if n < 2500:
-        found.append(f"太短：{n} 字（目標 2,500–4,000）")
+        found.append(f"太短：{n} 字（目標 2,500–4,000，不計時間線）")
     elif n > 4000:
-        found.append(f"太長：{n} 字（目標 2,500–4,000）")
+        found.append(f"太長：{n} 字（目標 2,500–4,000，不計時間線）")
     simp = [c for c in "觉这说没么时间关对认为发现实还会让给们个经过应该种问题" if c in body]
     if simp:
         found.append(f"含簡體字：{''.join(simp)}")

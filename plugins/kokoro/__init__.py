@@ -37,33 +37,6 @@ def _read_config(hermes_home: Path) -> Dict[str, Any]:
         return json.load(f)
 
 
-# Pinned groups (docs/prompt/prompt.md §2.4): a few reserved tags whose rows are ALWAYS in her system prompt, not
-# retrieved by similarity — the things that must frame every reply but change slowly (dated firsts, influences, the
-# stances and refusals she formed later, where she stands with each person). Rendered once per session into the
-# plugin prompt section, capped per tag, so they cost one copy per request, cached.
-PINNED_TAGS_DEFAULT = ["timeline", "influences", "stances", "refusals", "standing"]
-# headings use the generic 他 for every character (0.8.11); an English rendering would say he/she
-PINNED_ZH = {"timeline": "時間線", "influences": "影響過他的人與事", "stances": "立場", "refusals": "不做的事", "standing": "跟人的關係"}
-
-
-def render_pinned(store: Any, tags: List[str], per_tag: int, show) -> str:
-    """The 一直記著的 block: for each reserved tag its active rows (superseded ones out), the timeline oldest first,
-    the rest newest first, at most `per_tag` lines each. Empty when nothing is pinned."""
-    parts: List[str] = []
-    for tag in tags:
-        try:
-            rows = [m for m in store.by_tag(tag, include_archived=False) if not getattr(m, "superseded", False)]
-        except Exception:
-            rows = []
-        if not rows:
-            continue
-        rows.sort(key=lambda m: float(getattr(m, "created_at", 0.0) or 0.0), reverse=(tag != "timeline"))
-        rows = rows[: max(1, int(per_tag))]
-        head = PINNED_ZH.get(tag, tag)
-        parts.append(f"【{head}】" + chr(10) + chr(10).join(f"- {show(m.text)}" for m in rows))
-    return ("一直記著的：" + chr(10) + (chr(10) + chr(10)).join(parts)) if parts else ""
-
-
 class KokoroMemoryProvider(MemoryProvider):
     def __init__(self) -> None:
         self._cfg: Dict[str, Any] = {}
@@ -171,13 +144,9 @@ class KokoroMemoryProvider(MemoryProvider):
                 self._cfg = _read_config(self._home)
             except Exception:
                 return ""
-        pinned = ""
-        if self._store is not None:
-            tags = self._cfg.get("pinned_tags")
-            if not isinstance(tags, list):
-                tags = PINNED_TAGS_DEFAULT
-            pinned = render_pinned(self._store, [str(t) for t in tags], int(self._cfg.get("pinned_per_tag", 8)), self._render)
-        return (self._memory_block_text() + (chr(10) + chr(10) + pinned if pinned else "") + self._your_profile_block()).strip()
+        # who she is — the SOUL, with its dated 時間線 — is Hermes's identity slot; this section carries only how to read
+        # the memory block and who you are to her (the 0.8.7 pinned groups were folded into the SOUL, DECISIONS 2026-10-19)
+        return (self._memory_block_text() + self._your_profile_block()).strip()
 
     @staticmethod
     def _your_name(cfg: Dict[str, Any]) -> str:
@@ -299,7 +268,7 @@ class KokoroMemoryProvider(MemoryProvider):
         self._last_count = sum(1 for line in block.splitlines() if line.startswith("- "))
         return block
 
-    # -- tier 3 keyword triggers (docs/prompt/prompt.md §2.2; 0.9.0) ---------
+    # -- tier 3 keyword triggers (docs/prompt/prompt.md §2.2; 0.8.10) --------
     def _trigger_names(self) -> List[str]:
         """The names worth a lookup when they appear in the message: the other characters on the roster, the people
         she has a file for, and your name. Never the word 你."""

@@ -1,42 +1,70 @@
 # Memory — history is not memory
 
-Living doc. Graph: `memory-layers.d2` (commentary in the last section). Decision trail: `../DECISIONS.md`.
+Living doc. **Last verified 2026-10-19 (0.10.0)** against `plugins/kokoro/__init__.py`, `tools/seed-memories.py`,
+`templates/companion/kokoro.json`, `556d/internal/api/connections.go` / `hygiene.go`, `556d/internal/memory/memory.go`,
+`vendor/keepsakedb` 1.0.1 and `tests/test_kokoro_triggers.py`. Graph: `memory-layers.d2` (commentary in the last
+section). Decision trail: `../DECISIONS.md`.
 
 **Read this first — what changed since the plan of record (2026-09-30):**
 
-- The engine is **KeepsakeDB** (`D:\dev\KeepsakeDB`, 0.2.1) behind the Hermes provider `plugins/kokoro`.
-  Path A (mem0 + Qdrant) is history; Path C became KeepsakeDB (2026-10-01/02).
-- The "curated head" tier is off: Hermes's own MEMORY.md / USER.md writer is disabled
-  (`memory.memory_enabled: false`); the person file (`people/你.md`, formerly `memories/USER.md`)
-  is injected by kokoro after the memory block.
+- The engine is **KeepsakeDB 1.0.1**, the git submodule `vendor/keepsakedb` (its own repo is `D:\dev\KeepsakeDB`;
+  `setup-vendor.ps1` installs it into the Hermes venv), behind the Hermes provider `plugins/kokoro`, linked into every
+  profile as `home/profiles/<id>/plugins/kokoro` (a junction made by `new-companion.ps1`) with its config
+  `home/profiles/<id>/kokoro.json`. Path A (mem0 + Qdrant) is history (its leftovers left the repo in 0.9.0);
+  Path C became KeepsakeDB (2026-10-01/02).
+- The "curated head" tier is off: Hermes's own MEMORY.md / USER.md writer is disabled (`memory.memory_enabled: false`,
+  `memory.user_profile_enabled: false`, pinned into her `config.yaml` by 556d before every start). The person file
+  (`people/你.md`, formerly `memories/USER.md`) and the memory rule are kokoro's zh-TW system-prompt section
+  `kokoro.memory` (position `after_memory`, since 0.8.4) — once per session, not the per-turn block, not tied to a
+  toolset.
 - **Two layers** since 2026-10-03: long (tagged facts, trust labels, supersede/archive) and short (dated
   notes), one file, one observe call, searched concurrently. A recent-exchange layer was tried and removed:
   the last X turns are history, in Hermes's session store, shared by every surface.
-- Memories about you are **stored with the subject word 你** and rendered as her term for you (your name,
-  else the character's own default term, `address_default` in her kokoro.json) when injected or shown (2026-10-07,
-  KeepsakeDB 0.2.1 `render_subject`).
+- Memories about you are **stored with the subject word 你** and rendered as her term for you (`your_name`, else the
+  character's own default term, `address_default` in her kokoro.json) when injected or shown (2026-10-07;
+  `PipelineConfig.render_subject`, KeepsakeDB 1.0.1). The word is the store's (`meta.subject`): only the main pipeline
+  may rename it (`migrate_subject=True`, from Settings); a conversation with another character runs a counterpart
+  pipeline on the same store that passes `subject=None` and sets `pl.subject = <her name>`, so those memories name
+  that character (KeepsakeDB 1.0.1; incident `../DECISIONS.md` 2026-10-14). There is no "self" subject: what she
+  herself holds to is SOUL text, not a memory row.
 - Since 0.7.7 a memory can be **held** (`meta.hold`): kept and embedded, still a dedupe candidate for the observe, but never
   injected and never hinted at — the psyche engine holds a turn's memories while a hurt from that turn is on its ledger,
   and releases them when the entry closes (forgiven by time: tagged `舊帳` with the date and rendered with a
-  「（舊帳 …）」 prefix; repaired: plain). KeepsakeDB 0.3.1 `hold` / `patch` commands, `Memory.held`, `meta.prefix`.
+  「（舊帳 …）」 prefix; repaired: plain). KeepsakeDB 1.0.1 `hold` / `patch` commands (the psyche engine queues them in
+  the store's `commands` table, so kokoro stays the one writer), `Memory.held`, `meta.prefix`.
 - Since 0.7.0 the store is shared across her counterparts: memories about another character are written with that
-  character's name as the subject (one kokoro pipeline per counterpart, same file), and the other's person file
-  (`people/<id>.md`) is injected in those conversations.
+  character's name as the subject (one kokoro pipeline per counterpart, same file, surface 跟<name>的對話), and the
+  other's person file (`people/<id>.md`) is injected in those conversations behind the line 現在跟你說話的是<name>.
 - Her *state* (how she is now) is not memory either: it lives in `psyche.db`
   (`../inner-life/inner-life.md`). Since 0.5.0 every memory a turn writes carries `meta.turn_id` and
-  `meta.source`, and the engine annotates `valence`, `arousal`, `instance_ids` afterwards (KeepsakeDB 0.3.0).
+  `meta.source`, and the engine annotates `valence`, `arousal`, `instance_ids` afterwards (`Keepsake.annotate_turn`).
+- Since 0.9.0 nothing in memory has a hidden default: kokoro.json's `llm` (the 記憶 connection) and `embedder` (the
+  vectors) blocks are written by 556d from `home/models.json` (設定 → 全域 → 模型連線) before every start
+  (`writeKokoroConnections`); kokoro raises 模型連線未設定 instead of guessing an endpoint, and `tools/seed-memories.py`
+  reads the embedder from kokoro.json or stops.
+- Since 0.8.6 **no tools at baseline**: 556d empties the `memory` toolset from every `platform_toolsets` list before a
+  start, so `kokoro_search` / `kokoro_forget` (still defined behind kokoro.json `tools`) are never offered; memory is
+  injected, not a tool. Since 0.8.10 the per-turn block ends with **`By name`** rows: keyword triggers, names only.
+- The 0.8.7 **pinned groups are retired** (reserved tags `timeline` / `influences` / `stances` / `refusals` /
+  `standing` rendered as 一直記著的 — gone, with `render_pinned`, `pinned_tags`, `pinned_per_tag`). The dated, always-on
+  part of who she is is SOUL text (`## 時間線`, `## 影響過你的人與事`, written by the soul skill); the store keeps what
+  she knows; the same events are dated seeds for retrieval. See "The dated part of who she is" below.
 
 The rest of this doc is the design as decided, with its test record.
 
-## The five-tier stack (who writes what; conflicts resolve top-down)
+## The five-tier stack (who writes what)
 
 | Tier | What | Written by |
 |---|---|---|
-| Spirit card — `SOUL.md` (+ ST card import later) | identity, voice, habits | **human only** (frozen core) |
-| Lorebook — keyword triggers (built 0.8.10: kokoro `_with_triggers`, names only, `By name` lines) | the people she knows by name | deterministic: a name in the message → exact BM25 lookup |
-| Curated head — `MEMORY.md`/`USER.md` | top learned facts, always injected | her (background review) |
-| **DB tier — this doc** | long-tail facts, retrieved per turn | extraction pipeline |
-| FTS5 sessions | verbatim archive | automatic |
+| Spirit card — `SOUL.md` (+ ST card import later) | identity, voice, habits — and since 2026-10-19 the dated part of who she is: `## 時間線`, `## 影響過你的人與事` | **human**, or the soul skill from the description (code, not a model); never grows through conversation |
+| Lorebook — keyword triggers (built 0.8.10: kokoro `_with_triggers`, names only — the roster, the person files, your name; places later) | the people she knows by name | deterministic: a name in the message → one exact BM25 lookup per matched name, up to `trigger_k` rows under `By name`, minus what similarity already brought |
+| Curated head — `MEMORY.md`/`USER.md` | **off** — Hermes's writer is disabled (`memory_enabled` / `user_profile_enabled` false); the one curated file is `people/你.md`, carried by kokoro's prompt section | the app (Settings writes its managed lines), your hand |
+| **DB tier — this doc** | long facts + short dated notes, retrieved per turn; seeds | the observe pipeline (one LLM pass per turn), `tools/seed-memories.py` |
+| FTS5 sessions | verbatim archive — the history, `state.db` | automatic |
+
+When tiers disagree there is no top-down rule: **the conversation itself is ground truth; otherwise the newest entry
+wins, whatever the layer; a fact beats a note only on a tie** (kokoro's memory rule, `_memory_block_text`; the pipeline
+then supersedes the stale fact).
 
 Wardrobe = skills/procedures — a parallel track, NOT conversational memory.
 
@@ -86,22 +114,29 @@ stayed one entry); latency stable, no degradation, no crashes across 1000 sessio
 
 ## Path K — kokoro on KeepsakeDB — IMPLEMENTED 2026-10-02 (Path C realized as its own repo)
 
-The target engine exists: **KeepsakeDB** (`D:\dev\KeepsakeDB`, 0.1.x) and the Hermes provider
-**`plugins/kokoro`** (linked into `home/plugins/kokoro`; `memory.provider: kokoro`; config
-`home/kokoro.json`). What runs per turn:
+The target engine exists: **KeepsakeDB** (then 0.1.x at `D:\dev\KeepsakeDB`; today 1.0.1 as the submodule
+`vendor/keepsakedb`) and the Hermes provider **`plugins/kokoro`** (linked into `home/profiles/<id>/plugins/kokoro`;
+`memory.provider: kokoro`; config `home/profiles/<id>/kokoro.json`). What runs per turn (as of 0.10.0):
 
-- **prefetch** → `Pipeline.context_for(user_text)`: hybrid recall (bge-m3 dense + FTS5 BM25 with
-  CJK bigrams, RRF k=60, over-fetch 15), trust labels (`[high]` ≥ 0.60, dropped < 0.40 unless BM25
-  matched), archived topics as meta-info only unless a consent window is open; superseded facts
-  never surface. Embedder down → BM25-only fallback. Recall indicator 💗 Kokoro.
-- **sync_turn** (on Hermes's serialized memory worker) → `Pipeline.observe`: one
-  `agy/gemini-3.8-flash` JSON pass over the turn + the 8 most similar memories + the tag groups →
-  add / update / supersede / archive / unarchive / consent / noop, memories written in **zh-TW**,
-  tags as English slugs. Shutdown waits for an in-flight observe so one-shot runs never lose a write.
-- **tools**: `kokoro_search`, `kokoro_forget` (hard delete on explicit request only).
-- **store**: `home/memory/<profile>.db` — history, search_log, pipeline_log, command queue; owner
-  heartbeat + `data_version` reload; daily snapshot to `home/backups/` (Anki-style rotation).
-- **inspect**: `D:\dev\KeepsakeDB\.venv\Scripts\keepsake --db home\memory\default.db stats|list|log|plog|search Q --explain`.
+- **prefetch** → `Pipeline.context_for(user_text)`: hybrid recall (the vectors' dense leg + FTS5 BM25 with
+  CJK bigrams, RRF k=60, over-fetch ×3), trust labels (`[high]` ≥ 0.60, dropped < 0.40 unless BM25
+  matched), archived topics as meta-info only unless a consent window is open; superseded and held facts
+  never surface. Then the person block when another character is talking, then the `By name` rows.
+  Embedder down → BM25-only fallback (`store.context`). Skipped on trivial prompts. Recall indicator 💗 Kokoro.
+- **sync_turn** (on Hermes's serialized memory worker) → `Pipeline.observe`: one JSON pass by the 記憶 connection
+  (kokoro.json `llm`) over the turn + the 8 most similar long memories (`max_candidates`) + the tag groups →
+  add / update / supersede / archive / unarchive / consent / noop, plus an optional dated `note` for the short layer;
+  memories written in **zh-TW**, tags as English slugs; stamped `meta.turn_id` / `meta.source`. Her own 【事件】 turns
+  are not observed. Shutdown waits for an in-flight observe so one-shot runs never lose a write.
+- **tools**: none offered at baseline (0.8.6). `kokoro_search` / `kokoro_forget` (hard delete on explicit request only)
+  are still defined behind kokoro.json `tools` (true), but 556d empties the `memory` toolset from `platform_toolsets`
+  before every start, so she carries no tools unless an extension (查網路) is switched on for her.
+- **store**: `home/profiles/<id>/memory/<id>.db` — memories (a `layer` column), history, search_log, pipeline_log,
+  command queue; owner heartbeat + `data_version` reload; a snapshot on the first write of each day and before risky
+  operations into `home/profiles/<id>/backups/` (`backup_dir`; Anki-style rotation 7 daily / 4 weekly / 12 monthly);
+  the engine log at `home/profiles/<id>/logs/keepsake.jsonl` (`log`).
+- **inspect**: `vendor\hermes-agent\.venv\Scripts\keepsake --db home\profiles\<id>\memory\<id>.db stats|list|log|plog|search Q --explain`
+  (the `keepsake` CLI of the vendored package).
 - 556d gained `-no-hermes` (shim + embedder + API only) so CLI harnesses can run without a second
   Hermes process owning the store.
 
@@ -154,10 +189,10 @@ stored, writes are lossless, corrections hold; the remaining variance is the bac
 dated notes, one per turn worth recalling, no tags, surface in meta, ring-capped (`short_cap` 1000).
 Written by the same observe call (`ops` + `note`). Read by `search_layers`: one embedding, layers
 searched concurrently (bigger first, each on its own read connection), hybrid top 5 each, injected as
-`Facts (long-term)` / `Notes (recent, dated)`. Her system prompt carries the priority rule: the
+`Facts (long-term)` / `Notes (recent, dated)`. kokoro's prompt section carries the priority rule: the
 conversation is ground truth, then newest wins across layers, fact beats note on a tie. Knobs:
 `short_layer`, `short_k`, `short_cap` (kokoro.json, dev registry). The memory page shows long by
-default, short behind a toggle.
+default, short behind a toggle (看近期紀錄). Unchanged in KeepsakeDB 1.0.1.
 
 ### History is not memory (2026-10-02)
 A 'recent-exchange layer' that recorded every turn in the store (for cross-surface continuity) lived
@@ -246,24 +281,90 @@ Realistic final packaging = one installer/launcher with bundled sidecars (roadma
 
 ## Language & embedder — user-changeable (decided 2026-09-30)
 
-- `memory.language` per companion (default **zh-TW**; en selectable): the extraction prompt writes
+- `language` per companion (kokoro.json, template **zh-TW**; en selectable): the extraction prompt writes
   facts in this language. Never "mirror the input" — mixed-language stores defeat dedup.
-- `memory.embedder` per install: default **bge-m3** (100+ languages incl. zh/ja/fr/en). **Anyone
-  running a companion in another language must pair it with an embedder that covers that language**
-  — the language knob and the embedder knob travel together. Changing the embedder means
-  re-embedding the store (minutes at companion scale; the migration path A→C is the same tool).
-- Standalone engine: **KeepsakeDB** (`D:\dev\KeepsakeDB`, created 2026-10-01) — layered L1 store /
-  L2 pipeline (unpluggable) / L3 integration; 556 keeps `kokoro` as the Hermes provider name.
+- The embedder is the **vectors** connection of 設定 → 全域 → 模型連線 (0.9.0): 556d's own llama-server with a model
+  file, or any OpenAI-compatible embeddings endpoint, with its name and dimensions; no default — 556d writes it into
+  every profile's kokoro.json `embedder` before a start, and nothing starts until it is set (this machine: local
+  bge-m3, 100+ languages incl. zh/ja/fr/en). **Anyone running a companion in another language must pair it with an
+  embedder that covers that language** — the language knob and the embedder knob travel together. Changing the
+  embedder means re-embedding the store (`reembed`; minutes at companion scale).
+- Standalone engine: **KeepsakeDB** (own repo `D:\dev\KeepsakeDB`, created 2026-10-01; vendored here as the submodule
+  `vendor/keepsakedb`, 1.0.1, API frozen 2026-10-14) — layered L1 store / L2 pipeline (unpluggable) / L3 integration;
+  556 keeps `kokoro` as the Hermes provider name.
 
-## Pinned groups (0.8.7, `../prompt/prompt.md` §2.4)
+## The dated part of who she is — SOUL text, not pinned memory (2026-10-19, `../prompt/prompt.md` §2.4)
 
-A few reserved tags are not retrieved by similarity but rendered into her system prompt once per session, in
-kokoro's prompt section under 一直記著的: `timeline` (oldest first), `influences`, `stances`, `refusals`,
-`standing` (newest first), at most `kokoro.json` `pinned_per_tag` (8) lines each, superseded rows out, 你 rendered
-as her term. The names are `kokoro.json` `pinned_tags`. Who writes them: the soul skill (events → `timeline`,
-`influences`), seeds, and the 記憶 page by hand; the observe pipeline is told nothing about them (its prompt is the
-pinned library's), so a self track would be a separate change. A row written mid-session shows after her restart
-or a compression.
+The 0.8.7 pinned groups — reserved tags (`timeline`, `influences`, `stances`, `refusals`, `standing`) rendered once per
+session under 一直記著的 — are retired (`render_pinned`, `pinned_tags`, `pinned_per_tag` and their test are gone). Once
+it was settled that this content does not grow through conversation, "fixed and in every request" means SOUL:
+
+- Her timeline with absolute dates and the people and things that shaped her are `## 時間線` (oldest first) and
+  `## 影響過你的人與事` in `SOUL.md`, written by the soul skill from the description (code, not a model) or by hand;
+  stances and refusals live in `## 怎麼判斷、怎麼決定`, the people in `## 誰在跟你說話`; where she stands with someone
+  *now* is the engine's 對他 line. Before every start 556d copies SOUL.md, psyche.json and people/*.md from
+  `characters/<id>/` into the profile (people/你.md only when missing) — the package is the character.
+- The store keeps what she knows. The same events reach it as **seeds** (`characters/<id>/seeds.jsonl` →
+  `tools/seed-memories.py <id> [--replace]`, run while 556d is up and the character is not): `meta.seed: true`,
+  `meta.source: 設定`, tags as given (the skill still tags events `timeline` and influences `influences` — ordinary
+  tags now, for retrieval); a seed's `at` (`YYYY`, `YYYY-MM` or `YYYY-MM-DD`) becomes `created_at` (local noon of
+  that day) and is kept in `meta.at`, so a 2019 event sorts (and shows on the 記憶 page) as 2019. Same text = skipped unless
+  `--replace`. The tool reads the embedder from kokoro.json and stops if 556d has not written it yet.
+- Nothing in the pipeline knows a reserved tag; a row the observe LLM tags `timeline` is a fact about you and stays in
+  the retrieved tier.
+
+## What she reads, and the knobs (0.10.0)
+
+**System prompt, once per session** — kokoro's section `kokoro.memory` (`register_system_prompt_section`, position
+`after_memory`, at most 4 000 chars, frozen into the session like every section): the zh-TW memory rule (how to read
+the block: `[high]` is certain, plain is probably right, notes are dated, `[archived: …]` is never spoken — only asked
+about when the other side touches it, `By name` is why a person came up, what is not in memory is unknown — no
+guessing), then 關於<her term for you>：`people/你.md` (first 2 000 chars; `memories/USER.md` as the legacy
+fallback). The provider's own `system_prompt_block()` returns "" so nothing is injected twice. The SOUL (Hermes's
+identity slot) comes before it, with its 時間線.
+
+**The last user message, every turn** — Hermes wraps kokoro's prefetch in `<memory-context>` ("[System note: … recalled
+memory context, NOT new user input …]"); inside, in this order:
+
+- `Memory:` → `Facts (long-term):` up to `context_k` long rows, `[high]` or plain, `(tags: …)`, a `meta.prefix` such
+  as 「（舊帳 2026/10/13）」 in front; `[archived: <topic> — <reason> — contents withheld; offer to discuss]` for an
+  archived hit outside a consent window; superseded, held and below-`drop` rows out;
+- `Notes (recent, dated):` up to `short_k` short rows as `[MM/DD <surface>] text`;
+- when the session is another character's (`556:agent:<id>`): 現在跟你說話的是<name>，不是<your term>。About <name>
+  (person file): + `people/<id>.md`;
+- `By name:` — for each trigger name found in the message (the roster's display names, the `people/*.md` stems, your
+  name; never 你, two characters or more) one exact BM25 lookup (`phrase=True`, `k = trigger_k`), archived / superseded
+  / held rows out, rows already in the block out, at most `2 × trigger_k` lines in all; the block is `Memory:` +
+  `By name:` alone when similarity brought nothing.
+
+Then psyche's `<her-state>` with 【她現在】. The block is absent on trivial prompts; 你 is rendered as her term
+throughout. Tests: `tests/test_kokoro_triggers.py`.
+
+**Knobs** (`home/profiles/<id>/kokoro.json`; defaults = `templates/companion/kokoro.json`, else the code):
+
+| Key | Default | Meaning |
+|---|---|---|
+| `llm` | written by 556d | the 記憶 connection: `base_url`, `model`, `api_key`, `timeout` (60, kept if you changed it); the observe LLM |
+| `embedder` | written by 556d | the vectors: `base_url`, `model`, `api_key`, `dims`; one embedding per prefetch and per write |
+| `db` | `memory/{profile}.db` | the store, under the profile |
+| `backup_dir` | `backups` | snapshots (daily on first write, before risky ops; 7/4/12 rotation) |
+| `log` | `logs/keepsake.jsonl` | the engine log; `log_searches` / `log_pipeline` true, `log_retention_days` 90 |
+| `subject` | `你` | the stored subject word for memories about you; the store's record wins (`meta.subject`) |
+| `your_name` | `""` | your name (Settings writes it through); her term for you when set |
+| `address_default` | the template's role term | her term for you while `your_name` is empty |
+| `context_k` | 5 | long rows per turn |
+| `short_layer` / `short_k` / `short_cap` | true / 5 / 1000 | the short layer on, notes per turn, ring size |
+| `triggers` / `trigger_k` | true / 3 (code; not in the template) | the `By name` lookups and rows per name |
+| `tools` | true | defines `kokoro_search` / `kokoro_forget` — not offered while `platform_toolsets` is empty |
+| `system_prompt_block` | unset (the code's zh-TW rule) | replaces the memory-rule text of the section |
+| `high` / `drop` / `rrf_k` / `oversample` | 0.6 / 0.4 / 60 / 3 | trust line, drop line, RRF constant, over-fetch |
+| `language` / `max_candidates` / `consent_turns` / `tokenizer` | zh-TW / 8 / 100 / bigram | memory language, observe candidates, consent window, FTS tokenizer |
+
+**Where the files are** (all under `home/profiles/<id>/`): the store `memory/<id>.db`, snapshots `backups/`, the
+log `logs/keepsake.jsonl`, the config `kokoro.json` (`llm` + `embedder` rewritten before every start, the rest is
+hers), the person files `people/*.md`, the history `state.db`, the state `psyche.db`; the plugin itself is the junction
+`plugins/kokoro` → the repo's `plugins/kokoro`. `tools/seed-memories.py` writes the store with `owner=False` while
+she is stopped; 556d reads it read-only and sends deletes through the `commands` table (`internal/memory`).
 
 ## History vs memory vs state — `memory-layers.d2`
 
@@ -272,9 +373,11 @@ or a compression.
 - Still one observe call per turn; it may return two strings (`ops` for long, `note` for short). Still one
   embedding per prefetch, then both layers searched at once: the bigger layer starts first on its own read
   connection, the smaller follows immediately, nothing waits but the final join; hybrid (dense + BM25,
-  RRF), top 5 each, a few ms per search.
+  RRF), top `context_k` / `short_k` each, a few ms per search — plus one exact BM25 lookup per name found in
+  the message (`By name`, 0.8.10).
 - Priority when they disagree: history first; then the newest entry regardless of layer; long breaks
   ties; the pipeline supersedes the stale long fact afterwards. The state block names transitions
   explicitly so the history's tone inertia does not win.
 - One file with a layer column (one owner, one backup), not two database files. 記憶 shows the long layer;
-  a toggle shows the short layer. 556d reads the store read-only and deletes through a command queue.
+  a toggle shows the short layer. 556d reads the store read-only and deletes through the command queue; the
+  psyche engine's holds and patches travel the same queue.

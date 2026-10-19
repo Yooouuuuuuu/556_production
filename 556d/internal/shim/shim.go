@@ -1,7 +1,7 @@
-// Package shim is the OpenAI-compatible model router: Hermes sends model="auto/<lane>",
-// routing.json maps lanes to backends (single name or an ordered fallback list), and
-// backends without native tool calling get the Nous <tool_call> text protocol injected
-// and parsed back. Port of shim/shim.py; parity is enforced by golden tests.
+// Package shim sits between Hermes and the chat connection: Hermes sends model="auto/556", the shim
+// forwards to the endpoint set in 設定 → 模型連線 (home/models.json), injects the Nous <tool_call> text
+// protocol for backends without native tool calling and parses it back, and applies prompt hygiene on
+// the way out. The request and reply shapes are pinned by golden tests (testdata/).
 package shim
 
 import (

@@ -1,6 +1,6 @@
 # STACK — what exactly this project is using
 
-Last verified: 2026-10-01 (0.3.0). Ground-truth inventory; update it when reality changes.
+Last verified: 2026-10-19 (0.10.0). Ground-truth inventory; update it when reality changes.
 Reasoning behind each choice: `DECISIONS.md` and the part docs (`structure/`, `memory/`, `app/`, `voice/`, `inner-life/`).
 
 ## One app
@@ -8,18 +8,21 @@ Reasoning behind each choice: `DECISIONS.md` and the part docs (`structure/`, `m
 **556 Production** (`app/`, Electron + React) is the product. Launching it starts and owns the
 whole backend; closing it shuts everything down.
 
-Diagrams: D2 sources next to each part doc (`structure/`, `memory/`, `voice/`, `inner-life/`).
+Diagrams: D2 sources next to each part doc (`structure/`, `memory/`, `voice/`, `inner-life/`, `prompt/`).
 
 ```
-556 Production (Electron)          office window: chat + settings · avatar window (toggle) · tray
+556 Production (Electron)          office window: chat + settings · avatar window (toggle, hidden by default) · tray
   └─ spawns 556d.exe -parent-pid   (Go)  :55600  hub: chat API + events on /ws + avatar bridge + static
-        ├─ shim               :55601  OpenAI-compatible model router (lanes → Gemini proxy)
-        ├─ llama-server       :55602  bge-m3 embedder on CPU (KeepsakeDB dense leg), shared
+        ├─ shim               :55601  OpenAI-compatible, one lane auto/556 → the 對話 connection (bearer key);
+        │                             prompt-hygiene filter + scratch strip; 503 until the connections are set
+        ├─ llama-server       :<port in models.json>  the embedder, started by 556d only when the vectors are local
+        │                             (kind llama: exe + GGUF + port); otherwise an embeddings endpoint elsewhere
         └─ per ACTIVE companion (started from the roster, never automatically) — ONE process:
-              └─ hermes gateway run  :dynamic  her brain (HERMES_HOME = home/profiles/<name>): SOUL + kokoro memory
-                                               + tools; inside it the OpenAI-compatible API server (the app's
+              └─ hermes gateway run  :dynamic  her brain (HERMES_HOME = home/profiles/<id>): SOUL + kokoro memory
+                                               + psyche; inside it the OpenAI-compatible API server (the app's
                                                route) and her channel adapters (Telegram / Discord from her .env)
-External, untouched: Gemini proxy :18765 (user's), production shim :18766 (user's D:\Hermes).
+External: the model endpoints named in home/models.json (any OpenAI-compatible server; this machine's is a local
+proxy, openmini — the product assumes nothing about it). No character starts until 設定 → 全域 → 模型連線 is complete.
 ```
 
 Ownership chain: on quit the app calls `POST /api/shutdown` and waits; 556d asks every active
@@ -34,22 +37,24 @@ instead of spawning if one already serves :55600.
 
 | Path | What | Ours? |
 |---|---|---|
-| `app/` | the app: `electron/` (main, preload, backend lifecycle), `src/` (React: Office/Chat/Settings/Avatar, `live2d/Live2DStage`, `store` = hub WebSocket state, `api`, `i18n` zh-TW default), `assets/` icons, `scripts/` (dev runner, `cdp_capture.mjs`) | ours |
+| `app/` | the app: `electron/` (main, preload, backend lifecycle), `src/` (React: `pages/` Office, Chat, Settings, Character, NewCharacter, ConnectionsSettings, ProactiveSettings, ToolsSettings, VoiceSettings, DevSettings, Roster, Memory, State, Avatar; `live2d/Live2DStage`, `store` = hub WebSocket state, `api`, `i18n` zh-TW default), `assets/` icons, `scripts/` (dev runner, `cdp_capture.mjs`, `copy-vad.mjs`) | ours |
 | `app/public/vad/` | build output: Silero VAD models + audio worklet (from `@ricky0123/vad-web`) and ONNX Runtime wasm (from `onnxruntime-web`), copied by `scripts/copy-vad.mjs`, served by 556d at `/vad/` (ignored) | generated |
-| `556d/` | Go daemon: `internal/{config,supervisor,shim,bridge,hermes,api}`; config `556d.toml` | ours |
+| `556d/` | Go daemon: `internal/{api, bridge, companions, config, embedder, hermesapi, memory, models, shim, supervisor, voice}`. In `api/`: `connections.go` (`/api/connections` + probe; `prepareProfile` writes her `config.yaml` / `kokoro.json` / `psyche.json` from `home/models.json` before every start), `package.go` (the package sync: `characters/<id>/` → her profile), `hygiene.go` (the config half of prompt hygiene: guidance switches off, zh-TW platform hints, the old `memory` toolset stripped), `characters.go` (the 新角色 page: packages, the skill and the install as jobs). `shim/hygiene.go` is the shim half: vendor paragraphs and the date paragraph dropped from every system message, the proxy's reply function unwrapped. `models/` loads, merges, masks and probes the connections; `embedder/` runs llama-server when the vectors are local. Config `556d.toml` | ours |
 | `vendor/hermes-agent/` | Hermes Agent v0.21.0: git submodule pinned at upstream `7166071f` (fetched shallow); its venv `.venv` (py3.11/uv) is ignored. `setup-vendor.ps1` checks it out and builds the venv | **never edited** |
 | `vendor/keepsakedb/` | KeepsakeDB 1.0.1 (ours, upstream Yooouuuuuuu/KeepsakeDB): git submodule pinned at the release tag `v1.0.1`, installed editable into the Hermes venv by `setup-vendor.ps1`. Bumped only on a bug-fix release (`git -C vendor/keepsakedb checkout vX.Y.Z`, commit the pin) | never edited here |
 | `vendor/live2d/` | Cubism Core **4** (`live2dcubismcore.min.js`) | never edited |
 | `assets/live2d/hiyori/` | official free Hiyori model (Cubism-4-era assets, SDK tag 4-r.7) | third-party data |
-| `plugins/` | Python that plugs INTO Hermes: `kokoro/` memory provider on KeepsakeDB (live; linked into `home/plugins/`), platform adapter — planned | ours |
-| `home/` | HERMES_HOME of the shared shell (profile `default`): `config.yaml` (model → shim :55601 lane `auto/556`, `memory.provider: kokoro`), `kokoro.json`, `settings.json`, `plugins/kokoro` (junction), `memory/default.db` (the test stores), legacy `mem0.json` + `mem0_qdrant/` (Path A fallback), sessions | runtime (ignored) |
-| `home/profiles/<id>/` | **a character's HERMES_HOME** (Hermes profile, created by `new-companion.ps1`; `mane` is the disposable test character): `SOUL.md`, `people/*.md` (`你.md` carries your name and reply language as managed lines, written into every profile on save), `config.yaml`, `kokoro.json` (`subject: 你`, `your_name`, `address_default`), `voice.json` (her voice override, optional), `psyche.json`, `.env` (her own bot tokens), `plugins/kokoro` + `plugins/psyche` (junctions), `memory/<id>.db` (KeepsakeDB), `state.db` (sessions = history), `psyche.db` | ours |
-| `shim/routing.json` | lanes → backends (hot-reload): `556`→gemini-flash, `pro`→gemini, `code`→claude | ours |
-| `tools/` | `soul_writer.py` (the soul skill: `characters/<id>/describe/` → SOUL, seeds, people, psyche.json; models from the proxy at :18765, no 556d needed), `seed-memories.py` (dated seeds), `psychesim.py`; diagnostics `cdp_shot.mjs` (real-Chrome screenshot), `ws_probe.mjs`, `hub_probe.mjs` | ours |
-| `templates/character/` | the blank `describe/` template and `profile.json` schema for the skill; `example/` is a filled description (阿凜, a disposable test character) — `templates/companion/` stays the profile skeleton `new-companion.ps1` copies | ours |
-| `models/`, `bin/` | bge-m3 Q8_0 GGUF; llama.cpp CPU build (ignored, downloaded) | downloaded |
-| `tests/memory_stress.py` | 1000-round zh-TW memory benchmark harness | ours |
-| `556.cmd` | Hermes CLI/TUI on this home (needs 556d running for the model shim) | ours |
+| `plugins/` | Python that plugs INTO Hermes, linked into each profile's `plugins/` as junctions: `kokoro/` (memory provider on KeepsakeDB: prefetch, observe, the zh-TW prompt section `kokoro.memory`, keyword triggers) and `psyche/` (the engine: tick, appraisal, impact model, loops, relationships, thinking, the state block; `tests/`, 68) | ours |
+| `home/` | runtime, ignored: `models.json` (the model connections, the embedder, the timezone — 設定 → 全域 → 模型連線, the only place they live), `settings.json` (you + app), `voice.json` (global connectors), `mailbox/<id>.json`, `audio_cache/`, `profiles/<id>/`. Also HERMES_HOME of the shell (`556.cmd`): its `config.yaml` is the CLI's own and is no longer the source of any profile's model block | runtime (ignored) |
+| `home/profiles/<id>/` | **a character's HERMES_HOME** (Hermes profile, created by `new-companion.ps1`, rebuilt from `characters/<id>/` and `home/models.json` before every start): `SOUL.md`, `people/*.md` (`你.md` carries your name and reply language as managed lines, written into every profile on save; copied from the package only when missing), `config.yaml` (model → shim, memory → kokoro, plugins [psyche], empty toolsets, hygiene switches — written by 556d), `kokoro.json` (`subject: 你`, `your_name`, `address_default`; `llm` + `embedder` from the connections), `psyche.json` (from the package; `time.timezone_offset_h` from the connections), `companion.json` (display name, avatar, her API key), `voice.json` (her voice override, optional), `.env` (her own bot tokens), `plugins/kokoro` + `plugins/psyche` (junctions), `memory/<id>.db` (KeepsakeDB), `backups/` (its daily snapshots), `psyche.db`, `state.db` (sessions = history) | ours |
+| `characters/<id>/` | the character package — the character itself (ignored except `characters/README.md`): authored `describe/01…10.md`, `profile.json`, `companion.json`, `kokoro.json` (keys); generated by the soul skill `SOUL.md`, `seeds.jsonl`, `people/*.md`, `psyche.json`, `soul.lock.json`, `build/` (phase JSON, `check.md`, `verify.md`, `raw/`, `run.log`). Backup = the package + `memory/<id>.db` + `psyche.db` + `state.db` | ours (the user's) |
+| `tools/` | `soul_writer.py` (the soul skill: `characters/<id>/describe/` → SOUL, seeds, people, psyche.json; `--base-url`/`--model` or the 寫靈魂 connection, 556d need not run), `fidelity_probe.py` (scores a SOUL text blind against `tests/fidelity/<id>.json`, same model rule), `seed-memories.py` (dated seeds; the embedder from her `kokoro.json`), `psychesim.py`; diagnostics `cdp_shot.mjs` (real-Chrome screenshot), `ws_probe.mjs`, `hub_probe.mjs` (`package.json`: `ws`) | ours |
+| `templates/character/` | the blank `describe/` template and `profile.json` (Big Five, the seven constants incl. chronotype, the five thinking meters, the choices, schedule); `example/` is a filled description (阿凜, a disposable test character). `templates/companion/` stays the profile skeleton `new-companion.ps1` copies (SOUL skeleton, `companion.json`, `kokoro.json`, `psyche.json`, `people/你.md`, `env.example`) — no endpoints in either | ours |
+| `tests/` | `test_soul_writer.py`, `test_fidelity_probe.py`, `test_kokoro_triggers.py` (pytest from the Hermes venv); `fidelity/xi.json` (the gold set); `psyche_eval.py` (LLM eval against a running character); `memory_stress.py` / `memory_probe.py` / `memory_recall_check.py` (the 1000-round zh-TW benchmark and its re-runs); `live/smoke_*.sh` (foreground smoke runs). Go tests under `556d/internal/{api, models, shim, voice}` | ours |
+| `models/`, `bin/` | an embedding GGUF (bge-m3 Q8_0 here) and the llama.cpp CPU build — downloads, only when the vectors are local; their paths go into 設定 → 全域 → 模型連線 (ignored, anchored `/models/`, `/bin/`) | downloaded |
+| `556d.toml` | ports and in-repo paths only: `[daemon] port` 55600, `[hermes] home` / `exe`, `[shim] port` 55601 / `timeout_seconds` — no endpoints, no model names, no timezone | ours |
+| `556.cmd` | Hermes CLI/TUI on `home/` (`%~dp0`; needs 556d running for the model shim) | ours |
+| `.gitattributes`, `.gitignore` | `* -text` (bytes as committed on every machine: CRLF sources and golden files alike); ignored: `home/`, `characters/*/`, `/bin/`, `/models/`, build outputs | ours |
 
 ## Build & run
 - Daemon: `go -C 556d build -o ..\556d.exe .\cmd\556d` (binary ignored).
@@ -57,18 +62,23 @@ instead of spawning if one already serves :55600.
   (`npm run dev` = vite + electron with live reload). Electron's postinstall download hangs on
   this network: if `node_modules/electron/dist` is missing, run its `install.js` manually or
   copy a matching `dist` (44.4.5).
-- Everything else is spawned by 556d from `556d.toml`.
+- Everything else is spawned by 556d: the shim from `556d.toml` (its port), the embedder and the model backend
+  from `home/models.json` (設定 → 全域 → 模型連線).
 
 ## Wire protocols
 - **App ↔ 556d (hub)**: HTTP `POST /api/chat` (header `X-556-Client`) to send; WebSocket `/ws`
   for everything that happens — `chat.user/delta/complete/error`, `companion.state`, avatar
   `message/motion/expression/speak_audio`. `GET /api/history?limit=X`, `GET/PUT /api/settings`,
-  `GET /api/companion`, `GET /api/models`, `POST /api/restart-hermes`, static (`/` = the app
+  `GET/PUT /api/connections` + `POST /api/connections/probe` (the model connections, `home/models.json`: PUT applies at
+  once to the shim, the embedder and the clock, running characters need a restart; the probe asks an endpoint which
+  models it serves), `GET /api/companion`, `GET /api/models`, `POST /api/restart-hermes`, static (`/` = the app
   bundle, `/hiyori/...` models, `/live2dcubismcore.min.js`). OpenAI-compatible
   `/v1/chat/completions` (streaming) for third-party clients.
   The create-character page: `GET/POST /api/characters`, `GET /api/characters/{id}`, `PUT …/describe`, `PUT …/profile`,
   `POST …/run` (the soul skill as a subprocess of the venv's python, one job per package, log in `build/run.log`),
-  `POST …/install` (`install-character.ps1` + `seed-memories.py`), `GET …/job`; hub event `character.job`.
+  `POST …/simple` (the simple path: sliders and three boxes → the files, no model), `POST …/install`
+  (`install-character.ps1` + `seed-memories.py`; refused while the inputs are stale unless `force`), `GET …/job`; hub
+  event `character.job`.
 - **556d ↔ her gateway** (`internal/hermesapi`): the gateway's API server platform, enabled per start
   through `API_SERVER_KEY/HOST/PORT` in her environment (key generated once into her `companion.json`,
   port free at start; her `.env` can pin both). One non-stream `POST /v1/chat/completions` per turn with
@@ -78,23 +88,32 @@ instead of spawning if one already serves :55600.
   each message tagged app / telegram by Hermes's `platform_message_id`. The app is one client of her,
   same level as Telegram; turns serialized per companion in 556d. Client system prompts are not sent
   (SOUL owns persona). Approvals/clarify not surfaced — companion toolset policy avoids them.
-- **hermes → models**: through the shim (:55601): `<tool_call>` text translation for the Gemini
-  proxy, lane fallback chains, 4-attempt retry for emulated backends; since 0.8.4 the prompt-hygiene filter
-  (Hermes's vendor paragraphs dropped from every system message, the proxy's reply function unwrapped) and a
-  preamble that names no product. `[hermes] timezone` (default Asia/Taipei) is passed as `HERMES_TIMEZONE`.
+- **hermes → models**: through the shim (:55601, `internal/shim`): one lane, `auto/556`, pointed at the 對話
+  connection of `home/models.json` with its key as a bearer token; 503 (模型連線未設定) until it is configured. On the
+  way in: the prompt-hygiene filter (`shim/hygiene.go`: Hermes's vendor paragraphs and the date paragraph dropped from
+  every system message, logged when the set changes) and, only when a character has an extension, the `<tool_call>`
+  text-protocol translation under a preamble that names no product. On the way out: the hidden `<think>…</think>`
+  scratch stripped and logged before the tool-call parser (0.8.10), a text `<tool_call>` to the proxy's `openmini_reply`
+  unwrapped into reply text, a 4-attempt retry on empty replies. The connections' timezone reaches every gateway as
+  `HERMES_TIMEZONE`, the daemon's port as `X556_HUB`.
 
 ## Memory (kokoro on KeepsakeDB — see memory/memory.md and inner-life/inner-life.md)
 **KeepsakeDB 1.0.1** (our memory engine, upstream Yooouuuuuuu/KeepsakeDB, API frozen; a git submodule at `vendor/keepsakedb/` pinned at the release tag, which `setup-vendor.ps1` installs editable, or a local checkout with `-LocalKeepsake` while developing it; Hermes's curated MEMORY.md /
-USER.md head is off, the person file `people/你.md` is injected by kokoro): one SQLite file per profile, hybrid recall (bge-m3 dense + FTS5 BM25 with
+USER.md head is off, the person file `people/你.md` is injected by kokoro): one SQLite file per profile, hybrid recall (dense vectors from the configured embedder + FTS5 BM25 with
 CJK bigrams, RRF k=60), trust labels (high ≥ 0.60 / drop < 0.40), archive-with-reason + consent
-windows, L2 pipeline on `agy/gemini-3.8-flash` writing memories in the configured language
-(zh-TW). Provider: `plugins/kokoro` (prefetch → block, sync_turn → observe on Hermes's memory
-worker, tools `kokoro_search` / `kokoro_forget`). Logs: history / search_log / pipeline_log in the
-store, `logs/keepsake.jsonl` operational (muted in `hermes -z`). Snapshots daily to `home/backups/`.
-Inspect: `D:\dev\KeepsakeDB\.venv\Scripts\keepsake --db home\memory\default.db stats|list|log`.
-Path A (mem0 + Qdrant) stays on disk as the fallback (`memory.provider: mem0`).
+windows, L2 pipeline on the 記憶 connection (`kokoro.json` `llm`, written by 556d from `home/models.json`) writing
+memories in the configured language (zh-TW). Provider: `plugins/kokoro` (prefetch → the memory block, sync_turn →
+observe on Hermes's memory worker). **No tools at baseline** (0.8.6): `kokoro_search` / `kokoro_forget` are still
+defined (`kokoro.json` `tools: true`) but the `memory` toolset is in no `platform_toolsets` list — 556d strips it before
+a start — so she is never offered them unless an extension brings tools back; memory reaches her through the per-turn
+block and kokoro's zh-TW prompt section `kokoro.memory` (the memory rule + 關於你 from `people/你.md`, after Hermes's
+memory tier). Keyword triggers (0.8.10, `triggers` / `trigger_k`): a roster name, a person file's name or her own name in
+the message adds exact BM25 rows under `By name`. No pinned groups: the dated part of who she is (時間線,
+影響過你的人與事) is SOUL text; the same events are dated seeds. Logs: history / search_log / pipeline_log in the
+store, `logs/keepsake.jsonl` operational (muted in `hermes -z`). Snapshots daily to her `backups/`.
+Inspect: `vendor\hermes-agent\.venv\Scripts\keepsake --db home\profiles\<id>\memory\<id>.db stats|list|log`.
 **Memory page** (office window tab `記憶`, route `#/memory`): view + delete only. 556d opens the
-store read-only with `modernc.org/sqlite` (pure Go) — `GET /api/memory?q=&tag=&archived=1&limit=`,
+store read-only with `modernc.org/sqlite` (pure Go) — `GET /api/memory?q=&tag=&archived=1&limit=&layer=long|short`,
 `POST /api/memory/delete {ids, reason}` → a row in the store's `commands` table that the owning
 Hermes process executes (status `done` with count, or `queued` until she next runs — she "wakes"
 on the first chat turn of a session). Never writes the memory tables itself. Every memory a turn writes carries
@@ -103,8 +122,9 @@ on the first chat turn of a session). Never writes the memory tables itself. Eve
 
 **Settings & the config registry**: non-technical knobs directly; developer toggle shows every knob from
 `GET /api/config` (`internal/api/registry.go`: key, group, type, scope, file+path, effect) and writes them
-with `PUT /api/config` into her `config.yaml` / `kokoro.json` / `.env` or the global `556d.toml` /
-`shim/routing.json`; effects tell the UI what to restart. Secrets are masked and kept when left empty. Since 0.7.4
+with `PUT /api/config` into her `config.yaml` / `kokoro.json` / `.env` or the global `556d.toml`; effects tell the UI
+what to restart. The model connections are not registry knobs: they are 設定 → 全域 → 模型連線 (`/api/connections`), and
+556d writes them into her files before every start. Secrets are masked and kept when left empty. Since 0.7.4
 設定 has two layers: 全域 (`/api/settings` you + app, `/api/voice` connectors, backend knobs) and 角色 (a character's
 page; 556d edits the character on stage, so opening the page selects her). `/api/voice?companion=<id>` reads / writes
 her `voice.json` override; speak and transcribe use the effective config (`voice.Effective`). A failed turn (model
@@ -114,7 +134,9 @@ the engine could not get answered; unanswered rows older than 15 min are swept w
 
 **Roster / lifecycle** (office tab 名單, route `#/roster`): `GET /api/companions` (every
 `home/profiles/<name>` with a config.yaml: display name from `companion.json`, channels detected from
-`.env`, active state, API port), `POST /api/companions/{name}/start|stop`, `GET/PUT /api/selected`.
+`.env`, active state, API port), `POST /api/companions/{name}/start|stop` (start runs `prepareProfile` first — the
+package sync, her files from the connections, the hygiene switches — and is refused with 模型連線未設定 while something is
+missing), `GET/PUT /api/selected`.
 `companions.Manager` (Go) owns exactly one `hermes gateway run` per active companion under the
 supervisor's job object; stop cancels her context; app close stops all.
 Chat, history, memory and the companion part of Settings act on the selected companion; hub events
@@ -134,10 +156,12 @@ user) through her own bot token — no LLM; Settings toggle `mirror_to_telegram`
 her config.yaml — Hermes user plugins are opt-in, a memory provider activates through `memory.provider` instead). Hooks:
 `pre_llm_call` → `{"context": <her-state>…【她現在】…}`, which Hermes appends to the user message right after the
 `<memory-context>` block; `post_llm_call` → turn event + appraisal queued (own thread, never waited for); `on_unload` →
-drain + snapshot. In her profile: `psyche.json` (Big Five, six constants, time constants, impact knobs, `cares_about`;
-written with defaults on first start; Settings edits apply at restart) and `psyche.db` (events, appraisals, instances,
-loops, snapshots, params, owner heartbeat; WAL). Appraisal A runs on the `llm` block of kokoro.json (the memory lane),
-7–30 s per turn on Gemini flash. 556d reads `psyche.db` read-only for `GET /api/psyche` (狀態 tab) and waits for the last
+drain + snapshot. In her profile: `psyche.json` (`character`: Big Five, the seven constants incl. `chronotype`, `rumination`,
+`memory_reliability`; `thinking` and `thinking_choices` (0.8.8); `relationships` (per-counterpart priors, `你` from the
+package's closeness); `time` incl. `timezone_offset_h`, written by 556d from the connections; impact and expression
+knobs, `cares_about`; copied from `characters/<id>/` before every start, the 主動 page writes both copies, the rest
+applies at restart) and `psyche.db` (events, appraisals, instances, loops, withheld, snapshots, params, owner heartbeat;
+WAL). Appraisal A runs on the `llm` block of kokoro.json (the 記憶 connection), 7–30 s per turn on a flash-class model. 556d reads `psyche.db` read-only for `GET /api/psyche` (狀態 tab) and waits for the last
 turn's appraisal before a planned stop. Tests: `plugins/psyche/tests` (pytest from the KeepsakeDB venv) and
 `tests/psyche_eval.py` (LLM eval set against a running character; judge = the same lane).
 **Proactive (0.6.0)**: the engine's tick decides the urge (urge.py); the decision is a replayable `proactive_fired` event;
@@ -160,9 +184,10 @@ the initiator's psyche.json `proactive.inter_agent_turn_cap`, hub event `relay.t
 `pending`, `outbox`); her plugins reach 556d at `X556_HUB` (spawn env). Mailbox (0.7.5): a message for a character
 who is not running waits in `home/mailbox/<id>.json` (20 per pair, 7-day TTL) and is delivered at her start or the
 next sweep, continuing the conversation; late delivery is prefixed with the time it was left. Characters:
-`characters/<id>/` (SOUL, companion.json, psyche.json, kokoro.json keys, people/, seeds.jsonl) — the user's own,
-ignored by git except `characters/README.md`; `install-character.ps1`, `tools/seed-memories.py` (store without an
-owner, embedder up).
+`characters/<id>/` is the package (layout table above; `characters/README.md`) — authored `describe/` + `profile.json`,
+generated SOUL / seeds / people / psyche.json by the soul skill (設定 → 角色 → 新角色, or `tools/soul_writer.py`),
+installed by the page or `install-character.ps1`, seeded by `tools/seed-memories.py` (store without an owner, embedder
+up), and copied over her profile before every start.
 
 ## Third-party inventory (what is not ours, and where it lives)
 
@@ -179,15 +204,18 @@ not copied into `vendor/`. **Services** are called over the network under their 
 | npm | pixi-live2d-display-lipsyncpatch | MIT | `app/package.json` |
 | npm | `@ricky0123/vad-web` (bundles the Silero VAD ONNX models — MIT, snakers4/silero-vad — and the audio worklet) | ISC | `app/package.json`; built into `app/public/vad/` |
 | npm | onnxruntime-web (wasm runtime for the VAD) | MIT | `app/package.json`; built into `app/public/vad/` |
+| npm (dev) | electron 44.4.5, vite 6, tailwindcss 4 (`@tailwindcss/vite`), typescript 5 — build tools, not shipped in the bundle | MIT | `app/package.json` devDependencies |
 | Go | modernc.org/sqlite (pure Go), gorilla/websocket, BurntSushi/toml, yaml.v3, x/sys | BSD-3 / BSD-2 / MIT / MIT / BSD-3 | `556d/go.mod` |
 | submodule | KeepsakeDB 1.0.1 (ours) → numpy; optional httpx (pipeline LLM client) | MIT | `.gitmodules` → `vendor/keepsakedb/`; installed by `setup-vendor.ps1` |
 | Python | `ddgs` (DuckDuckGo search, keyless) for the 查網路 extension | MIT | Hermes venv, `setup-vendor.ps1` |
-| downloaded | llama.cpp CPU build; bge-m3 Q8_0 GGUF | MIT; MIT (BAAI) | `bin/`, `models/` (ignored) |
+| downloaded | llama.cpp CPU build; an embedding GGUF (bge-m3 Q8_0 here) — only when the vectors are local, paths set in 設定 → 全域 → 模型連線 | MIT; MIT (BAAI) | `bin/`, `models/` (ignored) |
 | service | Fish Audio (TTS `/v1/tts`, ASR `/v1/asr`) | Fish Audio terms; key in `home/voice.json` (a character may override in her `voice.json`) | 設定 → 全域 → 語音連線 / 角色 → 聲音 |
-| service | Gemini / Claude through the user's proxy (:18765); Telegram Bot API | provider terms; her own bot token | shim lanes; her `.env` |
+| service | the model endpoints in `home/models.json` (any OpenAI-compatible server: 對話, 記憶, 寫靈魂, and embeddings when not local); Telegram Bot API | provider terms; her own bot token | 設定 → 全域 → 模型連線; her `.env` |
 
 Not used (considered and dropped): sherpa-onnx local STT and the MOSS-TTS server from the earlier
-voice agent — 556 uses cloud STT/TTS connectors instead; mem0 + Qdrant (replaced by KeepsakeDB).
+voice agent — 556 uses cloud STT/TTS connectors instead; mem0 + Qdrant (the 0.3.0 Path A, replaced by KeepsakeDB;
+the last leftovers — `mem0ai` / `qdrant-client` in `setup-vendor.ps1`, `home/mem0.json`, the `mem0` provider option —
+left in 0.9.0).
 
 ## Avatar
 `Live2DStage` (pixi 7 + pixi-live2d-display-lipsyncpatch `cubism4` ESM; Core 4 fetched from
@@ -204,4 +232,6 @@ avatar window is transparent/frameless/always-on-top, drag-anywhere (IPC), hides
 ## Retired
 0.2.0: Python shim, adapter, static server, Node bridge, `embedder.cmd`, ports 18767/19200/
 19201/19260/19270/18768. 0.3.0: Artemis web-chat SPA, old Electron pet, viewer page,
-`avatar.cmd`/`pet.cmd`, `/chat/`, `vendor/artemis/`.
+`avatar.cmd`/`pet.cmd`, `/chat/`, `vendor/artemis/`. 0.9.0: `shim/routing.json` and its lanes `pro` / `code`, the
+endpoint / model / embedder / timezone keys of `556d.toml`, the gemini / claude / opus nicknames, the mem0 / Qdrant
+leftovers. 0.10.0: pinned groups (`pinned_tags` / `pinned_per_tag`, `tests/test_kokoro_pinned.py`).
