@@ -100,6 +100,7 @@ P_STRUCTURE = """從描述整理出下面幾樣，輸出 JSON：
 - "refusals": {pr}不會答應、不會做的事。
 - "tensions": {pr}自己也沒想清楚的矛盾，兩到三條。
 - "cares_about": {pr}在乎什麼，五到七條短句（評估{pr}心情時會用到，例：「答應的事有沒有做到」）。
+- "closeness": {pr}跟「跟{pr}說話的人」現在有多熟，五選一："剛認識"、"還不算熟"、"朋友"、"很熟"、"很親近"；附 "closeness_why" 一句證據。描述沒提就 "朋友"。
 - "vague": 描述裡太空泛、猜不出行為的句子，每條 {{"line": "原句", "why": "為什麼"}}；沒有就空陣列。
 
 {describe}"""
@@ -532,6 +533,18 @@ def build_people(d: Path) -> Dict[str, str]:
     return out
 
 
+# how close she and the user are when she starts (the structure phase reads it from the description; profile.json
+# `closeness` overrides): bond and quality hours, the bands of relation.closeness_words — and the disclosure depth the
+# bond gives (1 喜好 / 2 看法 / 3 感受 / 4 脆弱處), which the 表現 line caps on since 0.8.9
+CLOSENESS = {
+    "剛認識": {"bond": 0.05, "hours": 2.0},
+    "還不算熟": {"bond": 0.2, "hours": 30.0},
+    "朋友": {"bond": 0.4, "hours": 70.0},
+    "很熟": {"bond": 0.6, "hours": 150.0},
+    "很親近": {"bond": 0.8, "hours": 250.0},
+}
+
+
 def build_psyche(d: Path) -> Dict[str, Any]:
     base = json.loads(PSYCHE_TPL.read_text(encoding="utf-8-sig"))
     prof = read_json(d / "profile.json", {}) or {}
@@ -554,6 +567,9 @@ def build_psyche(d: Path) -> Dict[str, Any]:
     base["thinking_choices"] = {k: (prof.get("choices") or {}).get(k) for k in ("medium_primary", "medium_secondary", "first_look", "contradiction", "cause")}
     if isinstance(prof.get("schedule"), dict):
         base.setdefault("life", {})["schedule"] = prof["schedule"]
+    band = str(prof.get("closeness") or st.get("closeness") or "").strip()
+    if band in CLOSENESS:
+        base.setdefault("relationships", {})["你"] = dict(CLOSENESS[band])
     return base
 
 

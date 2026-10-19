@@ -291,6 +291,7 @@ export function State() {
             onClick={() => { command('life_event', { text: life.text.trim(), v: life.bad ? -0.4 : 0.3, R: 0.4, share: true }); setLife({ text: '', bad: false }); }}>{t('state.life_add')}</button>
         </div>
         {(snap as any)?.share_backlog?.length ? <div className="text-xs opacity-60 mt-1">{t('state.share')}: {(snap as any).share_backlog.map((s: any) => s.what).join('、')}</div> : null}
+        {(snap as any)?.withheld?.length ? <div className="text-xs opacity-60 mt-1">{t('state.withheld')}: {(snap as any).withheld.map((s: any) => s.what).join('、')}</div> : null}
       </section>
 
       {visible && relay && (relay.conversations ?? []).length > 0 && (

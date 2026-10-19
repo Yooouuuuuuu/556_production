@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.9 — 2026-10-19
+
+- **The five conversation mechanisms** (`docs/inner-life/inner-life.md` §24; `docs/prompt/prompt.md` §3 item 5). The
+  disclosure depth per counterpart is read at last: the 表現 line caps what she opens up about below the fourth layer
+  (聊喜好跟日常就好 / 感受先留著 / 最軟的那塊先留著), one layer more for a day after the other person opened up, one less
+  while her avoidance is high; the soul skill now reads 一開始多熟 from the description (剛認識 … 很親近; `profile.json`
+  `closeness`, a select on the 確認 step) and writes it as the `relationships.你` prior. Trust uncertainty (the Beta
+  pair's variance, neutral at the default prior) weights 玩笑／反話: evidence makes her more direct. The mood's pleasure
+  weights 直說／收斂 and the length hint and names the tone at the extremes (話可以隨便一點 / 但客氣一點). The withheld
+  register: the appraisal reads her own reply for what she visibly held back (`withheld.new`, `withheld.said`); it
+  comes back while idle, fades in three days if not, pulls the proactive urge, and once the pair reaches the feelings
+  layer (or it has grown past 0.9) it shows under 掛念 as 有件事還沒跟他說 and can go out as an `unsaid` message. The
+  State page lists 沒說出口. Thirteen scenario tests in `plugins/psyche/tests/test_mechanisms.py`.
+
 ## 0.8.8 — 2026-10-19
 
 - **The thinking module** (`plugins/psyche/thinking.py`; `docs/prompt/prompt.md` §2.5, `inner-life.md` §23). Five meters in

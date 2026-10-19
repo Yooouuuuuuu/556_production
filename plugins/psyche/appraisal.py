@@ -45,6 +45,11 @@ Rules:
 - If something said now is the SAME thing as an open loop listed below (the reminder asked again, the same plan
   mentioned again, her 「晚點再說」 repeated), do not open a second loop: put that loop's id under loops.refresh with
   the new cue_time when one is implied. Open a new loop only for a different thing.
+- WITHHELD: read HER reply for what {pronoun} visibly held back — changed the subject, answered a different question,
+  said 「沒事」 or 「算了」, started a sentence and dropped it, swallowed an opinion or a feeling that the context
+  shows {pronoun} has. Report at most two under withheld.new as short Traditional Chinese phrases from her side
+  (「其實很在意他忘了」), importance 0..1. Only what the reply itself shows: an ordinary reply has withheld.new [].
+  If the reply now SAYS one of the things listed under HELD BACK below, put its id under withheld.said.
 - Write "cause" as one short sentence in Traditional Chinese from her perspective, naming {term} as 「{term}」.
 Magnitude anchors (keep the scale stable across turns):
   a promise to her broken without notice: v -0.5..-0.7, R 0.6..0.8, devalue 0.4..0.7, intent by how avoidable it was;
@@ -81,16 +86,20 @@ Output JSON only, no prose:
                      "agreed": true|false, "ask": ["character id", ...]}}],
            "refresh": [{{"id": "loop id", "cue_time": "YYYY-MM-DDTHH:MM" | null}}],
            "closed": ["loop id", ...]}},
+ "withheld": {{"new": [{{"what": "...", "importance": 0..1}}], "said": ["withheld id", ...]}},
  "farewell": false}}"""
 
 
 def build_user(term: str, cares_about: Sequence[str], loops: Sequence[Dict[str, Any]],
                recent: Sequence[Tuple[str, str]], user_text: str, assistant_text: str,
-               others: Optional[Dict[str, str]] = None, ledger: Optional[Sequence[Dict[str, Any]]] = None) -> str:
+               others: Optional[Dict[str, str]] = None, ledger: Optional[Sequence[Dict[str, Any]]] = None,
+               withheld: Optional[Sequence[Dict[str, Any]]] = None) -> str:
     parts = ["## What she cares about"]
     parts += [f"- {c}" for c in cares_about] or ["- (nothing listed)"]
     parts.append(f"\n## Hurt ledger (what she still holds against {term}; id: what happened)")
     parts += [f"- {e['id']}: {e['cause']}" for e in (ledger or [])] or ["- none"]
+    parts.append(f"\n## HELD BACK (what she has not said to {term} yet; id: what)")
+    parts += [f"- {w['id']}: {w['what']}" for w in (withheld or [])] or ["- none"]
     parts.append("\n## Other characters of the story (id: name) — use the id in loops.new.ask")
     parts += [f"- {i}: {n}" for i, n in (others or {}).items()] or ["- none"]
     parts.append("\n## Open loops (things she is waiting on)")
@@ -180,7 +189,14 @@ def normalize(data: Dict[str, Any], max_events: int = 3) -> Dict[str, Any]:
     refresh = [{"id": str(r.get("id")), "cue_time": (str(r["cue_time"])[:16] if r.get("cue_time") else None),
                 "importance": _f(r.get("importance"), 0, 1, 0.0)}
                for r in (loops.get("refresh") or [])[:10] if isinstance(r, dict) and r.get("id")]
-    return {"events": events, "loops": {"new": new, "refresh": refresh, "closed": closed}, "farewell": bool(data.get("farewell"))}
+    wh = data.get("withheld") or {}
+    if not isinstance(wh, dict):
+        wh = {}
+    wh_new = [{"what": str(w["what"]).strip()[:80], "importance": _f(w.get("importance"), 0, 1, 0.5)}
+              for w in (wh.get("new") or [])[:2] if isinstance(w, dict) and str(w.get("what") or "").strip()]
+    wh_said = [str(x) for x in (wh.get("said") or []) if x][:6]
+    return {"events": events, "loops": {"new": new, "refresh": refresh, "closed": closed},
+            "withheld": {"new": wh_new, "said": wh_said}, "farewell": bool(data.get("farewell"))}
 
 
 def turn_key(session_id: str, user_text: str, assistant_text: str) -> str:
@@ -193,10 +209,11 @@ def turn_key(session_id: str, user_text: str, assistant_text: str) -> str:
 def run(llm: Any, *, term: str, cares_about: Sequence[str], loops: Sequence[Dict[str, Any]],
         recent: Sequence[Tuple[str, str]], user_text: str, assistant_text: str, today: str,
         max_events: int = 3, retries: int = 1, pronoun: str = "她",
-        others: Optional[Dict[str, str]] = None, ledger: Optional[Sequence[Dict[str, Any]]] = None) -> Tuple[Optional[Dict[str, Any]], str, Optional[str], float]:
+        others: Optional[Dict[str, str]] = None, ledger: Optional[Sequence[Dict[str, Any]]] = None,
+        withheld: Optional[Sequence[Dict[str, Any]]] = None) -> Tuple[Optional[Dict[str, Any]], str, Optional[str], float]:
     """-> (normalized data or None, raw reply, error, ms). Retries once on a bad reply."""
     system = SYSTEM.format(term=term, today=today, kinds=", ".join(EVENT_KINDS), max_events=max_events, pronoun=pronoun)
-    user = build_user(term, cares_about, loops, recent, user_text, assistant_text, others, ledger)
+    user = build_user(term, cares_about, loops, recent, user_text, assistant_text, others, ledger, withheld)
     t0 = time.perf_counter()
     raw, err = "", None
     for attempt in range(1 + max(0, retries)):

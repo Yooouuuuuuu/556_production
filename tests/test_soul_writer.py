@@ -26,6 +26,7 @@ STRUCTURE = {
     "seeds": [{"text": "你在水彩課坐阿凜旁邊", "tags": ["you"]}, {"text": "阿凜在水彩課認識你", "tags": ["dup"]}],
     "stances": ["斷更不是罪"], "refusals": ["不畫免費的 logo"], "tensions": ["嘴上說隨便畫，心裡在意"],
     "cares_about": ["畫的東西有沒有被當真", "答應的事有沒有做到"], "vague": [],
+    "closeness": "還不算熟", "closeness_why": "水彩課認識一個多月",
 }
 THINKING = {"big5": {"openness": 0.7, "conscientiousness": 0.4, "extraversion": 0.35, "agreeableness": 0.55, "neuroticism": 0.6},
             "constants": {"self_esteem_stability": 0.4, "expressiveness": 0.3, "humor_coping": 0.6, "clinginess_cap": 0.5,
@@ -105,6 +106,11 @@ def test_full_pipeline_with_scripted_llm(tmp_path, monkeypatch):
     assert ps["character"]["big5"]["neuroticism"] == 0.6 and ps["character"]["chronotype"] == 0.9 and ps["character"]["pronoun"] == "她"
     assert ps["thinking"]["prevention"] == 0.7 and ps["thinking_choices"]["first_look"] == "people"
     assert ps["cares_about"][0] == "畫的東西有沒有被當真"
+    assert ps["relationships"]["你"] == {"bond": 0.2, "hours": 30.0}      # the structure's closeness band → the prior
+    prof = sw.read_json(d / "profile.json")
+    prof["closeness"] = "很親近"                                            # profile.json overrides the band
+    sw.write_json(d / "profile.json", prof)
+    assert sw.build_psyche(d)["relationships"]["你"]["bond"] == 0.8
     # lock + status
     lock = sw.read_json(d / "soul.lock.json")
     assert lock["version"] == sw.VERSION and lock["inputs"]["profile.json"] and lock["outputs"]["SOUL.md"]

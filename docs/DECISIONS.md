@@ -92,6 +92,20 @@ Design: `inner-life/inner-life.md` (its §0 lists every decision applied).
 - The narrator cue behind a proactive turn is never the user's words: 556d tags it, the app hides it by default and
   can show it as a note (設定 → 全域 → 程式).
 
+## Built (2026-10-19) — the five conversation mechanisms [inner-life] [prompt]
+- `inner-life.md` §24. Nothing new is a meter; every one of the five changes only the 表現 and 掛念 lines or the
+  proactive urge. The disclosure depth that the engine computed and nobody read now caps what she opens up about
+  (three sentences for layers 1–3, none at 4), so the soul skill reads "how close at the start" from the description
+  and writes it as the `relationships.你` prior — otherwise every new character would be a stranger to the user.
+- Trust uncertainty is the Beta pair's variance measured against the default prior: a character with no promise
+  history behaves exactly as before, and only evidence moves her (settled → more direct; a flat prior → more
+  玩笑／反話). Pleasure is a weight on the same 直說／收斂 threshold, named only at the extremes.
+- The withheld register is the appraisal reading her own reply (the promise rule's precedent): what she visibly
+  swallowed comes back while idle like an unresolved feeling, fades in three days if it does not, pulls the urge,
+  and is said once the pair is at the feelings layer or it has grown past 0.9 — then as a 掛念 line and as the
+  `unsaid` occasion (before share). The register drains when she says it (the appraisal's `withheld.said`) or the
+  proactive message fires, like share.
+
 ## Built (2026-10-19) — the thinking module, first pass [inner-life] [prompt]
 - `plugins/psyche/thinking.py`, separate from the emotion engine: reads energy, fatigue, arousal, pleasure, anxiety,
   the hurt gate and closeness, writes nothing. Five meters in `psyche.json` `thinking` with Big Five defaults for

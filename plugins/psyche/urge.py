@@ -63,12 +63,14 @@ def gates(*, cfg: Dict[str, Any], hour: float, activity: str, chatting: bool, pr
 
 
 def willingness(*, needs: Dict[str, float], phase: str, share_backlog: List[Dict[str, Any]],
-                hurt: float, anxiety: float, avoidance: float, clinginess_eff: float) -> float:
+                hurt: float, anxiety: float, avoidance: float, clinginess_eff: float,
+                withheld: Optional[List[Dict[str, Any]]] = None) -> float:
     gap = needs.get("affiliation_person", 0.0)
     phase_w = {"ok": 0.6, "protest": 1.2, "despair": 0.5, "detachment": 0.1}.get(phase, 0.6)
     w = gap * phase_w
     w += 0.3 * needs.get("novelty", 0.0)
     w += 0.5 * min(1.0, len(share_backlog) * 0.5)
+    w += 0.4 * min(1.0, sum(float(x.get("importance", 0.5)) for x in (withheld or [])))   # what she swallowed pulls her back
     w += 0.3 * hurt if hurt < 0.4 else -0.3 * hurt      # a little hurt pulls, a lot pushes away
     w += 0.15 * anxiety - 0.3 * avoidance
     gain = 0.5 + 1.3 * clinginess_eff                   # urge_will_clinginess_gain 0.5–1.8
@@ -77,9 +79,10 @@ def willingness(*, needs: Dict[str, float], phase: str, share_backlog: List[Dict
 
 def occasion(*, due_loops: List[Dict[str, Any]], share_backlog: List[Dict[str, Any]], care_loops: List[Dict[str, Any]],
              phase: str, needs: Dict[str, float], floor: float,
-             report_loops: Optional[List[Dict[str, Any]]] = None) -> Tuple[float, str, Optional[Dict[str, Any]]]:
+             report_loops: Optional[List[Dict[str, Any]]] = None,
+             unsaid: Optional[List[Dict[str, Any]]] = None) -> Tuple[float, str, Optional[Dict[str, Any]]]:
     """(O, kind, payload). Due loops first (they are also handled as 'on time' by the engine), then an answer she
-    fetched for you (report_back), then the rest."""
+    fetched for you (report_back), then something she held back and can now say (unsaid), then the rest."""
     for l in due_loops:
         if l.get("origin") == "her_promise":
             return 1.0, "return_promise", l
@@ -90,6 +93,8 @@ def occasion(*, due_loops: List[Dict[str, Any]], share_backlog: List[Dict[str, A
         return 1.0, "report_back", l
     if care_loops:
         return 0.8, "care", care_loops[0]
+    if unsaid:
+        return 0.5 + 0.5 * float(unsaid[0].get("importance", 0.5)), "unsaid", unsaid[0]
     if share_backlog:
         return 0.6 + 0.4 * float(share_backlog[0].get("importance", 0.4)), "share", share_backlog[0]
     if phase in ("protest",) and needs.get("affiliation_person", 0.0) >= 0.5:

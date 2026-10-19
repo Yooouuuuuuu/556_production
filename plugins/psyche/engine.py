@@ -136,6 +136,7 @@ class Engine:
                                         "farewell_until": None, "pending": None, "answered_14d": [1.0] * 4}
         self.pm = T.fresh()
         self.share_backlog: List[Dict[str, Any]] = []
+        self.withheld: List[Dict[str, Any]] = []        # what she held back in a reply (the appraisal read it): per counterpart
         self.projects: List[Dict[str, Any]] = [dict(p) for p in cfg.get("life", {}).get("projects", [])]
         self.day: Dict[str, Any] = {"date": None, "hour": None, "weekday": None, "event": None}
         self.rel: Dict[str, Dict[str, Any]] = {}        # L5 per counterpart
@@ -274,6 +275,14 @@ class Engine:
         day = self.local(self.time_of(k)).strftime("%Y-%m-%d")
         return random.Random(f"{self.char}:{day}:{k}:{salt}")
 
+    def _unlocked_withheld(self, p: str, t: float) -> List[Dict[str, Any]]:
+        """The held-back things she could say to p now: the pair has reached the feelings layer (depth ≥ 3), or the
+        thing has grown until it has to come out. Below that she keeps holding it — it still pulls her and comes back."""
+        rel = self._rel(p)
+        depth = RL.depth_now(rel, t)
+        out = [w for w in self.withheld if (w.get("counterpart") or MAIN) == p and (depth >= 3 or float(w.get("importance", 0.5)) >= 0.9)]
+        return sorted(out, key=lambda w: -float(w.get("importance", 0.5)))
+
     def _rumination_coef(self) -> float:
         """How readily an unresolved negative feeling comes back: the character's `rumination` knob, else neuroticism
         (Verduyn: rumination is the strongest predictor of duration; made authorable in 0.8.8)."""
@@ -314,7 +323,8 @@ class Engine:
                 "stack_counts": dict(self.stack_counts), "last_block": self.last_block, "sleep": dict(self.sleep),
                 "fatigue": self.fatigue, "activity": self.activity, "needs": dict(self.needs), "contact": dict(self.contact),
                 "pm": {k: (list(v) if isinstance(v, list) else v) for k, v in self.pm.items()},
-                "share_backlog": list(self.share_backlog), "projects": [dict(p) for p in self.projects], "day": dict(self.day),
+                "share_backlog": list(self.share_backlog), "withheld": [dict(w) for w in self.withheld],
+                "projects": [dict(p) for p in self.projects], "day": dict(self.day),
                 "rel": self.rel, "rel_words": {p: RL.closeness_words(r, self._name(p)) for p, r in self.rel.items()},
                 "ledger": self.ledger, "others": self.others, "gain_adj": dict(self.gain_adj), "last_strategy": dict(self.last_strategy)}
 
@@ -336,6 +346,7 @@ class Engine:
             self.pm = {**T.fresh(), **s["pm"]}
         seen: set = set()
         self.share_backlog = [x for x in s.get("share_backlog", []) if not (x.get("what") in seen or seen.add(x.get("what")))]
+        self.withheld = [dict(w) for w in s.get("withheld", []) if w.get("what")]
         if s.get("projects"):
             self.projects = [dict(p) for p in s["projects"]]
         self.day = {**self.day, **s.get("day", {})}
@@ -582,6 +593,20 @@ class Engine:
                     inst["rumination"] = int(inst.get("rumination", 0)) + 1
                     self.conn.execute("UPDATE instances SET intensity0=?, born_at=?, born_tick=? WHERE id=?", (inst["intensity0"], t, k, inst["id"]))
                     self._event("rumination", {"instance": inst["id"], "type": inst["type"], "count": inst["rumination"]}, t, dedup=f"rum:{k}:{inst['id']}")
+        # what she held back (2.3): comes back the same way while idle, fades (three-day half-life) when it does not
+        if self.withheld:
+            keep: List[Dict[str, Any]] = []
+            for w in self.withheld:
+                imp = float(w.get("importance", 0.5)) * 0.5 ** (dt_h / 72.0)
+                if self.activity not in ("sleep", "chat") and int(w.get("rum", 0)) < 3:
+                    if rng.random() < 0.5 * imp * self._rumination_coef() * (1.0 - attention) * dt_h:
+                        imp, w["rum"] = min(1.0, imp * 1.2), int(w.get("rum", 0)) + 1
+                        self._event("rumination", {"withheld": w["id"], "what": w["what"], "count": w["rum"]}, t, counterpart=w.get("counterpart") or MAIN,
+                                    dedup=f"rum:{k}:{w['id']}")
+                w["importance"] = imp   # not rounded per tick: a rounding bias would eat a quarter of it over three days
+                if imp >= 0.1:
+                    keep.append(w)
+            self.withheld = keep
         # --- L2 core affect and mood
         act = self.active(t)
         pos = sum(i["intensity"] for i in act if i["type"] in model.POSITIVE)
@@ -779,15 +804,18 @@ class Engine:
             rel = self._rel(p)
             needs_p = dict(self.needs)
             needs_p["affiliation_person"] = self._need_of(p)
+            wh_p = [w for w in self.withheld if (w.get("counterpart") or MAIN) == p]
             W = U.willingness(needs=needs_p, phase=c.get("phase", "ok"), share_backlog=self.share_backlog, hurt=hurt, anxiety=anx,
-                              avoidance=avo, clinginess_eff=float(ch.get("clinginess_cap", 0.5)) * (rel["attachment"] if p != MAIN else float(self.cfg.get("needs", {}).get("attachment_strength", 0.4))))
+                              avoidance=avo, clinginess_eff=float(ch.get("clinginess_cap", 0.5)) * (rel["attachment"] if p != MAIN else float(self.cfg.get("needs", {}).get("attachment_strength", 0.4))),
+                              withheld=wh_p)
             olive = RL.olive_branch_due(self.ledger.get(p, []), t=t, last_contact=c.get("last_turn_at"),
                                         clinginess_eff=self.clinginess_eff, avoidance=rel["avoidance"])
             if olive is not None:
                 O, kind, payload = 0.9, "olive_branch", {"what": olive["cause"], "entry": olive["id"]}
             else:
                 O, kind, payload = U.occasion(due_loops=due, share_backlog=self.share_backlog, care_loops=care, phase=c.get("phase", "ok"),
-                                              needs=needs_p, floor=float(pc.get("occasion_floor", 0.1)), report_loops=reports)
+                                              needs=needs_p, floor=float(pc.get("occasion_floor", 0.1)), report_loops=reports,
+                                              unsaid=self._unlocked_withheld(p, t))
             if kind in ("reminder", "return_promise", "report_back") and payload is not None:
                 lam = float("inf")
             else:
@@ -921,6 +949,26 @@ class Engine:
                 continue
             self._finish(l, "closed", t, "ok")       # settled in conversation: it came to something
             self.needs["certainty"] = max(0.0, self.needs["certainty"] - 0.2)
+        wh = data.get("withheld") or {}
+        for wid in wh.get("said") or []:
+            w = next((x for x in self.withheld if x["id"] == str(wid)), None)
+            if w is not None:
+                self.withheld = [x for x in self.withheld if x["id"] != w["id"]]
+                self._event("withheld_said", {"id": w["id"], "what": w["what"]}, t, counterpart=p, dedup=f"wh_said:{aid}:{w['id']}")
+        for i, w in enumerate(wh.get("new") or []):
+            what = str(w.get("what") or "").strip()
+            if not what:
+                continue
+            alnum = lambda s_: "".join(ch for ch in s_ if ch.isalnum())   # quotes and marks differ between phrasings
+            dup = next((x for x in self.withheld if (x.get("counterpart") or MAIN) == p and self._similar(alnum(x["what"]), alnum(what)) >= 0.5), None)
+            if dup is not None:   # the same thing swallowed again weighs more
+                dup["importance"] = round(min(1.0, max(float(dup["importance"]), float(w.get("importance", 0.5))) + 0.1), 4)
+                continue
+            rec = {"id": f"wh_{k}_{aid}_{i}", "what": what, "at": t, "counterpart": p, "importance": round(float(w.get("importance", 0.5)), 4),
+                   "turn_id": turn_id, "rum": 0}
+            self.withheld = sorted(self.withheld + [rec], key=lambda x: -float(x["importance"]))[:6]
+            if rec in self.withheld:
+                self._event("withheld_opened", {"id": rec["id"], "what": what, "importance": rec["importance"]}, t, counterpart=p, dedup=f"wh:{rec['id']}")
         if data.get("farewell"):
             self.contact["farewell_until"] = t + 8 * 3600
         self.conn.execute("UPDATE appraisals SET applied_tick=? WHERE id=?", (k, aid))
@@ -976,6 +1024,8 @@ class Engine:
                 self._save_loop(l)
             if fk == "share":
                 self.share_backlog = [s for s in self.share_backlog if s.get("what") != what]
+            elif fk == "unsaid":
+                self.withheld = [w for w in self.withheld if w.get("what") != what]
             if fk != "ask_other":  # a question carried to another character is not one of her messages to you
                 self.contact["proactive_today"] = int(self.contact["proactive_today"]) + 1
             self._contact_of(cp)["pending"] = {"kind": fk, "what": what, "at": t, "tick": k, "loop": lid}
@@ -1304,10 +1354,11 @@ class Engine:
                 today = self.local(job["at"]).strftime("%Y-%m-%d %H:%M")
                 ac = self.cfg["appraisal"]
                 ledger = [{"id": e["id"], "cause": e["cause"]} for e in self.ledger.get(cp, []) if e.get("resolved_at") is None]
+                withheld = [{"id": w["id"], "what": w["what"]} for w in self.withheld if (w.get("counterpart") or MAIN) == cp]
                 data, raw, err, ms = A.run(self.llm, term=job["term"], cares_about=self.cfg.get("cares_about", []), loops=loops,
                                            recent=job["recent"], user_text=job["user"], assistant_text=job["assistant"], today=today,
                                            max_events=int(ac["max_events"]), retries=int(ac["retries"]), pronoun=self.pr,
-                                           others=self._known_others(), ledger=ledger)
+                                           others=self._known_others(), ledger=ledger, withheld=withheld)
                 self.record_appraisal(data, raw=raw, error=err, ms=ms, turn_id=job["turn_id"], counterpart=job.get("counterpart", MAIN),
                                       platform=job["platform"], at=job["at"])
                 if err:
@@ -1463,15 +1514,22 @@ class Engine:
             if heart:
                 lines.append("心裡：" + heart)
             dominant = act[0] if act else None
+            pleasure = float(self.mood[0])
+            depth = RL.depth_now(rel, t)
             name, how = RL.strategy(dominant, character=ch, rel=rel, gate=gate, other_tired=tired, rng_u=self._rng(self.tick, "expr").random(),
-                                    negative_types=model.NEGATIVE, shown=act[:2])
+                                    negative_types=model.NEGATIVE, shown=act[:2], pleasure=pleasure, uncertainty=RL.trust_uncertainty(rel))
             self.last_strategy[counterpart] = name
+            cap = RL.depth_words(depth)   # 2.4: the disclosure depth caps what she opens up about; nothing to say at the deepest layer
+            if cap and name != "suppress":
+                how.append(cap)
             if self.activity == "woken":
                 how.append("很睏，回一兩句就好")
             elif self.energy < 0.35 or self.fatigue > 0.6 or rel["avoidance"] > 0.6:
                 how.append("話少一點")
-            elif self.affect["ar"] > 0.75:
+            elif self.affect["ar"] > 0.75 or (pleasure > 0.5 and self.energy >= 0.5):
                 how.append("可以多說一點")
+            elif pleasure < -0.4:
+                how.append("話少一點")
             if self.activity == "work":
                 how.append(f"手上在忙，可以回短一點或說等{self.pr}一下，忙完會回來找他")
             if len(act) >= 2 and ((act[0]["type"] in model.POSITIVE) != (act[1]["type"] in model.POSITIVE)):
@@ -1504,8 +1562,10 @@ class Engine:
                 if l["state"] == "answered":
                     return f"（問到了：{str(l.get('answer'))[:24]}）" if l.get("answer") else "（去問了，沒問到）"
                 return ""
-            if waiting:
-                lines.append("掛念：" + "、".join(l["what"] + tag(l) for l in waiting[:2]))
+            held = self._unlocked_withheld(counterpart, t)[:1]   # 2.3: an unsaid thing she can now say sits with what is on her mind
+            if waiting or held:
+                items = [l["what"] + tag(l) for l in waiting[:2]] + [f"有件事還沒跟{term}說（{w['what']}）" for w in held]
+                lines.append("掛念：" + "、".join(items))
             dom_type = dominant["type"] if dominant else None
             prev = self.last_block.get("dominant")
             prev_word = self.last_block.get("word")
@@ -1532,7 +1592,7 @@ class Engine:
                     "p_expected": T.p_expected(self.pm, d.weekday(), d.hour + d.minute / 60.0),
                     "instances": [{k: v for k, v in i.items() if k != "pad"} for i in self.active(t)],
                     "loops": [l for l in self.loops.values() if l["state"] not in ("closed", "expired")],
-                    "share_backlog": list(self.share_backlog), "block": self.last_block.get("text", ""),
+                    "share_backlog": list(self.share_backlog), "withheld": [dict(w) for w in self.withheld], "block": self.last_block.get("text", ""),
                     "rel": {p: {**r, "trust_value": RL.trust_value(r), "words": RL.closeness_words(r, self._name(p))} for p, r in self.rel.items()},
                     "ledger": {p: [e for e in v if e.get("resolved_at") is None] for p, v in self.ledger.items()},
                     "others": {p: {"need": o["need"], "phase": o["contact"].get("phase"), "last_turn_at": o["contact"].get("last_turn_at")} for p, o in self.others.items()},

@@ -51,6 +51,45 @@ def trust_value(rel: Dict[str, Any]) -> float:
     return a / max(1e-6, a + b)
 
 
+def trust_variance(rel: Dict[str, Any]) -> float:
+    """The Beta pair's variance αβ/((α+β)²(α+β+1)): how little evidence she has about how he keeps his word."""
+    a, b = rel["trust"]
+    s = max(1e-6, a + b)
+    return a * b / (s * s * (s + 1.0))
+
+
+U_DEFAULT = 12.0 * 2.0 / (9.0 * 4.0)  # the default prior (2, 1) on the 0–1 scale: the neutral point
+
+
+def trust_uncertainty(rel: Dict[str, Any]) -> float:
+    """0–1: 1 at the flat prior (1, 1), two thirds at the default prior, toward 0 as promises are kept or broken.
+    The 2026-10-14 brief, mechanism 2.5: uncertainty about how he takes things makes her less direct — more
+    玩笑／反話 — and evidence makes her more direct. Measured against the default prior so a character with no
+    history behaves exactly as before."""
+    return _c(12.0 * trust_variance(rel))
+
+
+def depth_now(rel: Dict[str, Any], t: float) -> int:
+    """The disclosure depth she will go to with this person this turn (1 喜好 → 2 看法 → 3 感受 → 4 脆弱處;
+    Altman & Taylor): the bond's layer, one more while he just opened up, one less while her avoidance is high."""
+    d = disclosure_now(rel, t)
+    if float(rel.get("avoidance", 0.0)) > 0.6:
+        d -= 1
+    return max(1, min(4, d))
+
+
+DEPTH_CAP = {
+    1: "自己的事先不多講，聊喜好跟日常就好",
+    2: "可以講自己的看法，感受先留著",
+    3: "可以講感受，最軟的那塊先留著",
+}
+
+
+def depth_words(depth: int) -> Optional[str]:
+    """The cap on what she opens up about, for the 表現 line; None at the deepest layer (nothing to cap)."""
+    return DEPTH_CAP.get(int(depth))
+
+
 def ppr_mean(rel: Dict[str, Any]) -> float:
     p = rel["ppr"]
     return (p["understood"] + p["validated"] + p["cared"]) / 3.0
@@ -226,14 +265,20 @@ def expressed_level(felt: float, *, expressiveness: float, bond: float, suppress
 
 
 def strategy(dominant: Optional[Dict[str, Any]], *, character: Dict[str, Any], rel: Dict[str, Any], gate: float,
-             other_tired: bool, rng_u: float, negative_types: set, shown: Optional[List[Dict[str, Any]]] = None) -> Tuple[str, List[str]]:
+             other_tired: bool, rng_u: float, negative_types: set, shown: Optional[List[Dict[str, Any]]] = None,
+             pleasure: float = 0.0, uncertainty: float = U_DEFAULT) -> Tuple[str, List[str]]:
     """(strategy name, lines for the 表現 line). Strategy by §15: direct / reserved / humor / inverted / denial;
-    hurt closes the inverted route; a tired counterpart suppresses her own negatives (delayed, not cancelled)."""
+    hurt closes the inverted route; a tired counterpart suppresses her own negatives (delayed, not cancelled).
+    Two weights from the 2026-10-14 brief: the mood's pleasure (−1..1) pushes a borderline character toward 直說
+    when good and toward 收斂 when bad, and at the extremes names the tone (2.1); trust uncertainty above the
+    default makes 玩笑／反話 likelier, evidence makes them rarer (2.5)."""
     lines: List[str] = []
-    expr = float(character.get("expressiveness", 0.6))
+    expr = float(character.get("expressiveness", 0.6)) + 0.15 * _c(pleasure, -1.0, 1.0)
     tsun = float(character.get("tsundere_tendency", 0.3))
-    humor = float(character.get("humor_coping", 0.5))
+    indirect = _c(uncertainty) - U_DEFAULT                      # −0.67 (settled) … +0.33 (no idea how he takes things)
+    humor = float(character.get("humor_coping", 0.5)) + 0.2 * indirect
     assertive = float(character.get("assertiveness", 0.6))
+    direct = "直說，話可以隨便一點" if pleasure > 0.4 else "直說，但客氣一點" if pleasure < -0.3 else "直說"
     name = "direct"
     vul = next((i for i in (shown or ([dominant] if dominant else [])) if i["type"] in VULNERABLE), None)
     if dominant is not None:
@@ -245,7 +290,7 @@ def strategy(dominant: Optional[Dict[str, Any]], *, character: Dict[str, Any], r
         elif gate >= 0.1 and neg:
             name = "reserved"
             lines.append("心裡有委屈：不說反話，話少一點、語氣淡一點，不追討；被問到可以說「沒事啊」")
-        elif vul is not None and tsun >= 0.3 and rng_u < tsun * V_COST.get(vul["type"], 0.5) * (0.3 + 0.7 * rel["bond"]) * (1.0 - gate):
+        elif vul is not None and tsun >= 0.3 and rng_u < tsun * V_COST.get(vul["type"], 0.5) * (0.3 + 0.7 * rel["bond"]) * (1.0 - gate) * (1.0 + 0.6 * indirect):
             name = "inverted"
             lines.append("真心話用反話帶過，但一定要留破綻讓他看得出來")
         elif neg and humor >= 0.6:
@@ -255,8 +300,8 @@ def strategy(dominant: Optional[Dict[str, Any]], *, character: Dict[str, Any], r
             name = "reserved"
             lines.append("收斂，點到為止" + ("（還不熟）" if rel["bond"] < 0.25 else ""))
         else:
-            lines.append("直說")
+            lines.append(direct)
     else:
-        lines.append("直說" if expr >= 0.5 else "收斂，點到為止")
+        lines.append(direct if expr >= 0.5 else "收斂，點到為止")
     lines.append("不同意時直說自己的看法" if assertive >= 0.5 else "不同意時先收著，不附和也不爭")
     return name, lines

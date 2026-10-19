@@ -9,6 +9,7 @@ import { t } from '../i18n';
 
 const STEMS = ['01-她是誰', '02-背景', '03-發生過的事', '04-說話的方式', '05-怎麼想', '06-跟人相處', '07-喜好', '08-立場', '09-身邊的人', '10-其他'];
 const PHASES = ['intake', 'structure', 'thinking', 'voice', 'reactions', 'parts', 'assemble', 'verify'];
+const CLOSENESS = ['剛認識', '還不算熟', '朋友', '很熟', '很親近']; // the bands of tools/soul_writer.py CLOSENESS
 const METERS = ['rationality', 'experientiality', 'promotion', 'prevention', 'maximizing'];
 const BIG5 = ['openness', 'conscientiousness', 'extraversion', 'agreeableness', 'neuroticism'];
 const CONSTANTS = ['self_esteem_stability', 'expressiveness', 'humor_coping', 'clinginess_cap', 'tsundere_tendency', 'assertiveness', 'chronotype'];
@@ -95,7 +96,7 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
     if (!id || !profile) return;
     setBusy(true); setNotice(null);
     try {
-      const r = await chars.saveProfile(id, { pronoun: profile.pronoun, big5: profile.big5, constants: profile.constants, thinking: profile.thinking, choices: profile.choices });
+      const r = await chars.saveProfile(id, { pronoun: profile.pronoun, closeness: profile.closeness ?? null, big5: profile.big5, constants: profile.constants, thinking: profile.thinking, choices: profile.choices });
       setProfile(r.profile); setNotice({ kind: 'ok', text: t('newchar.saved') });
     } catch (e) { setNotice({ kind: 'err', text: String(e) }); } finally { setBusy(false); }
   }
@@ -231,6 +232,14 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
                       {evidence(k) && <div className="text-xs opacity-60 mt-1">{evidence(k)}</div>}
                     </div>
                   ))}
+                </div>
+                <div className="rounded-lg bg-white/5 p-2">
+                  <label className={label}>{t('newchar.closeness')}</label>
+                  <select className={field} value={profile.closeness ?? detail?.build?.structure?.closeness ?? ''} onChange={(e) => setProfile({ ...profile, closeness: e.target.value || null })}>
+                    <option value="">—</option>
+                    {CLOSENESS.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                  <div className="text-xs opacity-60 mt-1">{detail?.build?.structure?.closeness_why || t('newchar.closeness_hint')}</div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   {Object.keys(CHOICES).map((k) => (

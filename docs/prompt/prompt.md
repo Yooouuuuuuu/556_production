@@ -421,8 +421,10 @@ compile of §2.5 kept as a first-class route, so a character exists after five m
 4. **The thinking module** — §2.5: the `thinking` block with five meters and the two recorded choices, the
    想法 renderer, rumination as a knob, dial 4's rendered line, and the reading-care scalar (2.2 below) inside
    it. Each meter ships with a simulator scenario. Then the blind validation on the test character.
-5. **The five conversation mechanisms** (checked 2026-10-14 against the engine; they belong to `inner-life.md`
-   when built), by cost: rendering the disclosure depth per counterpart and letting the 表現 line cap what she
+5. **The five conversation mechanisms** ✅ built 0.8.9 (`inner-life.md` §24; `relation.depth_now` / `depth_words`,
+   `trust_uncertainty`, `strategy(pleasure=, uncertainty=)`, the engine's `withheld` register with the appraisal's
+   `withheld` field and the `unsaid` occasion; the skill's closeness band → `relationships.你`). As planned
+   (checked 2026-10-14 against the engine), by cost: rendering the disclosure depth per counterpart and letting the 表現 line cap what she
    opens up about (the number exists and nothing reads it); trust variance from the Beta pair weighting 玩笑／反話
    (uncertainty → indirectness); pleasure weighting 直說 and the length hint (good mood = more direct, less
    polite — absent today, nothing points the wrong way); a withheld-things register shaped like `share_backlog`

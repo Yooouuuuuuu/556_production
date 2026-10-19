@@ -23,6 +23,7 @@ REASONS = {
     "return_promise": "她之前跟{term}說「等我一下」，現在忙完了，回來找他",
     "care": "{term}說過的事到了：{what}，她想關心一下",
     "share": "她今天有件事想告訴{term}：{what}",
+    "unsaid": "有件事她那時候沒說出口，一直放在心裡：{what}。現在想跟{term}說了",
     "longing": "有一陣子沒跟{term}說到話了，她想找他",
     "olive_branch": "之前的事她還有點在意，但想主動給個台階",
     "ask_other": "她之前答應了{who}要幫忙問{term}一件事：{what}。現在她有空，來問{term}",

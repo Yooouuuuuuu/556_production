@@ -786,6 +786,31 @@ expressed_i = felt_i × g_expressiveness × g_disclosure(B[p]) × g_context × (
 話就是她的習慣。思考媒介與情境權重（dial 1、6）只記錄選項（`thinking_choices`），文字由 SOUL 承載，引擎不讀。反芻改為
 可設的 `character.rumination`（空白＝神經質）。
 
+## 24. 五個對話機制（0.8.9，設計在 `../prompt/prompt.md` §3 第 5 項；2026-10-14 的簡報第二部分）
+
+五個小機制，都只動「表現」與「掛念」兩行和主動行為，不新增刻度、不改情緒的強度或半衰期：
+
+1. **揭露深度有人讀了（2.4）。** `disclosure_depth[p]`（§13，1 喜好 → 2 看法 → 3 感受 → 4 脆弱處）之前算了沒人用。現在
+   `relation.depth_now`：親近給的層數，對方剛敞開過一天內加一層，迴避高減一層。「表現」行在第四層以下多一句上限
+   （自己的事先不多講，聊喜好跟日常就好／可以講自己的看法，感受先留著／可以講感受，最軟的那塊先留著），第四層沒有這句。
+   靈魂技能從描述判斷「一開始多熟」（剛認識／還不算熟／朋友／很熟／很親近，`profile.json` 的 `closeness` 可改），寫成
+   `psyche.json` 的 `relationships.你` 起始親近與時數，所以新角色不會一律從陌生人開始。
+2. **信任的不確定度進玩笑與反話（2.5）。** Beta 信任對的變異數 αβ/((α+β)²(α+β+1))，乘十二壓到 0–1（`trust_uncertainty`：
+   平先驗 1，預設先驗 (2, 1) 是三分之二，承諾守或破之後往 0）。以預設先驗為中性點：比預設更摸不準他會怎麼接，反話的機率乘
+   到 1.2、幽默門檻降到 0.53；證據累積後反話乘到 0.6、門檻升到 0.73。沒有歷史的角色跟以前一模一樣。
+3. **心情的愉悅進直說與長度（2.1）。** 外放度加 0.15 × 愉悅（−1…1）再過 0.5 的門檻：心情好把內斂邊緣的人推到直說，心情差把
+   外放邊緣的人推回收斂；極端時點名語氣（愉悅 > 0.4：直說，話可以隨便一點；< −0.3：直說，但客氣一點）。長度提示多兩條：
+   愉悅 > 0.5 且有精神 → 可以多說一點；愉悅 < −0.4 → 話少一點（在很睏、沒精神、迴避高之後判斷）。
+4. **沒說出口的事（2.3，最值錢的一個）。** 評估管線 A 讀她自己的回覆，找她明顯吞下去的——換話題、答非所問、「沒事」「算了」、
+   句子起頭又收掉——每回合最多兩條（`withheld.new`，附重要性），和 2026-10-14 的承諾規則一樣是「A 讀她的回覆」。引擎的
+   `withheld` 登錄（每對象，最多六條，相似的合併並加重）：閒著的時候跟負向實例一樣會回來（反芻係數 × 重要性 × 閒置注意力，
+   每次 ×1.2，最多三次），不回來就三天半衰、低於十分之一消失；拉主動意願（+0.4 × 重要性總和）；揭露深度到第三層（感受）或
+   重要性漲到 0.9 時解鎖——「掛念」行多一條「有件事還沒跟他說（…）」，主動時機多一種 `unsaid`（排在 care 之後、share 之前）；
+   她說出來（A 回報 `withheld.said` 的 id，或主動訊息送出）就從登錄移除。沒解鎖時她照樣放在心裡、照樣被拉，只是不說。
+5. **讀對方的用心（2.2）** 已在 §23 的思考模組：親近又累就懶得猜，想好再回又事情大就多想一下，只在兩端出現一行。
+
+測試：`tests/test_mechanisms.py`（十三個情境）。
+
 ## 22. 值得討論（實作時參考）
 
 依影響範圍排序。
@@ -1365,6 +1390,9 @@ PAD 值為記憶中的 ALMA 對照表，實作前核對原文。實例貢獻：�
 | 揭露深度增益 | disclosure gain | `g_disclosure(B)` | 函數 | 0–1 | 社會滲透 |
 | 情境增益 | context gain | `g_context` | param | 語音／Telegram／深夜 | 設計 |
 | 表達策略 | expression strategy | `direct / reserved / humor / inverted / denial` | 列舉 | — | 設計 |
+| 揭露上限句 | disclosure cap line | `depth_now`, `depth_words` | 輸出 | 第 1–3 層各一句，第 4 層無 | 社會滲透（0.8.9） |
+| 信任不確定度 | trust uncertainty | `trust_uncertainty` | derived | 12 × Beta 變異數，預設先驗 ⅔ 為中性點 | 設計（0.8.9） |
+| 愉悅對直說的權重 | pleasure → directness | `strategy(pleasure=)` | 權重 | 外放 + 0.15 × 愉悅 | Forgas 方向（0.8.9） |
 | 反話 | inverted (ironic) expression | `inverted` | 策略 | — | Keltner 2001、Dews & Winner 1995 |
 | 脆弱成本 | vulnerability cost | `vulnerability_cost[k]` | param | 想念、不捨高 | 設計 |
 | 安全門 | safety gate | `safety_gate(B)` | 函數 | B 低 → 0 | 設計 |
@@ -1389,7 +1417,8 @@ PAD 值為記憶中的 ALMA 對照表，實作前核對原文。實例貢獻：�
 | 阻尼 | damping | `urge_damping` | state | 0–1 | 原設計 + ElliQ 經驗 |
 | 每日上限 | proactive daily cap | `proactive_daily_cap` | param | 使用者設定 | 設計 |
 | 使用量門檻 | usage threshold | `usage_threshold_min` | param | 分鐘 | Fang 2025 方向 |
-| 主動類型 | proactive types | `return_promise / care / share / olive_branch / anniversary / longing` | 列舉 | — | 設計 |
+| 主動類型 | proactive types | `return_promise / care / unsaid / share / olive_branch / anniversary / longing` | 列舉 | — | 設計 |
+| 沒說出口的事 | withheld register | `withheld[]` | state | 每對象 ≤ 6 條，三天半衰，反芻 ×1.2 ≤ 3 次 | 設計（0.8.9） |
 | 事件 turn | event turn | `X-556-Event` | 標頭 | 引擎送進她自己的 API；556d 送 Telegram | 決定 2026-10-07 |
 | 時間抖動 | timing jitter | `timing_jitter_min` | param | 分鐘 | 設計 |
 
