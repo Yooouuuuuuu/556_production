@@ -92,6 +92,15 @@ Design: `inner-life/inner-life.md` (its §0 lists every decision applied).
 - The narrator cue behind a proactive turn is never the user's words: 556d tags it, the app hides it by default and
   can show it as a note (設定 → 全域 → 程式).
 
+## Decided (2026-10-19) — no tools at baseline; the avatar parked [prompt] [structure] [app]
+- Option C from `prompt/around-the-soul.md` §2, after the 真音 test: every character's `platform_toolsets` lists are empty
+  at baseline (556d removes `memory` from them before a start; `new-companion.ps1` writes empty lists). Memory is
+  injected every turn by kokoro's prompt section and the Memory block and is not a tool; the two kokoro tools were
+  never called in 79 turns, and without tools the three tool-only guidance blocks and the shim's preamble never appear.
+  An extension (查網路) brings the scaffold back for that character only; the preamble was reworded for that case.
+- The avatar window is hidden by default. Nothing about the avatar is designed or touched until the core
+  (`prompt.md` §3) is done.
+
 ## Built (2026-10-16) — prompt hygiene, first pass [prompt] [structure]
 - The vendor text has two kinds of removal and both run every time: the switches Hermes offers are written into her
   `config.yaml` before every start (idempotent), and the paragraphs with no switch are dropped by the shim by their

@@ -40,7 +40,7 @@ $link = Join-Path $Dir "plugins\kokoro"
 if (-not (Test-Path $link)) { New-Item -ItemType Junction -Path $link -Target (Join-Path $Root "plugins\kokoro") | Out-Null }
 $link = Join-Path $Dir "plugins\psyche"
 if (-not (Test-Path $link)) { New-Item -ItemType Junction -Path $link -Target (Join-Path $Root "plugins\psyche") | Out-Null }
-# tools: baseline = memory only (kokoro); Hermes's built-in memory writer off (kokoro injects people/<you>.md); extensions via Settings
+# tools: baseline = none (0.8.6; memory is injected, not a tool); Hermes's built-in memory writer off; extensions via Settings
 $cfgPath = Join-Path $Dir "config.yaml"
 $raw = Get-Content $cfgPath -Raw -Encoding UTF8
 if ($raw -match '(?m)^memory:\s*\r?\n\s+provider: kokoro') {
@@ -49,11 +49,13 @@ if ($raw -match '(?m)^memory:\s*\r?\n\s+provider: kokoro') {
     $raw = $raw.TrimEnd() + "`nmemory:`n    provider: kokoro`n    memory_enabled: false`n    user_profile_enabled: false`n"
 }
 # her inner life: the psyche plugin must be on the opt-in list (plugins.enabled); kokoro is activated by memory.provider
-if ($raw -match '(?m)^plugins:\s*?
-\s+enabled: \[\]') { $raw = $raw -replace '(?m)^plugins:\s*?
+if ($raw -match '(?m)^plugins:\s*
+?
+\s+enabled: \[\]') { $raw = $raw -replace '(?m)^plugins:\s*
+?
 (\s+)enabled: \[\]', "plugins:`n`$1enabled: [psyche]" }
 elseif ($raw -notmatch '(?m)^plugins:') { $raw = $raw.TrimEnd() + "`nplugins:`n    enabled: [psyche]`n" }
-if ($raw -notmatch '(?m)^platform_toolsets:') { $raw = $raw.TrimEnd() + "`nplatform_toolsets:`n    api_server: [memory]`n    telegram: [memory]`n    cli: [memory]`n" }
+if ($raw -notmatch '(?m)^platform_toolsets:') { $raw = $raw.TrimEnd() + "`nplatform_toolsets:`n    api_server: []`n    telegram: []`n    cli: []`n" }
 Set-Content $cfgPath -Encoding UTF8 -NoNewline -Value $raw
 # starting and stopping her is routine in 556: no "Gateway shutting down" pings in her DM (dev knob telegram.restart_notice)
 $cfg = Join-Path $Dir "config.yaml"

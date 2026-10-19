@@ -241,7 +241,7 @@ class KokoroMemoryProvider(MemoryProvider):
                 "記憶：每一回合會附上一段「Memory」。「Facts (long-term)」是你記得的事（標 [high] 的很確定，沒標的很可能對）；"
                 "「Notes (recent, dated)」是近期的紀錄，一行一件、帶日期。對不上的時候：對話本身最準；其次是最新的一條，不分種類；"
                 "事實和紀錄平手時事實優先。「[archived: …]」是對方不想被提起的話題——絕不說出內容，只有對方自己碰到時才問一句要不要聊。"
-                "記憶裡沒有的事就是不知道，不編、不猜；可以用 kokoro_search 再找。")
+                "記憶裡沒有的事就是不知道，不編、不猜。")
 
     # -- per turn ------------------------------------------------------------
     def prefetch(self, query: str, *, session_id: str = "") -> str:

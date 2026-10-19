@@ -49,6 +49,9 @@ What landed since:
   (the checks, the blind read-back, the SOUL, 安裝 → profile created, files copied, seeds loaded → start her on 名單).
   Packages with a hand-written SOUL (the cast) are marked and never overwritten. Backend: `/api/characters` and the
   skill as a 556d job (`internal/api/characters.go`). 0.8.0 was the skill itself (`tools/soul_writer.py`, no UI).
+- **0.8.6** (2026-10-19): the avatar window is hidden by default (設定 → 全域 → 啟動時顯示角色 off); the avatar is parked
+  until the core is done. 能力: the baseline is no tool at all — memory is injected every turn, not called; 查網路
+  and later extensions still switch on per character.
 - **0.7.9** (2026-10-15): no UI change. `docs/prompt/` — the request she answers, verified, and the 0.8.0 design
   (six-part SOUL, thinking dials, pinned groups, clock line, vendor-text filter).
 - **Coming**: see

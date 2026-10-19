@@ -49,6 +49,28 @@ func ensurePromptHygiene(dir string) (bool, error) {
 	for platform, text := range platformHintZH {
 		want([]string{"platform_hints", platform, "replace"}, text, "!!str")
 	}
+	// option C (0.8.6): the old baseline toolset "memory" leaves every platform list; extensions stay
+	for _, platform := range toolPlatforms {
+		seq := yamlFind(root, []string{"platform_toolsets", platform})
+		if seq == nil || seq.Kind != yaml.SequenceNode {
+			continue
+		}
+		var keep []string
+		had := false
+		for _, n := range seq.Content {
+			if n.Value == "memory" {
+				had = true
+				continue
+			}
+			if n.Value != "" {
+				keep = append(keep, n.Value)
+			}
+		}
+		if had {
+			setYAMLSequence(root, []string{"platform_toolsets", platform}, keep)
+			changed = true
+		}
+	}
 	if !changed {
 		return false, nil
 	}

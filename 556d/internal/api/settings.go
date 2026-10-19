@@ -37,7 +37,7 @@ func defaultSettings() Settings {
 		ReplyLanguage:     "",
 		MirrorToTelegram:  true,
 		AvatarModel:       "hiyori/Hiyori.model3.json",
-		ShowAvatarOnStart: true,
+		ShowAvatarOnStart: false, // 0.8.6: hidden until the core is done; the avatar is toggled from the office window
 		MemoryLanguage:    "zh-TW",
 		ModelLane:         "auto/556",
 		ContextTurns:      20,

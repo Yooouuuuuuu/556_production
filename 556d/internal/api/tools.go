@@ -1,7 +1,7 @@
 package api
 
-// Tools — what she can DO besides talking (0.5.0). The baseline is her memory only: kokoro's
-// kokoro_search / kokoro_forget, carried by Hermes's "memory" toolset. Everything else is an
+// Tools — what she can DO besides talking (0.5.0; baseline emptied in 0.8.6). Memory is not a tool any more: kokoro
+// injects it every turn. Everything else is an
 // extension switched on per character in Settings: it is written into her config.yaml as
 // platform_toolsets for the app route and her channels, and a graceful restart applies it.
 // No hot toggling by design (simple and stable).
@@ -25,8 +25,11 @@ type Extension struct {
 	Enabled     bool     `json:"enabled"`
 }
 
-// baselineToolsets is what every character has: "memory" gates the kokoro provider tools.
-var baselineToolsets = []string{"memory"}
+// baselineToolsets is what every character has: nothing (option C, docs/prompt/around-the-soul.md §2, 2026-10-19).
+// Memory is injected every turn by kokoro's prompt section and Memory block; the two kokoro tools were never
+// called in 79 turns and the tools scaffold cost every character a preamble and three guidance blocks. An
+// extension (查網路) brings the scaffold back for that character only.
+var baselineToolsets = []string{}
 
 // toolPlatforms are the Hermes platform keys her process serves: the app (API server) and Telegram.
 var toolPlatforms = []string{"api_server", "telegram", "cli"}

@@ -8,8 +8,9 @@ plugins, the shim and the three live stores (西, 子晴, 子睿). Nothing descr
 **Status 2026-10-16 (0.8.4).** §4 items 1–4 landed: the config switches and zh-TW hints before every start
 (`internal/api/hygiene.go`), the shim filter and the reworded preamble with the `openmini_reply` unwrap
 (`internal/shim/hygiene.go`, `textproto.go`), kokoro's block as a zh-TW plugin section, psyche's note in zh-TW. The 真音 test
-(§2) ran on 2026-10-16 on a fresh session: `[]` → zero tools, a normal reply; `[web]` → two tools, a real search. C is
-viable and waits for the user's word. The memory-context note is kept. Block 12's date paragraph is dropped whole
+(§2) ran on 2026-10-16 on a fresh session: `[]` → zero tools, a normal reply; `[web]` → two tools, a real search. C was
+decided on 2026-10-19 (0.8.6): the baseline is empty, `memory` is removed from every platform list before a start,
+extensions stay. The memory-context note is kept. Block 12's date paragraph is dropped whole
 (its weekday was wrong). §5's verdicts stand.
 
 ## 0. The facts that decide it

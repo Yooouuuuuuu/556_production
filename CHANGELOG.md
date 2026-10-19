@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.6 — 2026-10-19
+
+- **No tools at baseline** (option C, DECISIONS 2026-10-19). 556d empties the `memory` entry from every character's
+  `platform_toolsets` before a start, `new-companion.ps1` writes empty lists, the 能力 page says memory is injected,
+  not a tool. Without tools her prompt carries no tools preamble and none of the three tool-only guidance blocks;
+  switching 查網路 on brings them back for that character. kokoro's rule no longer mentions `kokoro_search`.
+- **The avatar is hidden by default** (`show_avatar_on_start` false); it is parked until the core is done.
+
 ## 0.8.5 — 2026-10-16
 
 - Prompt hygiene, checked live on a second daemon with 真音 (the app untouched). Findings and fixes:
