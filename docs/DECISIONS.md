@@ -92,6 +92,18 @@ Design: `inner-life/inner-life.md` (its §0 lists every decision applied).
 - The narrator cue behind a proactive turn is never the user's words: 556d tags it, the app hides it by default and
   can show it as a note (設定 → 全域 → 程式).
 
+## Decided (2026-10-19) — no hidden defaults: model connections live in the app [structure] [app] [memory]
+- Everything that is this machine's and not the product's leaves the code and the tracked files: the proxy URLs and
+  model names, the local Qwen path, the embedder executable / model file / port, the timezone, the lanes. They are
+  one local, ignored file, `home/models.json`, edited in 設定 → 全域 → 模型連線: a master endpoint; 對話, 記憶, 寫靈魂
+  follow it or carry their own; the vectors; the zone. A 「檢查」 button lists an endpoint's models.
+- No fallback anywhere. A missing field is shown on the page, a character does not start until the file is complete
+  (556d writes her `config.yaml`, `kokoro.json` and `psyche.json` from it before every start), kokoro / psyche / the
+  tools raise rather than guess. Reason: the repo on GitHub was not runnable — every profile's model block was
+  cloned from an ignored `home/config.yaml` no script creates, and five files carried one machine's values.
+- The shim keeps one lane (`auto/556`); `556d.toml` keeps only ports and in-repo paths; `routing.json`, the `pro` /
+  `code` lanes and the qwen / claude backends are gone (the user's plan: everything through gemini, chosen in the app).
+
 ## Built (2026-10-19) — the scratch, keyword triggers, the simple path, the fidelity probe [prompt] [memory] [app]
 - The hidden scratch (`prompt.md` §2.6) is stripped and logged in the shim, the one place that sees the raw reply
   and never streams upstream; that answers all four checks in one place, with Hermes's own scrubbers as a second

@@ -85,7 +85,7 @@ def test_state_block_shape_and_transition(tmp_path):
     clock = Clock(T0)
     e = make(tmp_path, "s", clock)
     b0 = e.state_block()
-    assert b0.startswith("【她現在】") and len(b0.splitlines()) <= 9 and "心情：" in b0 and "原則：" in b0
+    assert b0.startswith("【她現在】") and len(b0.splitlines()) <= 10 and "心情：" in b0 and "原則：" in b0   # title + clock + 8
     assert b0.splitlines()[1].startswith("現在：") and "（" in b0.splitlines()[1]  # the clock line, first after the title
     clock.t = T0 + 60
     e.record_appraisal(broken_promise(), turn_id="t1", counterpart="製作人", platform="api_server")
@@ -94,8 +94,25 @@ def test_state_block_shape_and_transition(tmp_path):
     clock.t = T0 + 600
     e.record_appraisal(apology(), turn_id="t2", counterpart="製作人", platform="api_server")
     b2 = e.state_block()
-    assert "轉變：剛才" in b2 and len(b2.splitlines()) <= 9
+    assert "轉變：剛才" in b2 and len(b2.splitlines()) <= 10
     assert all("0." not in ln for ln in b2.splitlines())  # words, not numbers
+
+
+def test_the_cap_counts_state_lines_and_never_drops_the_principle(tmp_path):
+    clock = Clock(T0)
+    e = make(tmp_path, "cap", clock)
+    clock.t = T0 + 60
+    e.record_appraisal(broken_promise(), turn_id="t1", counterpart="製作人", platform="api_server")
+    e.state_block()                                                      # remembers the dominant feeling for the transition line
+    clock.t = T0 + 600
+    e.record_appraisal(apology(), turn_id="t2", counterpart="製作人", platform="api_server")
+    full = e.state_block().splitlines()
+    assert "轉變：" in "".join(full) and full[-1].startswith("原則：") and len(full) <= 10
+    e.cfg.setdefault("expression", {})["max_lines"] = 3                  # squeeze: the transition goes first, 原則 stays last
+    e.last_block = {"dominant": "disappointment", "word": "有點失望", "at": clock.t, "mood": "", "text": "", "counterpart": "製作人", "strategy": ""}
+    short = e.state_block().splitlines()
+    assert short[0].startswith("【她現在】") and short[1].startswith("現在：") and short[-1].startswith("原則：")
+    assert not any(x.startswith("轉變：") or x.startswith("心裡：") for x in short)
 
 
 def test_apology_repairs_at_least_half(tmp_path):

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, CompanionInfo, Settings as S } from '../api';
 import { VoiceSettings } from './VoiceSettings';
+import { ConnectionsSettings } from './ConnectionsSettings';
 import { DevSettings } from './DevSettings';
 import { Character } from './Character';
 import { NewCharacter } from './NewCharacter';
@@ -140,6 +141,8 @@ function GlobalSettings() {
           <p className="text-xs opacity-60 mt-1">{t('settings.reply_language_note')}</p>
         </div>
       </section>
+
+      <ConnectionsSettings />
 
       <section className="space-y-3">
         <h2 className="font-semibold">{t('settings.app')}</h2>

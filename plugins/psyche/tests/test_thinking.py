@@ -57,7 +57,7 @@ def test_state_block_carries_the_line_only_when_it_fires(tmp_path):
     e.energy = 0.2                                              # no energy + think-first
     b = e.state_block()
     assert "想法：今天沒力氣想，會先回再想" in b
-    assert len(b.splitlines()) <= 9
+    assert len(b.splitlines()) <= 10
 
 
 def test_rumination_knob_overrides_neuroticism():

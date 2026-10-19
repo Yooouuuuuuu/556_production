@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 import random
 import re
 import sys
@@ -34,8 +35,6 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
-PROXY = "http://127.0.0.1:18765/v1"
-MODELS = {"gemini": "agy/gemini-3.8-flash", "gemini-pro": "agy/gemini-3.1-pro", "claude": "agy/claude-sonnet-4-6", "opus": "agy/claude-opus-4-6"}
 
 QUIET_BLOCK = """【她現在】
 現在：{clock}
@@ -70,9 +69,24 @@ TAKES_SYSTEM = """{soul}
 下面每一題是一個話題，和兩句看法 A、B。你是{name}；每一題選你比較會說的那一句。只輸出 JSON：{{"answers": ["A", "B", ...]}}，順序跟題目一樣。"""
 
 
-def make_llm(model: str, base_url: str = PROXY, temperature: float = 0.3, timeout: float = 300):
+def connection(base_url: Optional[str], model: Optional[str]):
+    """(base_url, model, api_key): what was passed, else the 寫靈魂 connection of home/models.json; never a guess."""
+    key = os.environ.get("X556_API_KEY", "")
+    if base_url and model:
+        return base_url.rstrip("/"), model, key
+    cfg = json.loads((ROOT / "home" / "models.json").read_text(encoding="utf-8")) if (ROOT / "home" / "models.json").exists() else {}
+    soul = cfg.get("soul") or {}
+    ep = soul if soul.get("use") == "custom" else (cfg.get("master") or {})
+    base_url, model, key = base_url or ep.get("base_url"), model or ep.get("model"), key or ep.get("api_key") or ""
+    if not (base_url and model):
+        raise SystemExit("模型連線未設定：給 --base-url 和 --model，或在 app 的 設定 → 全域 → 模型連線 填好（home/models.json）")
+    return base_url.rstrip("/"), model, key
+
+
+def make_llm(model: Optional[str], base_url: Optional[str] = None, temperature: float = 0.3, timeout: float = 300):
     from keepsakedb.llms import OpenAIChat
-    return OpenAIChat(base_url, MODELS.get(model, model), api_key="local-proxy-no-key", temperature=temperature, timeout=timeout)
+    base_url, model, key = connection(base_url, model)
+    return OpenAIChat(base_url, model, api_key=key or "none", temperature=temperature, timeout=timeout)
 
 
 def extract_json(text: str) -> Dict[str, Any]:
@@ -189,9 +203,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--lineup", default="xi=characters/xi/SOUL.md,ziqing=characters/ziqing/SOUL.md,zirui=characters/zirui/SOUL.md")
     ap.add_argument("--target", default="xi", help="the lineup id the judge should pick")
     ap.add_argument("--people", default="", help="people/你.md shown as the person file (default: next to the first SOUL)")
-    ap.add_argument("--model", default="gemini")
-    ap.add_argument("--judge", default="gemini")
-    ap.add_argument("--base-url", default=PROXY)
+    ap.add_argument("--model", default=None, help="model name on the endpoint (default: the 寫靈魂 connection in home/models.json)")
+    ap.add_argument("--judge", default=None, help="the judge's model (default: the same)")
+    ap.add_argument("--base-url", default=None)
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--out", default="")
     args = ap.parse_args(argv)

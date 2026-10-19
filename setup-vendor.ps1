@@ -10,7 +10,7 @@ git -C $Root submodule update --init --depth 1 vendor/hermes-agent
 git -C $Root submodule update --init vendor/keepsakedb
 Push-Location $Engine
 uv venv .venv --python 3.11
-uv pip install --python .venv\Scripts\python.exe -e . mem0ai qdrant-client
+uv pip install --python .venv\Scripts\python.exe -e .
 Pop-Location
 Write-Host ("vendor/hermes-agent ready (upstream " + (git -C $Engine rev-parse --short HEAD) + ")")
 

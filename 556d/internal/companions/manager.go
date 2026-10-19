@@ -63,7 +63,8 @@ type Manager struct {
 	home      string
 	hermesExe string
 	root      string
-	Timezone  string // HERMES_TIMEZONE for every gateway (556d.toml [hermes] timezone)
+	Timezone  string // HERMES_TIMEZONE for every gateway (home/models.json timezone, set by the API)
+	HubPort   int    // 556d's own port: her plugins reach the hub at http://127.0.0.1:<HubPort>
 	sup       *supervisor.Supervisor
 	mu        sync.Mutex
 	live      map[string]*live
@@ -199,7 +200,7 @@ func (m *Manager) Start(name string) (Info, error) {
 			"API_SERVER_KEY=" + key, // enables Hermes's API server platform (gateway/config_env.py)
 			"API_SERVER_HOST=127.0.0.1",
 			"API_SERVER_PORT=" + fmt.Sprint(port),
-			"X556_HUB=http://127.0.0.1:55600", // her plugins reach 556d here (counterpart sessions, the relay)
+			"X556_HUB=" + fmt.Sprintf("http://127.0.0.1:%d", m.HubPort), // her plugins reach 556d here (counterpart sessions, the relay)
 			"HERMES_TIMEZONE=" + m.Timezone,    // her date line and her engine's clock in the same zone
 		},
 		Dir:    m.root,

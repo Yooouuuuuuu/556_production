@@ -2,6 +2,8 @@
 package main
 
 import (
+	_ "time/tzdata" // IANA zones for models.json timezone on Windows
+	"github.com/Yooouuuuuuu/556_production/556d/internal/embedder"
 	"context"
 	"flag"
 	"fmt"
@@ -54,31 +56,23 @@ func main() {
 	if *noHermes {
 		log.Printf("[556d] -no-hermes is now the default behaviour (companions start from the roster)")
 	}
-	if cfg.Embedder.Enabled {
-		sup.Run(ctx, supervisor.Spec{
-			Name: "embedder",
-			Exe:  cfg.Embedder.Exe,
-			Args: []string{"-m", cfg.Embedder.Model, "--embedding", "--pooling", "cls", "-c", "8192",
-				"--host", "127.0.0.1", "--port", fmt.Sprint(cfg.Embedder.Port)},
-			Dir:    cfg.Root,
-			Health: fmt.Sprintf("http://127.0.0.1:%d/health", cfg.Embedder.Port),
-		})
-	}
-	if len(cfg.Shim.Backends) > 0 {
-		go func() {
-			if err := shim.New(cfg.Shim).ListenAndServe(ctx); err != nil {
-				log.Printf("[shim] server error: %v", err)
-			}
-		}()
-	}
+	sh := shim.New(cfg.Shim) // her model: one lane, pointed at the chat connection once the app has set it
+	go func() {
+		if err := sh.ListenAndServe(ctx); err != nil {
+			log.Printf("[shim] server error: %v", err)
+		}
+	}()
+	emb := embedder.New(ctx, sup, cfg.Root) // the local embedding server, when the connections say so
 	// daemon port: avatar bridge (API + /ws + static) + the chat API backed by hermes serve
 	mux := http.NewServeMux()
 	br := bridge.New(cfg.Bridge)
 	br.Register(mux)
 	mgr := companions.New(ctx, cfg.Hermes.Home, cfg.Hermes.Exe, cfg.Root, sup)
-	mgr.Timezone = cfg.Hermes.Timezone
-	hub := api.New(mgr, br, sup, cfg.Hermes.Home, cfg.Daemon.Profile)
+	mgr.HubPort = cfg.Daemon.Port
+	hub := api.New(mgr, br, sup, cfg.Hermes.Home)
 	hub.Shutdown = requestShutdown
+	hub.Shim, hub.ShimPort, hub.Embedder = sh, cfg.Shim.Port, emb
+	hub.LoadConnections() // home/models.json → the shim's backend, the embedder, the zone; or a log line naming what is missing
 	hub.Register(mux)
 	daemonSrv := &http.Server{Addr: fmt.Sprintf("127.0.0.1:%d", cfg.Daemon.Port), Handler: mux}
 	go func() {
@@ -87,8 +81,8 @@ func main() {
 			log.Printf("[daemon] server error: %v", err)
 		}
 	}()
-	log.Printf("556d up: %d companion(s) on the roster, embedder :%d, shim :%d, bridge :%d - Ctrl+C to stop",
-		len(mgr.List()), cfg.Embedder.Port, cfg.Shim.Port, cfg.Daemon.Port)
+	log.Printf("556d up: %d companion(s) on the roster, shim :%d, bridge :%d - Ctrl+C to stop",
+		len(mgr.List()), cfg.Shim.Port, cfg.Daemon.Port)
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)

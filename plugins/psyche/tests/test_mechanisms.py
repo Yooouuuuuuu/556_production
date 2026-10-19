@@ -189,9 +189,31 @@ def test_an_unsaid_thing_sent_leaves_the_register(tmp_path):
     clock = Clock(T0)
     e = make(tmp_path, "sent", clock)
     e.withheld = [{"id": "wh_1", "what": WH["what"], "at": clock.t, "counterpart": MAIN, "importance": 0.9, "turn_id": "t1", "rum": 0}]
-    e._record_and_apply("proactive_fired", {"kind": "unsaid", "what": WH["what"], "loop": None, "entry": None, "counterpart": MAIN, "W": 1, "O": 1},
-                        counterpart=MAIN)
-    assert e.withheld == []
+    fired = {"kind": "unsaid", "what": WH["what"], "loop": None, "entry": None, "counterpart": MAIN, "W": 1, "O": 1}
+    e._record_and_apply("proactive_fired", fired, counterpart=MAIN)
+    assert len(e.withheld) == 1                      # deciding to say it is not saying it
+    e._record_and_apply("silent", {"kind": "unsaid", "what": WH["what"], "loop": None}, counterpart=MAIN)
+    assert len(e.withheld) == 1                      # she stayed quiet: still unsaid
+    e._record_and_apply("proactive_fired", fired, counterpart=MAIN)
+    e._record_and_apply("sent", {"kind": "unsaid", "what": WH["what"], "loop": None}, counterpart=MAIN)
+    assert e.withheld == []                          # it really went out
+
+
+def test_the_register_keeps_six_per_counterpart(tmp_path):
+    clock = Clock(T0)
+    e = make(tmp_path, "cap", clock)
+    yours = ["其實很在意他說的話", "想說自己最近很累", "上次的事還沒道歉", "想問他週末有沒有空", "覺得他最近變了", "其實不喜歡那家店",
+             "想告訴他媽媽的事", "對工作的事很煩"]
+    hers = ["想跟子晴說考試的事", "欠子晴一句謝謝", "子晴借的書還沒還"]
+    for i, what in enumerate(yours):
+        e.record_appraisal({"events": [], "loops": {"new": [], "closed": []}, "withheld": {"new": [{"what": what, "importance": 0.5 + i * 0.05}], "said": []},
+                            "farewell": False}, turn_id=f"a{i}", counterpart=MAIN, platform="api_server")
+    for i, what in enumerate(hers):
+        e.record_appraisal({"events": [], "loops": {"new": [], "closed": []}, "withheld": {"new": [{"what": what, "importance": 0.9}], "said": []},
+                            "farewell": False}, turn_id=f"b{i}", counterpart="ziqing", platform="api_server")
+    assert sum(1 for w in e.withheld if w["counterpart"] == MAIN) == 6      # six per counterpart …
+    assert sum(1 for w in e.withheld if w["counterpart"] == "ziqing") == 3  # … not six in all
+    assert "其實很在意他說的話" not in [w["what"] for w in e.withheld]       # the lightest two of yours fell off
 
 
 def test_withheld_survives_a_snapshot(tmp_path):

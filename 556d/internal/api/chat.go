@@ -15,6 +15,8 @@
 package api
 
 import (
+	"github.com/Yooouuuuuuu/556_production/556d/internal/shim"
+	"github.com/Yooouuuuuuu/556_production/556d/internal/embedder"
 	"bytes"
 	"context"
 	"crypto/rand"
@@ -57,6 +59,9 @@ type session struct {
 
 type API struct {
 	Shutdown func() // set by main: asks the daemon to finish up and exit (the app calls POST /api/shutdown on quit)
+	Shim     *shim.Shim    // set by main: the lane's backend follows 設定 → 模型連線 (connections.go)
+	ShimPort int           // her config.yaml points at http://127.0.0.1:<ShimPort>/v1
+	Embedder *embedder.Ctl // the local embedding server, when the connections say the vectors are made here
 	mgr      *companions.Manager
 	bridge   *bridge.Bridge
 	sup      *supervisor.Supervisor
@@ -68,15 +73,12 @@ type API struct {
 	jobs      map[string]*charJob  // per character package: the soul skill / install subprocess (characters.go)
 }
 
-// New wires the hub API. defaultSelected (556d.toml daemon.profile) is the companion the
-// windows open on when settings.json has no selection yet; nothing is started by it.
-func New(mgr *companions.Manager, b *bridge.Bridge, sup *supervisor.Supervisor, hermesHome, defaultSelected string) *API {
+// New wires the hub API. The windows open on the companion settings.json selected last (if she still
+// exists); nothing is started by it.
+func New(mgr *companions.Manager, b *bridge.Bridge, sup *supervisor.Supervisor, hermesHome string) *API {
 	a := &API{mgr: mgr, bridge: b, sup: sup, settings: NewSettingsStore(hermesHome), sessions: map[string]*session{}, followers: map[string]*follower{}}
 	go a.followLoop()
 	sel := a.settings.Get().SelectedCompanion
-	if sel == "" || !mgr.Exists(sel) {
-		sel = defaultSelected
-	}
 	if sel != "" && mgr.Exists(sel) {
 		a.settings.SetSelected(sel, mgr.Dir(sel))
 	} else {
@@ -93,6 +95,8 @@ func (a *API) Register(mux *http.ServeMux) {
 	})
 	mux.HandleFunc("/api/history", a.history)
 	mux.HandleFunc("/api/settings", a.settingsHandler)
+	mux.HandleFunc("/api/connections", a.connectionsHandler)     // model connections (home/models.json): 設定 → 全域 → 模型連線
+	mux.HandleFunc("/api/connections/probe", a.connectionsProbe) // what models an endpoint serves
 	mux.HandleFunc("/api/companion", a.companion)
 	mux.HandleFunc("/api/companions", a.companionsHandler)
 	mux.HandleFunc("/api/companions/", a.companionsHandler)

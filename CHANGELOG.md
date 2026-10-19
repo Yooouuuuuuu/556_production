@@ -1,5 +1,40 @@
 # Changelog
 
+## 0.9.0 — 2026-10-19
+
+- **Model connections in the app; no hidden defaults.** 設定 → 全域 → **模型連線** (`home/models.json`, ignored): one master
+  endpoint (方式 自訂／OpenAI 相容, 網址, 金鑰, 模型) with 「檢查」 asking the endpoint which models it serves and filling the
+  picker; 對話, 記憶 and 寫靈魂 each either follow the master or carry their own; the **vectors** (556d's own llama-server with
+  a model file, or any OpenAI-compatible embeddings endpoint, with name and dimensions); the **timezone**. Nothing has a
+  default any more: the page lists what is missing, 556d refuses to start a character until the list is empty, and the
+  plugins and tools raise instead of guessing an endpoint. Before every start 556d writes what she needs into her own
+  files from this one place — `config.yaml` (the shim as her model, kokoro as her memory, psyche enabled, empty toolsets),
+  `kokoro.json` (`llm`, `embedder`), `psyche.json` (`time.timezone_offset_h`) — so a fresh clone no longer depends on an
+  ignored `home/config.yaml` that no script creates. `GET/PUT /api/connections`, `POST /api/connections/probe`.
+- **Cleaned out of the repo.** `556d.toml` keeps only ports and in-repo paths (the proxy URLs, model names, the qwen path,
+  `profile = "mane"`, the embedder block and the timezone are gone); `shim/routing.json` and its lanes `pro` / `code` are
+  gone — the shim has one lane, `auto/556`, pointed at the 對話 connection, and sends the key as a bearer token; `556.cmd`
+  uses its own directory; the companion templates carry no endpoints and no zone; `tools/soul_writer.py` and
+  `tools/fidelity_probe.py` take `--base-url`/`--model` or read the 寫靈魂 connection (key in `X556_API_KEY`), the
+  gemini/claude/opus nicknames are gone and the new-character page shows the configured model instead of a menu;
+  `tools/seed-memories.py` reads the embedder from `kokoro.json` or stops. The dev registry loses `model.lane`,
+  `model.base_url`, `memory.provider` and the kokoro `llm.*` / `embedder.*` knobs (the connections own them); 設定 loses
+  `model_lane` and `embedder_model`. The daemon's own port reaches her plugins from `556d.toml`, not a literal.
+- **Upgrading this machine:** `home/models.json` was written once with the values in use until now (proxy :18765,
+  gemini-3.8-flash for every job, local bge-m3 on :55602, Asia/Taipei); check it under 設定 → 全域 → 模型連線.
+- Tests: `internal/models` (missing list, merge keeps keys, masking, probe), `internal/api` (the profile files written from
+  the connections, idempotent), `internal/shim` (503 until configured, bearer key, one lane).
+- **Fix: the state block lost 轉變 and 原則 when it was full.** `max_lines` (8) now counts state lines only — the title and
+  the clock are extra — and when the block still overflows the transition line goes first, then 心裡, 想法, 掛念;
+  原則 always stays. The old slice counted the title, so with 想法, 對他 and 掛念 all present the last two lines were cut.
+- **Fix: the withheld register.** Six entries per counterpart (it was six in all, so 子晴's things pushed yours off), and an
+  unsaid thing leaves the register when the message really went out (`sent`), not when the urge fired — a silent turn
+  or a failed send keeps it for the next occasion. Tests updated and added.
+- The pinned heading 影響過他的人與事 uses the generic 他 for every character (kokoro no longer reads a `pronoun` key
+  that nothing wrote); an English rendering would say he/she.
+- mem0 / Qdrant leftovers removed: `setup-vendor.ps1` no longer installs `mem0ai` / `qdrant-client`, 556d no longer
+  rewrites `home/mem0.json` or offers `mem0` as a memory provider.
+
 ## 0.8.10 — 2026-10-19
 
 - **The hidden scratch** (`docs/prompt/prompt.md` §2.6, opt-in). The shim strips a `<think>…</think>` block from the

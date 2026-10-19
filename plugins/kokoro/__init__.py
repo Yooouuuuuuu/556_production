@@ -42,10 +42,11 @@ def _read_config(hermes_home: Path) -> Dict[str, Any]:
 # stances and refusals she formed later, where she stands with each person). Rendered once per session into the
 # plugin prompt section, capped per tag, so they cost one copy per request, cached.
 PINNED_TAGS_DEFAULT = ["timeline", "influences", "stances", "refusals", "standing"]
-PINNED_ZH = {"timeline": "時間線", "influences": "影響過{pr}的人與事", "stances": "立場", "refusals": "不做的事", "standing": "跟人的關係"}
+# headings use the generic 他 for every character (0.8.11); an English rendering would say he/she
+PINNED_ZH = {"timeline": "時間線", "influences": "影響過他的人與事", "stances": "立場", "refusals": "不做的事", "standing": "跟人的關係"}
 
 
-def render_pinned(store: Any, tags: List[str], per_tag: int, show, pronoun: str = "她") -> str:
+def render_pinned(store: Any, tags: List[str], per_tag: int, show) -> str:
     """The 一直記著的 block: for each reserved tag its active rows (superseded ones out), the timeline oldest first,
     the rest newest first, at most `per_tag` lines each. Empty when nothing is pinned."""
     parts: List[str] = []
@@ -58,7 +59,7 @@ def render_pinned(store: Any, tags: List[str], per_tag: int, show, pronoun: str 
             continue
         rows.sort(key=lambda m: float(getattr(m, "created_at", 0.0) or 0.0), reverse=(tag != "timeline"))
         rows = rows[: max(1, int(per_tag))]
-        head = PINNED_ZH.get(tag, tag).replace("{pr}", pronoun)
+        head = PINNED_ZH.get(tag, tag)
         parts.append(f"【{head}】" + chr(10) + chr(10).join(f"- {show(m.text)}" for m in rows))
     return ("一直記著的：" + chr(10) + (chr(10) + chr(10)).join(parts)) if parts else ""
 
@@ -115,9 +116,12 @@ class KokoroMemoryProvider(MemoryProvider):
                        for h in logging.getLogger("keepsakedb").handlers):
                 configure_logging(str(log_path))
 
-        e = cfg.get("embedder", {})
-        embedder = OpenAIEmbedder(e.get("base_url", "http://127.0.0.1:55602/v1"), e.get("model", "bge-m3"),
-                                  api_key=e.get("api_key", ""), batch_size=int(e.get("batch_size", 32)),
+        e = cfg.get("embedder") or {}
+        l = cfg.get("llm") or {}
+        missing = [k for k, blk in (("embedder", e), ("llm", l)) if not (blk.get("base_url") and blk.get("model"))]
+        if missing:  # no guessed endpoint: 556d writes these from 設定 → 全域 → 模型連線 before she starts
+            raise RuntimeError("kokoro: 模型連線未設定（kokoro.json 缺 " + " / ".join(missing) + "）— 設定 → 全域 → 模型連線")
+        embedder = OpenAIEmbedder(e["base_url"], e["model"], api_key=e.get("api_key", ""), batch_size=int(e.get("batch_size", 32)),
                                   timeout=float(e.get("timeout", 60)), dims=e.get("dims"))
         owner = self._agent_context == "primary"
         backup_dir = str(self._home / cfg["backup_dir"]) if cfg.get("backup_dir") else None
@@ -132,10 +136,9 @@ class KokoroMemoryProvider(MemoryProvider):
         )
         if owner:
             self._store.start_owner_loop(float(cfg.get("owner_poll_s", 1.0)))
-        l = cfg.get("llm", {})
-        llm = OpenAIChat(l.get("base_url", "http://127.0.0.1:18765/v1"), l.get("model", "agy/gemini-3.8-flash"),
-                         api_key=l.get("api_key", "local-proxy-no-key"), temperature=float(l.get("temperature", 0.0)),
-                         timeout=float(l.get("timeout", 60)), json_mode=bool(l.get("json_mode", False)))
+        llm = OpenAIChat(l["base_url"], l["model"], api_key=l.get("api_key") or "none",
+                         temperature=float(l.get("temperature", 0.0)), timeout=float(l.get("timeout", 60)),
+                         json_mode=bool(l.get("json_mode", False)))
         # which surface this agent serves — stamped on short-layer notes (meta only, never the text)
         platform = str(kwargs.get("platform") or "cli")
         surfaces = {"api_server": "事務所", "telegram": "Telegram", "discord": "Discord", "cli": "終端機"}
@@ -173,8 +176,7 @@ class KokoroMemoryProvider(MemoryProvider):
             tags = self._cfg.get("pinned_tags")
             if not isinstance(tags, list):
                 tags = PINNED_TAGS_DEFAULT
-            pinned = render_pinned(self._store, [str(t) for t in tags], int(self._cfg.get("pinned_per_tag", 8)), self._render,
-                                   str(self._cfg.get("pronoun") or "她"))
+            pinned = render_pinned(self._store, [str(t) for t in tags], int(self._cfg.get("pinned_per_tag", 8)), self._render)
         return (self._memory_block_text() + (chr(10) + chr(10) + pinned if pinned else "") + self._your_profile_block()).strip()
 
     @staticmethod

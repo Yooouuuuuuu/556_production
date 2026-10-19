@@ -1,8 +1,9 @@
-# 556d configuration - paths relative to this file's directory unless absolute.
+# 556d configuration - only what is the same on every machine; paths are relative to this file.
+# Model connections, the embedder and the timezone are NOT here: they live in home/models.json (ignored),
+# set in the app under 設定 → 全域 → 模型連線. A character does not start until they are set.
 
 [daemon]
 port = 55600
-profile = "mane"   # the companion the windows open on when nothing is selected yet (nothing auto-starts)
 
 [hermes]
 home = "home"
@@ -10,38 +11,6 @@ exe  = "vendor/hermes-agent/.venv/Scripts/hermes.exe"
 # each companion is ONE process: her `hermes gateway run` (API server for the app + her channels);
 # the API port is picked per start, or set API_SERVER_PORT in her .env
 
-[embedder]
-enabled = true
-exe   = "bin/llama/llama-server.exe"
-model = "models/bge-m3-Q8_0.gguf"
-port  = 55602
-
 [shim]
-port = 55601                      # Python shim keeps :18767 until S5 repoints consumers
-routing_file = "shim/routing.json"
+port = 55601                      # her config.yaml points at this; the shim forwards to the chat connection
 timeout_seconds = 600
-
-[shim.backends.qwen]
-base_url = "http://127.0.0.1:18002/v1"
-model = "/mnt/c/localai/models/hub/Qwen3.6-27B-Balanced/Qwen3.6-27B-Uncensored-HauhauCS-Balanced-IQ3_XS.gguf"
-native_tools = true
-
-[shim.backends.gemini]
-base_url = "http://localhost:18765/v1"
-model = "agyapi/gemini-3.1-pro"
-native_tools = false
-
-[shim.backends.gemini-flash]
-base_url = "http://localhost:18765/v1"
-model = "agyapi/gemini-3.8-flash"
-native_tools = false
-
-[shim.backends.claude]
-base_url = "http://localhost:18765/v1"
-model = "agyapi/claude-sonnet-4-6"
-native_tools = false
-
-[shim.backends.claude-opus]
-base_url = "http://localhost:18765/v1"
-model = "agyapi/claude-opus-4-6"
-native_tools = false

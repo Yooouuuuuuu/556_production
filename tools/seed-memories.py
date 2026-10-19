@@ -44,8 +44,11 @@ def main() -> int:
     kok = json.loads((profile / "kokoro.json").read_text(encoding="utf-8-sig"))
     from keepsakedb import Keepsake
     from keepsakedb.embedders import OpenAIEmbedder
-    e = kok.get("embedder", {})
-    emb = OpenAIEmbedder(e.get("base_url", "http://127.0.0.1:55602/v1"), e.get("model", "bge-m3"), api_key=e.get("api_key", ""), dims=e.get("dims"))
+    e = kok.get("embedder") or {}
+    if not (e.get("base_url") and e.get("model")):
+        print("模型連線未設定：kokoro.json 沒有 embedder（在 app 的 設定 → 全域 → 模型連線 填好，啟動角色一次讓 556d 寫入，再來）")
+        return 1
+    emb = OpenAIEmbedder(e["base_url"], e["model"], api_key=e.get("api_key", ""), dims=e.get("dims"))
     db = profile / str(kok.get("db", "memory/{profile}.db")).format(profile=args.name)
     db.parent.mkdir(parents=True, exist_ok=True)
     ks = Keepsake(str(db), embedder=emb, tokenizer=kok.get("tokenizer", "bigram"), dims=e.get("dims"), owner=False)

@@ -4,19 +4,8 @@
   "context_k": 5,
   "db": "memory/{profile}.db",
   "drop": 0.4,
-  "embedder": {
-    "base_url": "http://127.0.0.1:55602/v1",
-    "dims": 1024,
-    "model": "bge-m3"
-  },
   "high": 0.6,
   "language": "zh-TW",
-  "llm": {
-    "api_key": "local-proxy-no-key",
-    "base_url": "http://127.0.0.1:18765/v1",
-    "model": "agy/gemini-3.8-flash",
-    "timeout": 60
-  },
   "log": "logs/keepsake.jsonl",
   "log_pipeline": true,
   "log_searches": true,
@@ -29,7 +18,13 @@
   "short_layer": true,
   "short_k": 5,
   "short_cap": 1000,
-  "pinned_tags": ["timeline", "influences", "stances", "refusals", "standing"],
+  "pinned_tags": [
+    "timeline",
+    "influences",
+    "stances",
+    "refusals",
+    "standing"
+  ],
   "pinned_per_tag": 8,
   "your_name": "",
   "address_default": "製作人"

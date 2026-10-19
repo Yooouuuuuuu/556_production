@@ -1,5 +1,4 @@
 @echo off
-REM 556 Production - isolated Hermes instance launcher.
-REM Own engine copy + own HERMES_HOME (production install is never touched).
-set "HERMES_HOME=D:\dev\556_production\home"
-"D:\dev\556_production\vendor\hermes-agent\.venv\Scripts\hermes.exe" %*
+REM 556 Production - isolated Hermes instance launcher (own engine copy + own HERMES_HOME).
+set "HERMES_HOME=%~dp0home"
+"%~dp0vendor\hermes-agent\.venv\Scripts\hermes.exe" %*

@@ -36,6 +36,10 @@ func (a *API) companionsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	switch action {
 	case "start":
+		if err := a.prepareProfile(name); err != nil { // her files follow 設定 → 模型連線; nothing starts while it is incomplete
+			writeJSON(w, 400, map[string]any{"error": err.Error()})
+			return
+		}
 		if _, err := ensurePromptHygiene(a.mgr.Dir(name)); err != nil {
 			log.Printf("[hygiene] %s: %v", name, err) // her prompt keeps the vendor switches on; the shim still filters
 		}

@@ -12,8 +12,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"os"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -22,35 +20,47 @@ import (
 type Backend struct {
 	BaseURL     string `toml:"base_url"`
 	Model       string `toml:"model"`
+	APIKey      string `toml:"api_key"`
 	NativeTools bool   `toml:"native_tools"`
 }
 
 type Config struct {
-	Port        int                `toml:"port"`
-	RoutingFile string             `toml:"routing_file"`
-	Backends    map[string]Backend `toml:"backends"`
-	Timeout     int                `toml:"timeout_seconds"`
+	Port    int `toml:"port"`
+	Timeout int `toml:"timeout_seconds"`
 }
 
-type routing struct {
-	Default string         `json:"default"`
-	Lanes   map[string]any `json:"lanes"`
-}
+// Lane is the one model name every character's config.yaml carries (model.default). The shim resolves it
+// to whatever 設定 → 模型連線 says for 對話 (home/models.json), so her files never name a provider or a model.
+const Lane = "auto/556"
 
 type Shim struct {
 	cfg    Config
 	client *http.Client
 	mu     sync.Mutex
-	rmtime time.Time
-	rdata  routing
+	be     *Backend // the chat connection; nil until the app configured one (every request answers 503)
 }
 
 func New(cfg Config) *Shim {
 	if cfg.Timeout == 0 {
 		cfg.Timeout = 600
 	}
-	return &Shim{cfg: cfg, client: &http.Client{Timeout: time.Duration(cfg.Timeout) * time.Second},
-		rdata: routing{Default: "qwen", Lanes: map[string]any{}}}
+	return &Shim{cfg: cfg, client: &http.Client{Timeout: time.Duration(cfg.Timeout) * time.Second}}
+}
+
+// SetBackend points the lane at a connection; nil clears it.
+func (s *Shim) SetBackend(be *Backend) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.be = be
+}
+
+func (s *Shim) backend() (Backend, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.be == nil {
+		return Backend{}, false
+	}
+	return *s.be, true
 }
 
 func (s *Shim) Handler() http.Handler {
@@ -77,82 +87,25 @@ func (s *Shim) ListenAndServe(ctx context.Context) error {
 	return err
 }
 
-// routing re-reads routing.json when its mtime changes (hot reload, like the Python shim).
-func (s *Shim) routing() routing {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	st, err := os.Stat(s.cfg.RoutingFile)
-	if err != nil {
-		return s.rdata
-	}
-	if !st.ModTime().Equal(s.rmtime) {
-		if b, err := os.ReadFile(s.cfg.RoutingFile); err == nil {
-			var r routing
-			if json.Unmarshal(b, &r) == nil {
-				if r.Lanes == nil {
-					r.Lanes = map[string]any{}
-				}
-				s.rdata = r
-				s.rmtime = st.ModTime()
-			}
-		}
-	}
-	return s.rdata
-}
-
 type pick struct {
 	name string
 	be   Backend
 }
 
-// pickBackends resolves a lane to its ordered fallback chain.
+// pickBackends: one lane, one backend — the chat connection. An empty chain means "not configured".
 func (s *Shim) pickBackends(model string) (string, []pick) {
-	r := s.routing()
 	lane := model
 	if strings.HasPrefix(model, "auto/") {
 		lane = strings.SplitN(model, "/", 2)[1]
 	}
-	spec, ok := r.Lanes[lane]
-	if !ok {
-		spec = r.Default
+	if be, ok := s.backend(); ok {
+		return lane, []pick{{"chat", be}}
 	}
-	var names []string
-	switch v := spec.(type) {
-	case string:
-		names = []string{v}
-	case []any:
-		for _, x := range v {
-			names = append(names, str(x))
-		}
-	}
-	var chain []pick
-	for _, n := range names {
-		if be, ok := s.cfg.Backends[n]; ok {
-			chain = append(chain, pick{n, be})
-		}
-	}
-	if len(chain) == 0 {
-		if be, ok := s.cfg.Backends[r.Default]; ok {
-			chain = []pick{{r.Default, be}}
-		}
-	}
-	return lane, chain
+	return lane, nil
 }
 
 func (s *Shim) models(w http.ResponseWriter, _ *http.Request) {
-	set := map[string]bool{"tasks": true, "probe": true}
-	for l := range s.routing().Lanes {
-		set[l] = true
-	}
-	lanes := make([]string, 0, len(set))
-	for l := range set {
-		lanes = append(lanes, l)
-	}
-	sort.Strings(lanes)
-	data := make([]any, 0, len(lanes))
-	for _, l := range lanes {
-		data = append(data, map[string]any{"id": "auto/" + l, "object": "model", "owned_by": "556d-shim"})
-	}
+	data := []any{map[string]any{"id": Lane, "object": "model", "owned_by": "556d-shim"}}
 	writeJSON(w, 200, map[string]any{"object": "list", "data": data})
 }
 
@@ -169,6 +122,9 @@ func (s *Shim) upstream(be Backend, body map[string]any) (map[string]any, error)
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if be.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+be.APIKey)
+	}
 	resp, err := s.client.Do(req)
 	if err != nil {
 		return nil, err
@@ -217,6 +173,10 @@ func (s *Shim) chat(w http.ResponseWriter, r *http.Request) {
 	_ = json.Unmarshal(rawBody, &raw)
 	wantStream, _ := original["stream"].(bool)
 	lane, chain := s.pickBackends(str(original["model"]))
+	if len(chain) == 0 {
+		writeJSON(w, 503, map[string]any{"error": map[string]any{"message": "模型連線未設定（設定 → 全域 → 模型連線）"}})
+		return
+	}
 	var lastCode int
 	var lastDetail string
 	for idx, p := range chain {

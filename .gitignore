@@ -12,10 +12,10 @@ app/*.png
 app/dist/
 app/node_modules/
 app/out/
-bin/
+/bin/
 bin/llama-cpu.zip
 home/
-models/
+/models/
 tests/stress_*.jsonl
 tests/stress_*.log
 tests/stress_log.jsonl

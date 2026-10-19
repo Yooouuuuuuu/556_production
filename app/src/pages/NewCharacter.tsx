@@ -29,19 +29,18 @@ const primary = 'px-4 py-2 rounded-xl bg-pink-500/80 hover:bg-pink-500 text-whit
 export function NewCharacter({ onBack }: { onBack(): void }) {
   const [list, setList] = useState<CharPackage[]>([]);
   const [template, setTemplate] = useState<Record<string, string>>({});
-  const [models, setModels] = useState<string[]>(['gemini', 'claude']);
+  const [model, setModel] = useState('');
   const [id, setId] = useState<string | null>(null);
   const [detail, setDetail] = useState<CharDetail | null>(null);
   const [describe, setDescribe] = useState<Record<string, string>>({});
   const [profile, setProfile] = useState<CharProfile | null>(null);
-  const [model, setModel] = useState('gemini');
   const [notice, setNotice] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [form, setForm] = useState({ id: '', display_name: '', pronoun: '她', from_example: false });
   const [thenRest, setThenRest] = useState(false); // 「全部」: after a clean intake, continue from structure
   const logRef = useRef<HTMLPreElement>(null);
 
-  const refreshList = () => chars.list().then((r) => { setList(r.characters); setTemplate(r.template); if (r.models?.length) setModels(r.models); }).catch((e) => setNotice({ kind: 'err', text: String(e) }));
+  const refreshList = () => chars.list().then((r) => { setList(r.characters); setTemplate(r.template); setModel(r.model || ''); }).catch((e) => setNotice({ kind: 'err', text: String(e) }));
   const load = (cid: string) => chars.detail(cid).then((d) => { setDetail(d); setDescribe(d.describe); setProfile(d.profile); }).catch((e) => setNotice({ kind: 'err', text: String(e) }));
 
   useEffect(() => { refreshList(); }, []);
@@ -87,7 +86,7 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
   async function run(phase: string, yes: boolean, force = false, from?: string) {
     if (!id) return;
     setNotice(null);
-    try { const r = await chars.run(id, { phase, from, model, yes, force }); setDetail((d) => (d ? { ...d, job: r.job } : d)); }
+    try { const r = await chars.run(id, { phase, from, yes, force }); setDetail((d) => (d ? { ...d, job: r.job } : d)); }
     catch (e) { setNotice({ kind: 'err', text: String(e) }); }
   }
   function runAll() { setThenRest(true); run('intake', false); }
@@ -191,7 +190,7 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
             <p className="text-xs opacity-60">{t('newchar.generate_note')}</p>
             <div className="flex flex-wrap items-center gap-2">
               <label className="text-sm">{t('newchar.model')}</label>
-              <select className={`${field} w-auto`} value={model} onChange={(e) => setModel(e.target.value)}>{models.map((m) => <option key={m} value={m}>{m}</option>)}</select>
+              <span className="text-sm opacity-80">{model || t('newchar.model_unset')}</span>
               <button className={primary} disabled={running} onClick={runAll}>{t('newchar.run_all')}</button>
               <button className={btn} disabled={running || !detail.character.phases.includes('intake')} onClick={continueThin} title={t('newchar.continue_note')}>{t('newchar.continue')}</button>
             </div>

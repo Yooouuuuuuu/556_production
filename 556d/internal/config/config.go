@@ -1,5 +1,6 @@
-// Package config loads 556d.toml. Relative paths resolve against the directory that
-// contains the config file (the repo root).
+// Package config loads 556d.toml: only what is the same on every machine (ports and the paths inside
+// the repo). Model connections, the embedder and the timezone are home/models.json, set in the app
+// (internal/models); relative paths resolve against the directory that contains the config file.
 package config
 
 import (
@@ -14,37 +15,26 @@ import (
 )
 
 type Config struct {
-	Root     string        `toml:"-"`
-	Daemon   Daemon        `toml:"daemon"`
-	Hermes   Hermes        `toml:"hermes"`
-	Embedder Embedder      `toml:"embedder"`
-	Shim     shim.Config   `toml:"shim"`
-	Bridge   bridge.Config `toml:"bridge"`
+	Root   string        `toml:"-"`
+	Daemon Daemon        `toml:"daemon"`
+	Hermes Hermes        `toml:"hermes"`
+	Shim   shim.Config   `toml:"shim"`
+	Bridge bridge.Config `toml:"bridge"`
 }
 
 type Daemon struct {
-	Port    int    `toml:"port"`
-	Profile string `toml:"profile"` // companion the windows open on when nothing is selected yet (nothing auto-starts)
+	Port int `toml:"port"`
 }
 
 type Hermes struct {
-	Home     string `toml:"home"`     // profiles live under <home>/profiles/<name>
-	Exe      string `toml:"exe"`      // hermes.exe of the vendored venv; each companion runs `hermes gateway run`
-	Timezone string `toml:"timezone"` // IANA zone passed as HERMES_TIMEZONE so Hermes's date line and the engine's clock agree
-}
-
-type Embedder struct {
-	Enabled bool   `toml:"enabled"`
-	Exe     string `toml:"exe"`
-	Model   string `toml:"model"`
-	Port    int    `toml:"port"`
+	Home string `toml:"home"` // profiles live under <home>/profiles/<name>
+	Exe  string `toml:"exe"`  // hermes.exe of the vendored venv; each companion runs `hermes gateway run`
 }
 
 func Load(path string) (*Config, error) {
 	c := &Config{
-		Daemon:   Daemon{Port: 55600},
-		Hermes:   Hermes{Home: "home", Exe: "vendor/hermes-agent/.venv/Scripts/hermes.exe", Timezone: "Asia/Taipei"},
-		Embedder: Embedder{Enabled: true, Exe: "bin/llama/llama-server.exe", Model: "models/bge-m3-Q8_0.gguf", Port: 18768},
+		Daemon: Daemon{Port: 55600},
+		Hermes: Hermes{Home: "home", Exe: "vendor/hermes-agent/.venv/Scripts/hermes.exe"},
 	}
 	if _, err := toml.DecodeFile(path, c); err != nil {
 		return nil, fmt.Errorf("config %s: %w", path, err)
@@ -56,15 +46,9 @@ func Load(path string) (*Config, error) {
 	c.Root = filepath.Dir(abs)
 	c.Hermes.Home = c.resolve(c.Hermes.Home)
 	c.Hermes.Exe = c.resolve(c.Hermes.Exe)
-	c.Embedder.Exe = c.resolve(c.Embedder.Exe)
-	c.Embedder.Model = c.resolve(c.Embedder.Model)
 	if c.Shim.Port == 0 {
 		c.Shim.Port = 55601
 	}
-	if c.Shim.RoutingFile == "" {
-		c.Shim.RoutingFile = "shim/routing.json"
-	}
-	c.Shim.RoutingFile = c.resolve(c.Shim.RoutingFile)
 	if c.Bridge.StaticDir == "" {
 		c.Bridge.StaticDir = "app/dist"
 	}

@@ -14,7 +14,7 @@ import (
 )
 
 // Settings are the user-facing knobs the app edits. They live in home/settings.json (owned by
-// 556d); the ones Hermes reads are applied into home/config.yaml and home/mem0.json on save.
+// 556d); the ones Hermes reads are applied into home/config.yaml and the profile's kokoro.json on save.
 type Settings struct {
 	SelectedCompanion string `json:"selected_companion"` // which companion the windows are on (roster selection)
 	CompanionName     string `json:"companion_name"`     // display name of the SELECTED companion (companion.json)
@@ -23,10 +23,8 @@ type Settings struct {
 	MirrorToTelegram  bool   `json:"mirror_to_telegram"` // (c) echo app exchanges into your Telegram DM (plain text, no LLM)
 	AvatarModel       string `json:"avatar_model"` // path under assets/live2d, e.g. hiyori/Hiyori.model3.json
 	ShowAvatarOnStart bool   `json:"show_avatar_on_start"`
-	MemoryLanguage    string `json:"memory_language"` // effective in the kokoro engine (Path C); mem0 has no prompt hook
-	ModelLane         string `json:"model_lane"`      // -> config.yaml model.default
+	MemoryLanguage    string `json:"memory_language"` // effective in the kokoro engine
 	ContextTurns      int    `json:"context_turns"`   // -> config.yaml compression.protect_last_n
-	EmbedderModel     string `json:"embedder_model"`  // -> mem0.json embedder model (re-embed required)
 }
 
 func defaultSettings() Settings {
@@ -39,9 +37,7 @@ func defaultSettings() Settings {
 		AvatarModel:       "hiyori/Hiyori.model3.json",
 		ShowAvatarOnStart: false, // 0.8.6: hidden until the core is done; the avatar is toggled from the office window
 		MemoryLanguage:    "zh-TW",
-		ModelLane:         "auto/556",
 		ContextTurns:      20,
-		EmbedderModel:     "bge-m3",
 	}
 }
 
@@ -110,17 +106,11 @@ func (s *SettingsStore) Update(patch json.RawMessage) (Settings, Applied, error)
 		return s.cur, Applied{}, errors.New("context_turns must be 2..200")
 	}
 	var ap Applied
-	if next.ModelLane != s.cur.ModelLane || next.ContextTurns != s.cur.ContextTurns {
+	if next.ContextTurns != s.cur.ContextTurns {
 		if err := s.applyConfigYAML(next); err != nil {
 			return s.cur, Applied{}, err
 		}
 		ap.RestartRequired = true
-	}
-	if next.EmbedderModel != s.cur.EmbedderModel {
-		if err := s.applyMem0(next); err != nil {
-			return s.cur, Applied{}, err
-		}
-		ap.RestartRequired, ap.ReembedRequired = true, true
 	}
 	if next.SelectedCompanion != s.cur.SelectedCompanion {
 		next.SelectedCompanion = s.cur.SelectedCompanion // selection changes go through /api/selected
@@ -142,7 +132,7 @@ func (s *SettingsStore) Update(patch json.RawMessage) (Settings, Applied, error)
 		}
 		ap.RestartRequired = true
 	}
-	if s.profileDirPath != "" && (next.MemoryLanguage != s.cur.MemoryLanguage || next.EmbedderModel != s.cur.EmbedderModel) {
+	if s.profileDirPath != "" && next.MemoryLanguage != s.cur.MemoryLanguage {
 		if err := s.applyKokoro(next); err != nil { // the memory engine settings are the selected character's own
 			return s.cur, Applied{}, err
 		}
@@ -176,7 +166,6 @@ func (s *SettingsStore) applyConfigYAML(v Settings) error {
 		return errors.New("config.yaml: unexpected document")
 	}
 	root := doc.Content[0]
-	setScalar(root, []string{"model", "default"}, v.ModelLane)
 	setScalar(root, []string{"compression", "protect_last_n"}, itoa(v.ContextTurns))
 	out, err := yaml.Marshal(&doc)
 	if err != nil {
@@ -185,33 +174,8 @@ func (s *SettingsStore) applyConfigYAML(v Settings) error {
 	return os.WriteFile(p, out, 0o644)
 }
 
-// applyMem0 rewrites the embedder model in home/mem0.json (legacy Path A; skipped when absent).
-func (s *SettingsStore) applyMem0(v Settings) error {
-	p := filepath.Join(s.home, "mem0.json")
-	raw, err := os.ReadFile(p)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-	var m map[string]any
-	if err := json.Unmarshal(raw, &m); err != nil {
-		return err
-	}
-	oss, _ := m["oss"].(map[string]any)
-	emb, _ := oss["embedder"].(map[string]any)
-	cfg, _ := emb["config"].(map[string]any)
-	if cfg == nil {
-		return errors.New("mem0.json: no oss.embedder.config")
-	}
-	cfg["model"] = v.EmbedderModel
-	out, _ := json.MarshalIndent(m, "", "  ")
-	return os.WriteFile(p, out, 0o644)
-}
-
 // applyKokoro writes the prompt-layer values into the bound profile's kokoro.json:
-// your_name (never the memory subject — memories store 你), memory language, embedder model.
+// your_name (never the memory subject — memories store 你) and the memory language.
 func (s *SettingsStore) applyKokoro(v Settings) error {
 	if s.profileDir() == "" {
 		return nil
@@ -231,9 +195,6 @@ func (s *SettingsStore) applyKokoro(v Settings) error {
 	m["your_name"] = v.YourName
 	delete(m, "producer_name")
 	m["language"] = v.MemoryLanguage
-	if emb, ok := m["embedder"].(map[string]any); ok {
-		emb["model"] = v.EmbedderModel
-	}
 	out, _ := json.MarshalIndent(m, "", "  ")
 	return os.WriteFile(p, out, 0o644)
 }

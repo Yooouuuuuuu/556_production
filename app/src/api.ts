@@ -15,10 +15,15 @@ export type Settings = {
   avatar_model: string;
   show_avatar_on_start: boolean;
   memory_language: string;
-  model_lane: string;
   context_turns: number;
-  embedder_model: string;
 };
+
+// 設定 → 全域 → 模型連線 (home/models.json). Keys never come back: api_key is write-only, api_key_set says one is stored.
+export type Endpoint = { method: string; base_url: string; api_key?: string; model: string };
+export type Use = Endpoint & { use: 'master' | 'custom' };
+export type EmbedderConn = { kind: string; exe: string; file: string; port: number; base_url: string; api_key?: string; model: string; dims: number };
+export type Connections = { master: Endpoint; chat: Use; memory: Use; soul: Use; embedder: EmbedderConn; timezone: string };
+export type ConnectionsView = { exists: boolean; connections: any; missing: string[]; restart_required?: boolean; embedder_status?: { kind: string; local_running: boolean; port: number } };
 
 export type MemoryItem = {
   id: number; text: string; tags: string[]; archived: number; superseded: boolean;
@@ -108,6 +113,17 @@ export const api = {
   },
   history: (limit?: number) => get<{ turns: number; messages: { role: 'user' | 'assistant'; text: string; ts?: number; source?: string }[] }>(`/api/history${limit ? `?limit=${limit}` : ''}`),
   settings: () => get<{ settings: Settings }>('/api/settings'),
+  connections: () => get<ConnectionsView>('/api/connections'),
+  updateConnections: async (c: Connections) => {
+    const r = await fetch(BASE + '/api/connections', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(c) });
+    if (!r.ok) throw new Error(await errorOf(r));
+    return r.json() as Promise<ConnectionsView & { restart_required: boolean }>;
+  },
+  probeConnection: async (body: { base_url: string; api_key?: string; job?: string }) => {
+    const r = await fetch(BASE + '/api/connections/probe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error(await errorOf(r));
+    return r.json() as Promise<{ ok: boolean; models: string[]; error?: string }>;
+  },
   updateSettings: async (patch: Partial<Settings>) => {
     const r = await fetch(BASE + '/api/settings', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) });
     if (!r.ok) throw new Error(await errorOf(r));
@@ -185,13 +201,13 @@ async function send<T>(path: string, method: 'POST' | 'PUT', body?: any): Promis
 }
 
 export const chars = {
-  list: () => get<{ characters: CharPackage[]; template: Record<string, string>; models: string[]; phases: string[] }>('/api/characters'),
+  list: () => get<{ characters: CharPackage[]; template: Record<string, string>; model: string; models: string[]; phases: string[] }>('/api/characters'),
   create: (body: { id: string; display_name: string; pronoun: string; avatar?: string; from_example: boolean }) => send<{ character: CharPackage; output: string }>('/api/characters', 'POST', body),
   detail: (id: string) => get<CharDetail>(`/api/characters/${encodeURIComponent(id)}`),
   saveDescribe: (id: string, files: Record<string, string>) => send<{ saved: number; character: CharPackage }>(`/api/characters/${encodeURIComponent(id)}/describe`, 'PUT', { files }),
   saveProfile: (id: string, profile: Partial<CharProfile>) => send<{ profile: CharProfile }>(`/api/characters/${encodeURIComponent(id)}/profile`, 'PUT', { profile }),
   simple: (id: string, force = false) => send<{ started: boolean; job: CharJob }>(`/api/characters/${encodeURIComponent(id)}/simple`, 'POST', { force }),
-  run: (id: string, body: { phase: string; from?: string; model: string; yes?: boolean; force?: boolean }) => send<{ started: boolean; job: CharJob }>(`/api/characters/${encodeURIComponent(id)}/run`, 'POST', body),
+  run: (id: string, body: { phase: string; from?: string; model?: string; yes?: boolean; force?: boolean }) => send<{ started: boolean; job: CharJob }>(`/api/characters/${encodeURIComponent(id)}/run`, 'POST', body),
   install: (id: string, force = false) => send<{ started: boolean; job: CharJob }>(`/api/characters/${encodeURIComponent(id)}/install`, 'POST', { force }),
   job: (id: string) => get<{ job: CharJob }>(`/api/characters/${encodeURIComponent(id)}/job`),
 };

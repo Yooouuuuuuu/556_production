@@ -49,6 +49,9 @@ What landed since:
   (the checks, the blind read-back, the SOUL, 安裝 → profile created, files copied, seeds loaded → start her on 名單).
   Packages with a hand-written SOUL (the cast) are marked and never overwritten. Backend: `/api/characters` and the
   skill as a 556d job (`internal/api/characters.go`). 0.8.0 was the skill itself (`tools/soul_writer.py`, no UI).
+- **0.9.0** (2026-10-19): 設定 → 全域 → **模型連線** — master endpoint with 檢查 (lists the endpoint's models), 對話／記憶／寫靈魂
+  follow it or carry their own, the vectors (local llama-server or an embeddings endpoint), the timezone; what is missing is
+  listed and a character does not start until it is complete; the new-character page shows the configured model.
 - **0.8.6** (2026-10-19): the avatar window is hidden by default (設定 → 全域 → 啟動時顯示角色 off); the avatar is parked
   until the core is done. 能力: the baseline is no tool at all — memory is injected every turn, not called; 查網路
   and later extensions still switch on per character.

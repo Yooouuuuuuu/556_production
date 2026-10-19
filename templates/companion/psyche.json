@@ -29,8 +29,7 @@
     "affect_half_life_h": null,
     "mood_regress_tau_h": 3.0,
     "mood_rise_max": 0.4,
-    "mood_fall_max": 0.25,
-    "timezone_offset_h": 8
+    "mood_fall_max": 0.25
   },
   "impact": {
     "prototype_width": 0.35,

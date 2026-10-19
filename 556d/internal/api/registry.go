@@ -56,12 +56,9 @@ func knobs() []Knob {
 	withDefault := func(k Knob, d any) Knob { k.Default = d; return k }
 	return []Knob{
 		// ---- her model (config.yaml)
-		c("model.lane", "model", "模型路線（lane）", "shim 的 lane 名稱；對應 shim/routing.json", "string", "restart_companion", "yaml", "config.yaml", "model.default"),
-		c("model.base_url", "model", "模型 API 位址", "OpenAI 相容端點（預設是 556d 的 shim）", "string", "restart_companion", "yaml", "config.yaml", "model.base_url"),
 		c("model.context_length", "model", "模型上下文長度", "tokens", "int", "restart_companion", "yaml", "config.yaml", "model.context_length"),
 		withDefault(c("model.streaming", "model", "串流回覆", "Hermes 與模型之間是否串流", "bool", "restart_companion", "yaml", "config.yaml", "model.streaming"), false),
 		c("context.protect_last_n", "model", "對話視窗保留的輪數（X）", "壓縮時保留最後 X 輪；聊天視窗也顯示 X 輪", "int", "restart_companion", "yaml", "config.yaml", "compression.protect_last_n"),
-		c("memory.provider", "model", "記憶提供者", "kokoro = KeepsakeDB；mem0 = 舊路線", "select", "restart_companion", "yaml", "config.yaml", "memory.provider", "kokoro", "mem0"),
 		// ---- her channels
 		c("telegram.token", "channels", "Telegram bot token", "這位角色自己的 bot（BotFather）", "secret", "restart_companion", "env", ".env", "TELEGRAM_BOT_TOKEN"),
 		c("telegram.allowed_users", "channels", "Telegram 允許的使用者 ID", "逗號分隔的數字 ID；空白 = 全部拒絕", "string", "restart_companion", "env", ".env", "TELEGRAM_ALLOWED_USERS"),
@@ -84,14 +81,7 @@ func knobs() []Knob {
 		c("kokoro.drop", "memory", "捨棄門檻（cosine）", "低於此值且關鍵字也沒命中就不注入", "float", "restart_companion", "json", "kokoro.json", "drop"),
 		c("kokoro.rrf_k", "memory", "RRF k", "", "float", "restart_companion", "json", "kokoro.json", "rrf_k"),
 		c("kokoro.oversample", "memory", "每路過取倍數", "", "int", "restart_companion", "json", "kokoro.json", "oversample"),
-		c("kokoro.llm.base_url", "memory", "記憶管線模型 API", "L2 用的 OpenAI 相容端點", "string", "restart_companion", "json", "kokoro.json", "llm.base_url"),
-		c("kokoro.llm.model", "memory", "記憶管線模型", "", "string", "restart_companion", "json", "kokoro.json", "llm.model"),
-		c("kokoro.llm.api_key", "memory", "記憶管線 API key", "", "secret", "restart_companion", "json", "kokoro.json", "llm.api_key"),
-		c("kokoro.llm.timeout", "memory", "記憶管線逾時（秒）", "", "float", "restart_companion", "json", "kokoro.json", "llm.timeout"),
 		c("kokoro.llm_retries", "memory", "記憶管線重試次數", "空回覆／非 JSON 時重試", "int", "restart_companion", "json", "kokoro.json", "llm_retries"),
-		c("kokoro.embedder.base_url", "memory", "嵌入模型 API", "", "string", "restart_companion", "json", "kokoro.json", "embedder.base_url"),
-		c("kokoro.embedder.model", "memory", "嵌入模型", "改了要重新嵌入整個記憶庫", "string", "reembed", "json", "kokoro.json", "embedder.model"),
-		c("kokoro.embedder.dims", "memory", "嵌入維度", "", "int", "reembed", "json", "kokoro.json", "embedder.dims"),
 		c("kokoro.tools", "memory", "記憶工具", "kokoro_search / kokoro_forget", "bool", "restart_companion", "json", "kokoro.json", "tools"),
 		c("kokoro.backup_dir", "memory", "記憶快照資料夾", "相對角色的資料夾；可指向雲端同步資料夾", "string", "restart_companion", "json", "kokoro.json", "backup_dir"),
 		c("kokoro.snapshot_text_only", "memory", "快照不含向量", "小很多；還原時重新嵌入", "bool", "restart_companion", "json", "kokoro.json", "snapshot_text_only"),

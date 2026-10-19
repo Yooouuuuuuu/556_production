@@ -22,21 +22,19 @@ import argparse
 import datetime as dt
 import hashlib
 import json
+import os
 import re
 import shutil
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 ROOT = Path(__file__).resolve().parents[1]
 CHARS = ROOT / "characters"
 TPL = ROOT / "templates" / "character"
 PSYCHE_TPL = ROOT / "templates" / "companion" / "psyche.json"
 VERSION = "0.8.0"
-PROXY = "http://127.0.0.1:18765/v1"
-MODELS = {"gemini": "agy/gemini-3.8-flash", "gemini-pro": "agy/gemini-3.1-pro",
-          "claude": "agy/claude-sonnet-4-6", "opus": "agy/claude-opus-4-6"}
 PHASES = ["intake", "structure", "thinking", "voice", "reactions", "parts", "assemble", "verify"]
 LLM_PHASES = {"intake", "structure", "thinking", "voice", "reactions", "parts", "verify"}
 
@@ -338,10 +336,29 @@ def display(d: Path) -> str:
 
 
 # ----------------------------------------------------------------------------- llm
-def make_llm(model: str, base_url: str, temperature: float, timeout: float):
+def make_llm(model: Optional[str], base_url: Optional[str], temperature: float, timeout: float):
     from keepsakedb.llms import OpenAIChat
-    name = MODELS.get(model, model)
-    return OpenAIChat(base_url, name, api_key="local-proxy-no-key", temperature=temperature, timeout=timeout)
+    base_url, model, key = connection(base_url, model)
+    return OpenAIChat(base_url, model, api_key=key or "none", temperature=temperature, timeout=timeout)
+
+
+# ----------------------------------------------------------------------------- connection
+def connection(base_url: Optional[str], model: Optional[str]) -> Tuple[str, str, str]:
+    """(base_url, model, api_key): what was passed, else the 寫靈魂 connection of home/models.json (設定 → 全域 →
+    模型連線). Nothing is guessed: with neither, this is an error."""
+    key = os.environ.get("X556_API_KEY", "")
+    if base_url and model:
+        return base_url.rstrip("/"), model, key
+    p = ROOT / "home" / "models.json"
+    cfg = read_json(p, {}) or {}
+    soul = cfg.get("soul") or {}
+    ep = soul if soul.get("use") == "custom" else (cfg.get("master") or {})
+    base_url = base_url or ep.get("base_url")
+    model = model or ep.get("model")
+    key = key or ep.get("api_key") or ""
+    if not (base_url and model):
+        raise SystemExit("模型連線未設定：給 --base-url 和 --model，或在 app 的 設定 → 全域 → 模型連線 填好（home/models.json）")
+    return base_url.rstrip("/"), model, key
 
 
 def ask(llm, d: Path, phase: str, system: str, user: str, retries: int = 1) -> Dict[str, Any]:
@@ -829,7 +846,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     prof = json.loads((TPL / "profile.json").read_text(encoding="utf-8"))
     prof["pronoun"] = args.pronoun
     write_json(d / "profile.json", prof)
-    print(f"init: {d} — fill describe/*.md (or keep the example), then: soul_writer.py run {args.name} --phase all --model claude --yes")
+    print(f"init: {d} — fill describe/*.md (or keep the example), then: soul_writer.py run {args.name} --phase all --yes")
     return 0
 
 
@@ -928,10 +945,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     r.add_argument("name")
     r.add_argument("--phase", default="all", choices=["all", *PHASES])
     r.add_argument("--from", dest="from_phase", default=None, choices=PHASES, help="run from this phase to the end (overrides --phase)")
-    r.add_argument("--model", default="gemini", help="gemini | gemini-pro | claude | opus | a model name on the proxy")
-    r.add_argument("--base-url", default=PROXY)
+    r.add_argument("--model", default=None, help="model name on the endpoint (default: the 寫靈魂 connection in home/models.json)")
+    r.add_argument("--base-url", default=None, help="OpenAI-compatible /v1 endpoint (default: the same connection)")
     r.add_argument("--temperature", type=float, default=0.4)
-    r.add_argument("--timeout", type=float, default=900, help="per call; claude through the proxy can take several minutes on the parts phase")
+    r.add_argument("--timeout", type=float, default=900, help="per call; a slow endpoint can take minutes on the parts phase")
     r.add_argument("--yes", action="store_true", help="accept proposals into empty profile fields; continue past a thin intake")
     r.add_argument("--force", action="store_true", help="write SOUL.md even when the checks fail")
     r.set_defaults(fn=cmd_run)

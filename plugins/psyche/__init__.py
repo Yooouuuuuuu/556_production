@@ -81,8 +81,9 @@ def _llm(home: Path, cfg: Dict[str, Any]) -> Optional[Any]:
         logger.warning("psyche: keepsakedb not importable (%s); appraisal off", exc)
         return None
     l = cfg.get("llm") or _read_json(home / "kokoro.json").get("llm") or {}
-    return OpenAIChat(l.get("base_url", "http://127.0.0.1:18765/v1"), l.get("model", "agy/gemini-3.8-flash"),
-                      api_key=l.get("api_key", "local-proxy-no-key"), temperature=float(l.get("temperature", 0.0)),
+    if not (l.get("base_url") and l.get("model")):  # 556d writes kokoro.json's llm from 設定 → 模型連線 before a start
+        raise RuntimeError("psyche: 模型連線未設定（kokoro.json 缺 llm）— 設定 → 全域 → 模型連線")
+    return OpenAIChat(l["base_url"], l["model"], api_key=l.get("api_key") or "none", temperature=float(l.get("temperature", 0.0)),
                       timeout=float(cfg["appraisal"].get("timeout_s", 60)), json_mode=bool(l.get("json_mode", False)))
 
 

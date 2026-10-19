@@ -232,7 +232,7 @@ func (a *API) charactersHandler(w http.ResponseWriter, r *http.Request) {
 			for _, id := range ids {
 				list = append(list, a.packageSummary(id))
 			}
-			writeJSON(w, 200, map[string]any{"characters": list, "template": a.describeTemplate(), "models": []string{"gemini", "claude", "gemini-pro", "opus"}, "phases": skillPhases})
+			writeJSON(w, 200, map[string]any{"characters": list, "template": a.describeTemplate(), "model": a.soulModel(), "models": []string{a.soulModel()}, "phases": skillPhases})
 		case http.MethodPost:
 			a.createCharacter(w, r)
 		default:
@@ -327,10 +327,14 @@ func (a *API) charactersHandler(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, 400, map[string]any{"error": "bad phase or model"})
 			return
 		}
-		if body.Model == "" {
-			body.Model = "gemini"
+		soul, ok := a.soulEndpoint()
+		if !ok {
+			writeJSON(w, 400, map[string]any{"error": "模型連線未設定（設定 → 全域 → 模型連線：寫靈魂）"})
+			return
 		}
-		args := []string{filepath.Join(a.mgr.Root(), "tools", "soul_writer.py"), "run", id, "--phase", body.Phase, "--model", body.Model}
+		body.Model = soul.Model
+		args := []string{filepath.Join(a.mgr.Root(), "tools", "soul_writer.py"), "run", id, "--phase", body.Phase,
+			"--model", soul.Model, "--base-url", soul.BaseURL}
 		if body.From != "" {
 			args = append(args, "--from", body.From)
 		}
@@ -426,6 +430,9 @@ func (a *API) createCharacter(w http.ResponseWriter, r *http.Request) {
 	cmd := exec.Command(a.venvPython(), args...)
 	cmd.Dir = a.mgr.Root()
 	cmd.Env = append(os.Environ(), "PYTHONIOENCODING=utf-8", "PYTHONUTF8=1")
+	if soul, ok := a.soulEndpoint(); ok && soul.APIKey != "" {
+		cmd.Env = append(cmd.Env, "X556_API_KEY="+soul.APIKey) // the key never goes on the command line
+	}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		writeJSON(w, 500, map[string]any{"error": strings.TrimSpace(string(out))})
@@ -505,6 +512,9 @@ func (a *API) startCharJob(id, kind, phase, model, exe string, args []string) er
 	cmd := exec.Command(exe, args...)
 	cmd.Dir = a.mgr.Root()
 	cmd.Env = append(os.Environ(), "PYTHONIOENCODING=utf-8", "PYTHONUTF8=1")
+	if soul, ok := a.soulEndpoint(); ok && soul.APIKey != "" {
+		cmd.Env = append(cmd.Env, "X556_API_KEY="+soul.APIKey) // the key never goes on the command line
+	}
 	pr, pw := io.Pipe()
 	cmd.Stdout, cmd.Stderr = pw, pw
 	if err := cmd.Start(); err != nil {

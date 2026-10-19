@@ -966,7 +966,8 @@ class Engine:
                 continue
             rec = {"id": f"wh_{k}_{aid}_{i}", "what": what, "at": t, "counterpart": p, "importance": round(float(w.get("importance", 0.5)), 4),
                    "turn_id": turn_id, "rum": 0}
-            self.withheld = sorted(self.withheld + [rec], key=lambda x: -float(x["importance"]))[:6]
+            mine = sorted([x for x in self.withheld if (x.get("counterpart") or MAIN) == p] + [rec], key=lambda x: -float(x["importance"]))[:6]
+            self.withheld = [x for x in self.withheld if (x.get("counterpart") or MAIN) != p] + mine   # six per counterpart, not six in all
             if rec in self.withheld:
                 self._event("withheld_opened", {"id": rec["id"], "what": what, "importance": rec["importance"]}, t, counterpart=p, dedup=f"wh:{rec['id']}")
         if data.get("farewell"):
@@ -1024,13 +1025,17 @@ class Engine:
                 self._save_loop(l)
             if fk == "share":
                 self.share_backlog = [s for s in self.share_backlog if s.get("what") != what]
-            elif fk == "unsaid":
-                self.withheld = [w for w in self.withheld if w.get("what") != what]
+            # an unsaid thing (2.3) stays on the register until "sent": deciding to say it is not saying it, and a
+            # silent turn or a failed send keeps it for the next occasion
             if fk != "ask_other":  # a question carried to another character is not one of her messages to you
                 self.contact["proactive_today"] = int(self.contact["proactive_today"]) + 1
             self._contact_of(cp)["pending"] = {"kind": fk, "what": what, "at": t, "tick": k, "loop": lid}
         elif kind == "sent":
             c = self._contact_of(cp)
+            pend = c.get("pending") or {}
+            if (p.get("kind") or pend.get("kind")) == "unsaid":   # 2.3: it really went out — off the register now
+                said = str(p.get("what") or pend.get("what") or "")
+                self.withheld = [w for w in self.withheld if w.get("what") != said]
             c["last_sent_at"], c["awaiting_since"], c["pending"] = t, t, None
             lid = p.get("loop")
             if lid and lid in self.loops:
@@ -1573,7 +1578,15 @@ class Engine:
                 now_word = (model.intensity_word(shown(dominant)) + model.EMOTION_ZH[dom_type]) if dominant else "已經平復了"
                 lines.append(f"轉變：剛才{prev_word}，現在{now_word}")
             lines.append("原則：情緒是底色，內容以對方的話題為主；不提沒做過的事；有自己的看法，不用附和")
-            text = "\n".join(lines[: int(ex.get("max_lines", 8)) + 1])  # the clock line is not a state line
+            # max_lines counts state lines only (the title and the clock are extra). When the block overflows, the least
+            # load-bearing line goes first and 原則 always stays. (Before 0.8.11 the slice counted the title, so a full
+            # block lost 轉變 and 原則.)
+            cap = int(ex.get("max_lines", 8))
+            for drop in ("轉變：", "心裡：", "想法：", "掛念："):
+                if len(lines) - 2 <= cap:
+                    break
+                lines = [x for x in lines if not x.startswith(drop)]
+            text = "\n".join(lines)
             self.last_block = {"dominant": dom_type, "word": (model.intensity_word(shown(dominant)) + model.EMOTION_ZH[dom_type]) if dominant else "平靜",
                                "at": t, "mood": mood_word, "text": text, "counterpart": counterpart, "strategy": name}
             if self.live:
