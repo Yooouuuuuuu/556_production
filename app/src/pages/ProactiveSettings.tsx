@@ -8,12 +8,19 @@ import { t } from '../i18n';
 const BIG5: [string, string][] = [['openness', '開放性'], ['conscientiousness', '盡責性'], ['extraversion', '外向性'], ['agreeableness', '親和性'], ['neuroticism', '神經質']];
 const CONSTS: [string, string][] = [['self_esteem_stability', '自尊穩定'], ['expressiveness', '表達外放'], ['humor_coping', '幽默調節'], ['clinginess_cap', '黏人度上限'], ['tsundere_tendency', '傲嬌'], ['assertiveness', '主見']];
 
+// the five thinking meters (psyche.json `thinking`) with the engine's Big Five defaults for a blank slider
+const THINKING: [string, (b5: Record<string, number>) => number][] = [
+  ['rationality', (b5) => Number(b5.conscientiousness ?? 0.5)], ['experientiality', () => 0.5],
+  ['promotion', (b5) => Number(b5.extraversion ?? 0.5)], ['prevention', (b5) => Number(b5.neuroticism ?? 0.5)], ['maximizing', () => 0.5],
+];
+
 export function ProactiveSettings({ onChanged }: { onChanged(): void }) {
   const [s, setS] = useState<PsycheSettings | null>(null);
   const [exists, setExists] = useState(true);
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [showPersonality, setShowPersonality] = useState(false);
+  const [showThinking, setShowThinking] = useState(false);
 
   useEffect(() => {
     api.psycheSettings().then((r) => { setExists(r.exists); setS(r.settings ?? {}); }).catch((e) => setNotice(String(e)));
@@ -44,6 +51,7 @@ export function ProactiveSettings({ onChanged }: { onChanged(): void }) {
         life: { busyness_mode: life.busyness_mode ?? 'work' },
         cares_about: s.cares_about ?? [],
         character: ch,
+        thinking: s.thinking ?? {},
       };
       const r = await api.updatePsycheSettings(patch);
       setS(r.settings);
@@ -130,6 +138,15 @@ export function ProactiveSettings({ onChanged }: { onChanged(): void }) {
           {BIG5.map(([k, zh]) => slider(k, zh, Number(b5[k] ?? 0.5), (v) => setB5(k, v)))}
           {CONSTS.map(([k, zh]) => slider(k, zh, Number(ch[k] ?? 0.5), (v) => setCh(k, v)))}
           {slider('chronotype', '晨型／夜型', Number(ch.chronotype ?? 0), (v) => setCh('chronotype', v), -1, 1)}
+          {slider('rumination', t('proactive.rumination'), Number(ch.rumination ?? b5.neuroticism ?? 0.4), (v) => setCh('rumination', v))}
+        </div>
+      )}
+      <button className="text-xs opacity-70 hover:opacity-100" onClick={() => setShowThinking(!showThinking)}>
+        {showThinking ? '▾' : '▸'} {t('proactive.thinking')} <span className="opacity-60">({t('proactive.thinking_note')})</span>
+      </button>
+      {showThinking && (
+        <div className="grid grid-cols-2 gap-x-6 gap-y-1">
+          {THINKING.map(([k, def]) => slider(k, t('newchar.meter.' + k), Number((s.thinking ?? {})[k] ?? def(b5)), (v) => setS({ ...s, thinking: { ...(s.thinking ?? {}), [k]: v } })))}
         </div>
       )}
       <div className="space-y-1">

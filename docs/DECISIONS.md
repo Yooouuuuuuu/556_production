@@ -92,6 +92,17 @@ Design: `inner-life/inner-life.md` (its §0 lists every decision applied).
 - The narrator cue behind a proactive turn is never the user's words: 556d tags it, the app hides it by default and
   can show it as a note (設定 → 全域 → 程式).
 
+## Built (2026-10-19) — the thinking module, first pass [inner-life] [prompt]
+- `plugins/psyche/thinking.py`, separate from the emotion engine: reads energy, fatigue, arousal, pleasure, anxiety,
+  the hurt gate and closeness, writes nothing. Five meters in `psyche.json` `thinking` with Big Five defaults for
+  blanks (promotion ≈ E, prevention ≈ N, rationality ≈ C, the rest 0.5); the two choice sets are recorded only.
+- One optional 想法 line after 表現, first rule that fires: interpretation bias (dial 4, from the emotion side),
+  stakes, no energy, mood lifting or dropping the default framing, reading care at the extremes (mechanism 2.2 lives
+  here), the maximizer's clarifying question. Thresholds are design values, to be tuned by the simulator scenarios.
+- Rumination became `character.rumination` (blank = neuroticism), an emotion-side knob, not a thinking meter.
+- 設定 → 角色 → 主動 gains the five sliders and 想不開的程度; applied at her next start like the personality sliders.
+- Not here: the hidden scratch (§2.6), keyword triggers, the blind questionnaire.
+
 ## Decided (2026-10-19) — no tools at baseline; the avatar parked [prompt] [structure] [app]
 - Option C from `prompt/around-the-soul.md` §2, after the 真音 test: every character's `platform_toolsets` lists are empty
   at baseline (556d removes `memory` from them before a start; `new-companion.ps1` writes empty lists). Memory is

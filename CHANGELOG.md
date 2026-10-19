@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.8 — 2026-10-19
+
+- **The thinking module** (`plugins/psyche/thinking.py`; `docs/prompt/prompt.md` §2.5, `inner-life.md` §23). Five meters in
+  `psyche.json` `thinking` — 想好再回, 憑感覺, 先看機會, 先看會不會出錯, 找更好答案找到哪 — with Big Five defaults for
+  blanks; the engine reads them against the moment and renders one optional line after 表現, 想法：…, only when this turn
+  differs from her trait: 今天特別容易往壞處想 (anxious with something open), 這件事不小，會想一下再回, 今天沒力氣想，會先回再想
+  / 今天沒力氣猜，直接問對方, 心情好，先看能變成什麼 / 這題先看會不會出錯, 懶得猜對方的意思 / 會多想一下對方是什麼意思 (reading
+  care: closer and tired = less careful), 會問清楚再答. The module reads emotion state and writes nothing. Rumination is
+  now `character.rumination` (blank = neuroticism). 設定 → 角色 → 主動: a 怎麼想 fold with the five sliders and 想不開的程度.
+  Six tests.
+
 ## 0.8.7 — 2026-10-19
 
 - **Pinned groups** (`docs/prompt/prompt.md` §2.4, `docs/memory/memory.md`). kokoro renders the rows of a few reserved

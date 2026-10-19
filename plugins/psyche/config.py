@@ -28,8 +28,15 @@ DEFAULTS: Dict[str, Any] = {
         "tsundere_tendency": 0.3,
         "assertiveness": 0.6,
         "chronotype": 0.0,
+        "rumination": None,         # how much an unresolved negative feeling comes back on idle attention; None = neuroticism
         "pronoun": "她",            # 她 | 他 — used in the state block and the event cues
     },
+    # The thinking module (thinking.py; docs/prompt/prompt.md §2.5): five meters 0..1 the engine reads for the 想法
+    # line; None = a Big Five default. Set by the soul skill (profile.json) or the 主動 page; applied at her next start.
+    "thinking": {"rationality": None, "experientiality": None, "promotion": None, "prevention": None, "maximizing": None},
+    # Recorded choices (the medium of thought, the context weighting): the SOUL text carries them; kept here for the
+    # blind validation and the coming scratch instruction. Not read by the engine.
+    "thinking_choices": {"medium_primary": None, "medium_secondary": None, "first_look": None, "contradiction": None, "cause": None},
     # What she cares about (preference profile read by appraisal A — not her personality, which is B's).
     "cares_about": [
         "答應的事有沒有做到（約好的聊天、說會回來）",

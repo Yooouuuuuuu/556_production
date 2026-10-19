@@ -188,7 +188,7 @@ sim (`psyche.json` projects; the block already says 在做). Who writes them: se
 prompt stores facts about the user only; a self track in the pipeline is a separate decision. A row written
 mid-session shows after the next rebuild; Hermes has `invalidate_system_prompt`, so a seed change can force it.
 
-### 2.5 The thinking dials
+### 2.5 The thinking dials (built 0.8.8: `plugins/psyche/thinking.py` — five meters with Big Five defaults, the 想法 line, reading care, rumination as a knob; the choices are recorded, not read)
 
 Six stable, replicated dimensions of how people think (the 2026-10-14 brief; references to be verified
 before they enter `inner-life.md` Appendix D). Meters, never booleans; two of them are two independent

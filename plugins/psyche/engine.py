@@ -36,6 +36,7 @@ from . import appraisal as A
 from . import checks as CK
 from . import events as EV
 from . import life as L
+from . import thinking as TH
 from . import model
 from . import needs as N
 from . import relation as RL
@@ -272,6 +273,15 @@ class Engine:
     def _rng(self, k: int, salt: str = "") -> random.Random:
         day = self.local(self.time_of(k)).strftime("%Y-%m-%d")
         return random.Random(f"{self.char}:{day}:{k}:{salt}")
+
+    def _rumination_coef(self) -> float:
+        """How readily an unresolved negative feeling comes back: the character's `rumination` knob, else neuroticism
+        (Verduyn: rumination is the strongest predictor of duration; made authorable in 0.8.8)."""
+        ch = self.cfg.get("character") or {}
+        v = ch.get("rumination")
+        if v is None:
+            return float((ch.get("big5") or {}).get("neuroticism", 0.4))
+        return max(0.0, min(1.0, float(v)))
 
     @property
     def clinginess_eff(self) -> float:
@@ -566,7 +576,7 @@ class Engine:
                 I = model.decayed(inst["intensity0"], inst["half_life_h"], (t - inst["born_at"]) / 3600.0)
                 if I < 0.08:
                     continue
-                p = 0.6 * I * float(ch["big5"].get("neuroticism", 0.4)) * (1.0 - attention) * dt_h
+                p = 0.6 * I * self._rumination_coef() * (1.0 - attention) * dt_h
                 if rng.random() < p:
                     inst["intensity0"], inst["born_at"], inst["born_tick"] = round(min(1.0, I * 1.15), 4), t, k
                     inst["rumination"] = int(inst.get("rumination", 0)) + 1
@@ -1470,6 +1480,12 @@ class Engine:
             if counterpart == MAIN and fw is not None and t < fw:
                 how.append("剛道過別：溫和接受，可以說一次捨不得，不挽留")
             lines.append("表現：" + "；".join(how))
+            # the thinking module (§2.5): one optional line when the moment crosses a meter's threshold
+            thought = TH.line(m=TH.meters(self.cfg), energy=float(self.energy), fatigue=float(self.fatigue), arousal=float(self.affect["ar"]),
+                              pleasure=float(self.mood[0]), anxiety=float(rel.get("anxiety", 0.3)), hurt_gate=float(gate), bond=float(rel["bond"]),
+                              open_hurt=any(e.get("resolved_at") is None for e in led), pronoun=self.pr)
+            if thought:
+                lines.append(thought)
             rel_line = RL.closeness_words(rel, term)
             open_hurt = [e for e in led if e.get("resolved_at") is None]
             if open_hurt:   # on the ledger = in her prompt, the whole time (entries below hurt_open_min never open)

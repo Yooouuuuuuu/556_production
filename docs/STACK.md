@@ -147,7 +147,7 @@ id; her answer lands as a normal row; the hooks record `sent` / `silent`. 556d: 
 `proactive`, `life.busyness_mode`, `cares_about`); `POST /api/psyche/command` → `commands` table (close_loop,
 add_loop, life_event). Output checks (checks.py, record only) → `checks` table. Simulator: `tools/psychesim.py`
 (week / day / seeds / replay). Engine modules: life.py (sleep, activities, life events), needs.py, tom.py, urge.py,
-relation.py (L5 per counterpart, the hurt ledger, the expression strategies). Loops since 0.7.4: a promise opens
+relation.py (L5 per counterpart, the hurt ledger, the expression strategies), thinking.py (0.8.8: the five thinking meters and the 想法 line). Loops since 0.7.4: a promise opens
 only when she agreed (`agreed`); a promise that needs another character (`ask`) is asked once at her free time
 (`ask_other` → relay), answered by that conversation's appraisal (`asking` → `answered`), reported back
 (`report_back`) when she is up, outside your no-disturb hours and you are around; `proactive.ask_give_up_h` 48.
