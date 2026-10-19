@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.7 — 2026-10-19
+
+- **Pinned groups** (`docs/prompt/prompt.md` §2.4, `docs/memory/memory.md`). kokoro renders the rows of a few reserved
+  tags into her system prompt once per session, under 一直記著的: `timeline` oldest first, `influences`, `stances`,
+  `refusals`, `standing` newest first, eight lines per tag (`kokoro.json` `pinned_tags`, `pinned_per_tag`), superseded
+  rows out, 你 rendered as her term. Always read, paid once, cached. The soul skill tags every dated event `timeline`
+  and writes `influences` rows from the description. Tests: `tests/test_kokoro_pinned.py`.
+
 ## 0.8.6 — 2026-10-19
 
 - **No tools at baseline** (option C, DECISIONS 2026-10-19). 556d empties the `memory` entry from every character's

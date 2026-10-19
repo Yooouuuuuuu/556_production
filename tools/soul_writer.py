@@ -95,6 +95,7 @@ P_INTAKE = """下面是角色描述。請列出缺少或太薄、會讓扮演失
 P_STRUCTURE = """從描述整理出下面幾樣，輸出 JSON：
 - "events": 發生過的事，每件 {{"at": "YYYY-MM-DD" 或 "YYYY-MM" 或 "YYYY"——只在描述有寫日期時填，沒有就 null，不要猜年份, "text": "一句話，第三人稱，用{pr}的名字或「{pr}」", "left": "這件事留在{pr}身上的痕跡，寫成設定裡的一句，第二人稱「你」，不帶日期", "tags": ["一到三個英文小寫標籤"]}}
 - "seeds": 要載入記憶庫的事實，每條 {{"text": "一句話", "tags": ["..."], "at": "可省略"}}：包含{pr}自己的經歷與生活事實（主詞用{pr}的名字）、{pr}知道的關於跟{pr}說話的人的事（主詞寫「你」）、關於其他人的事（用名字）。十到二十條。
+- "influences": 影響過{pr}的人與事（老師、某個人說過的話、一本書、一首歌），每條 {{"text": "一句話，寫明留下了什麼", "tags": ["..."]}}；描述沒有就空陣列。
 - "stances": {pr}會為之爭的看法，十條左右，一條一句。
 - "refusals": {pr}不會答應、不會做的事。
 - "tensions": {pr}自己也沒想清楚的矛盾，兩到三條。
@@ -501,7 +502,14 @@ def build_seeds(d: Path) -> List[Dict[str, Any]]:
         at = e.get("at")
         text = str(e.get("text") or "").strip()
         zh = _date_zh(at)
-        add((zh + "，" + text) if zh and text and not text.startswith(zh) else text, e.get("tags") or ["history"], at)
+        tags = [str(t).strip().lower() for t in (e.get("tags") or []) if str(t).strip()]
+        if "timeline" not in tags:  # events are the pinned timeline (prompt.md §2.4)
+            tags = ["timeline", *tags]
+        add((zh + "，" + text) if zh and text and not text.startswith(zh) else text, tags, at)
+    for inf in st.get("influences") or []:
+        if isinstance(inf, dict):
+            tags = [str(t).strip().lower() for t in (inf.get("tags") or []) if str(t).strip()]
+            add(inf.get("text"), ["influences", *[t for t in tags if t != "influences"]])
     for s in st.get("seeds") or []:
         if isinstance(s, dict):
             add(s.get("text"), s.get("tags"), s.get("at"))

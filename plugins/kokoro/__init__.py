@@ -37,6 +37,32 @@ def _read_config(hermes_home: Path) -> Dict[str, Any]:
         return json.load(f)
 
 
+# Pinned groups (docs/prompt/prompt.md §2.4): a few reserved tags whose rows are ALWAYS in her system prompt, not
+# retrieved by similarity — the things that must frame every reply but change slowly (dated firsts, influences, the
+# stances and refusals she formed later, where she stands with each person). Rendered once per session into the
+# plugin prompt section, capped per tag, so they cost one copy per request, cached.
+PINNED_TAGS_DEFAULT = ["timeline", "influences", "stances", "refusals", "standing"]
+PINNED_ZH = {"timeline": "時間線", "influences": "影響過{pr}的人與事", "stances": "立場", "refusals": "不做的事", "standing": "跟人的關係"}
+
+
+def render_pinned(store: Any, tags: List[str], per_tag: int, show, pronoun: str = "她") -> str:
+    """The 一直記著的 block: for each reserved tag its active rows (superseded ones out), the timeline oldest first,
+    the rest newest first, at most `per_tag` lines each. Empty when nothing is pinned."""
+    parts: List[str] = []
+    for tag in tags:
+        try:
+            rows = [m for m in store.by_tag(tag, include_archived=False) if not getattr(m, "superseded", False)]
+        except Exception:
+            rows = []
+        if not rows:
+            continue
+        rows.sort(key=lambda m: float(getattr(m, "created_at", 0.0) or 0.0), reverse=(tag != "timeline"))
+        rows = rows[: max(1, int(per_tag))]
+        head = PINNED_ZH.get(tag, tag).replace("{pr}", pronoun)
+        parts.append(f"【{head}】" + chr(10) + chr(10).join(f"- {show(m.text)}" for m in rows))
+    return ("一直記著的：" + chr(10) + (chr(10) + chr(10)).join(parts)) if parts else ""
+
+
 class KokoroMemoryProvider(MemoryProvider):
     def __init__(self) -> None:
         self._cfg: Dict[str, Any] = {}
@@ -142,7 +168,14 @@ class KokoroMemoryProvider(MemoryProvider):
                 self._cfg = _read_config(self._home)
             except Exception:
                 return ""
-        return (self._memory_block_text() + self._your_profile_block()).strip()
+        pinned = ""
+        if self._store is not None:
+            tags = self._cfg.get("pinned_tags")
+            if not isinstance(tags, list):
+                tags = PINNED_TAGS_DEFAULT
+            pinned = render_pinned(self._store, [str(t) for t in tags], int(self._cfg.get("pinned_per_tag", 8)), self._render,
+                                   str(self._cfg.get("pronoun") or "她"))
+        return (self._memory_block_text() + (chr(10) + chr(10) + pinned if pinned else "") + self._your_profile_block()).strip()
 
     @staticmethod
     def _your_name(cfg: Dict[str, Any]) -> str:

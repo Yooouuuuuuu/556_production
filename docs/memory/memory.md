@@ -255,6 +255,16 @@ Realistic final packaging = one installer/launcher with bundled sidecars (roadma
 - Standalone engine: **KeepsakeDB** (`D:\dev\KeepsakeDB`, created 2026-10-01) — layered L1 store /
   L2 pipeline (unpluggable) / L3 integration; 556 keeps `kokoro` as the Hermes provider name.
 
+## Pinned groups (0.8.7, `../prompt/prompt.md` §2.4)
+
+A few reserved tags are not retrieved by similarity but rendered into her system prompt once per session, in
+kokoro's prompt section under 一直記著的: `timeline` (oldest first), `influences`, `stances`, `refusals`,
+`standing` (newest first), at most `kokoro.json` `pinned_per_tag` (8) lines each, superseded rows out, 你 rendered
+as her term. The names are `kokoro.json` `pinned_tags`. Who writes them: the soul skill (events → `timeline`,
+`influences`), seeds, and the 記憶 page by hand; the observe pipeline is told nothing about them (its prompt is the
+pinned library's), so a self track would be a separate change. A row written mid-session shows after her restart
+or a compression.
+
 ## History vs memory vs state — `memory-layers.d2`
 
 - Three stores feed her prompt: history (the verbatim session), memory (long facts + short dated notes),

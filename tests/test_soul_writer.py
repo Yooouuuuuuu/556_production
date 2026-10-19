@@ -92,6 +92,7 @@ def test_full_pipeline_with_scripted_llm(tmp_path, monkeypatch):
     # seeds: events first with the date in the text and the `at` field; duplicates dropped
     rows = [json.loads(ln) for ln in (d / "seeds.jsonl").read_text(encoding="utf-8").splitlines()]
     assert rows[0]["at"] == "2023-11" and rows[0]["text"].startswith("2023 年 11 月，")
+    assert rows[0]["tags"][0] == "timeline" and "comic" in rows[0]["tags"]   # events are the pinned timeline
     assert rows[1]["at"] == "2026-09-02"
     texts = [r["text"] for r in rows]
     assert len(texts) == len(set(texts)) and any(t == "你在水彩課坐阿凜旁邊" for t in texts)

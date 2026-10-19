@@ -29,6 +29,8 @@
   "short_layer": true,
   "short_k": 5,
   "short_cap": 1000,
+  "pinned_tags": ["timeline", "influences", "stances", "refusals", "standing"],
+  "pinned_per_tag": 8,
   "your_name": "",
   "address_default": "製作人"
 }

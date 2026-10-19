@@ -175,7 +175,7 @@ is. Validation: a fidelity probe in `tests/` — a blind judge guesses which cha
 "would she say this" lines, ten novel topics scored against her stance list; one SOUL change at a time, keep
 it only if the score holds.
 
-### 2.4 Pinned groups
+### 2.4 Pinned groups (built 0.8.7: `render_pinned` in kokoro, `pinned_tags` / `pinned_per_tag` in kokoro.json; the skill tags events `timeline` and writes `influences`)
 
 A group is a tag: every long memory carries 1–3 lowercase English slugs the observe LLM chooses each turn
 (it sees the existing tags with counts and is told to reuse); no taxonomy exists; tags sit in an indexed
