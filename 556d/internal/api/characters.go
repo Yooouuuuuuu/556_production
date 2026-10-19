@@ -345,6 +345,21 @@ func (a *API) charactersHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		writeJSON(w, 200, map[string]any{"started": true, "job": a.jobView(id)})
+	case action == "simple" && r.Method == http.MethodPost:
+		// the simple path (prompt.md §2.10): profile.json's sliders, choices and three boxes → the files, no model
+		var body struct {
+			Force bool `json:"force"`
+		}
+		_ = decodeJSON(r, &body)
+		args := []string{filepath.Join(a.mgr.Root(), "tools", "soul_writer.py"), "simple", id}
+		if body.Force {
+			args = append(args, "--force")
+		}
+		if err := a.startCharJob(id, "simple", "simple", "", a.venvPython(), args); err != nil {
+			writeJSON(w, 409, map[string]any{"error": err.Error()})
+			return
+		}
+		writeJSON(w, 200, map[string]any{"started": true, "job": a.jobView(id)})
 	case action == "install" && r.Method == http.MethodPost:
 		if !fileExists(filepath.Join(dir, "SOUL.md")) {
 			writeJSON(w, 400, map[string]any{"error": "no SOUL.md yet — run the skill first"})

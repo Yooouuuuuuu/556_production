@@ -92,6 +92,24 @@ Design: `inner-life/inner-life.md` (its §0 lists every decision applied).
 - The narrator cue behind a proactive turn is never the user's words: 556d tags it, the app hides it by default and
   can show it as a note (設定 → 全域 → 程式).
 
+## Built (2026-10-19) — the scratch, keyword triggers, the simple path, the fidelity probe [prompt] [memory] [app]
+- The hidden scratch (`prompt.md` §2.6) is stripped and logged in the shim, the one place that sees the raw reply
+  and never streams upstream; that answers all four checks in one place, with Hermes's own scrubbers as a second
+  net. It is compiled per character from the dial 1 and 6 choices and is opt-in (`scratch` in profile.json),
+  because it costs output tokens every turn and nothing has measured what it buys yet.
+- Keyword triggers are names only (the roster, the person files, your name): a name in the message is an exact
+  BM25 lookup, a few lines under `By name`, never a second similarity search. The lorebook row in `memory.md` is
+  this and nothing more until a store has enough named places to need them.
+- The simple path writes the same files as the skill with band sentences and three boxes; the size check does not
+  apply to it (flatter and shorter is the stated cost). A hand-written SOUL is never overwritten by either path.
+- The fidelity probe compares SOUL texts against a gold file written from what the character is, not against
+  each other, with a quiet state block and no engine, so a swap decision rests on the text. 西's candidate
+  (`characters/xi_v2`, drafted from her files, gemini) is measured against her hand-written SOUL; the cast stays
+  as it is until the user approves the diff. First run (gemini as her and as the judge, 2026-10-19 10:47): both SOULs
+  score 0.96 — recognition 7/8 (each once mistaken for 子晴), 像她會說 20/20, takes 10/10. A tie at the ceiling says
+  the candidate holds her and that this gold is too easy to separate them: the next gold needs harder lines (hers
+  against a near miss, not against 客服話) and more prompts. The swap stays the user's call on the text diff.
+
 ## Built (2026-10-19) — the five conversation mechanisms [inner-life] [prompt]
 - `inner-life.md` §24. Nothing new is a meter; every one of the five changes only the 表現 and 掛念 lines or the
   proactive urge. The disclosure depth that the engine computed and nobody read now caps what she opens up about

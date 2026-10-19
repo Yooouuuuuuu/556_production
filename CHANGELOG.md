@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.8.10 — 2026-10-19
+
+- **The hidden scratch** (`docs/prompt/prompt.md` §2.6, opt-in). The shim strips a `<think>…</think>` block from the
+  raw reply — closed pairs, and an unterminated tag at a line start to the end — before the tool-call parser and
+  before Hermes sees the text, and logs it (`[shim] … scratch:`); a tool call written inside the scratch is not a
+  tool call. The skill compiles the instruction from the thinking choices (medium, 第一眼, 矛盾) into
+  怎麼聽、怎麼想、怎麼回 when `profile.json` has `scratch: true` (新角色 → 確認 → 回覆前先想).
+- **Keyword triggers** (tier 3, §2.2). kokoro: a roster name, a person file's name or your name in the message adds
+  up to `trigger_k` exact BM25 rows under `By name`, minus what similarity already brought; `triggers: false` turns
+  it off. Tests: `tests/test_kokoro_triggers.py`.
+- **The simple path** (§2.10). `soul_writer.py simple <id>` and the 簡單版 fold on the 產生 step: three boxes (who,
+  how she talks, what she refuses) plus the sliders and choices become the same files with one zh-TW sentence per
+  band, no model; the size check does not apply; a hand-written SOUL is never overwritten.
+- **The fidelity probe** (§2.3). `tools/fidelity_probe.py` with `tests/fidelity/xi.json`: a SOUL text answers as her,
+  a blind judge picks her out of the three-SOUL lineup; twenty 像不像她會說 lines; ten A/B takes — scores on the
+  text alone. 西's description drafted from her files (`characters/xi_v2`) and run through the skill on gemini;
+  the cast is untouched until the user approves the diff.
+- 556d: `POST /api/characters/<id>/simple`; the daemon binary rebuilt (0.8.6 hygiene, the shim's scratch).
+
 ## 0.8.9 — 2026-10-19
 
 - **The five conversation mechanisms** (`docs/inner-life/inner-life.md` §24; `docs/prompt/prompt.md` §3 item 5). The

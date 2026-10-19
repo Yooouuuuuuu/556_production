@@ -38,6 +38,13 @@ Every phase stops for review unless `--yes`; a part can be regenerated alone; `a
 fails the checks (theory or machine words, digits, simplified characters, size 2,500–4,000, missing sections) unless
 `--force`. The models are served by the proxy at :18765; 556d need not be running.
 
+The simple path (0.8.10, `docs/prompt/prompt.md` §2.10): `python tools/soul_writer.py simple <id>` compiles `profile.json`
+alone — the sliders, the choices and three boxes under `simple` (`who`, `talk`, `refuses`) — into the same files with
+one zh-TW sentence per band, no model; the 產生 step's 簡單版 fold does the same. `closeness` (剛認識 … 很親近) becomes
+her starting bond with you (`psyche.json` `relationships.你`); `scratch: true` adds the hidden think-first instruction
+(§2.6). The fidelity probe: `python tools/fidelity_probe.py --gold tests/fidelity/<id>.json --soul <SOUL.md> …` scores a
+SOUL text blind (recognition in a lineup, 像不像她會說, A/B takes) so two versions of the same character can be compared.
+
 Install into a profile: `install-character.ps1 -Name <id>` (creates the profile with `new-companion.ps1` when missing,
 then copies SOUL.md, companion.json, psyche.json, kokoro keys and people/*.md; restart her afterwards). Seed memories
 with the embedder up and the character not running. A hand-written character (SOUL.md and the rest written directly,

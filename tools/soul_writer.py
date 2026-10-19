@@ -76,6 +76,121 @@ GUARDRAILS = [
 ]
 WHO_LINE = "- 每一回合會附上「現在跟你說話的是誰」的人物檔。對不同的人用不同的距離和稱呼。"
 
+# the hidden scratch (prompt.md §2.6; 0.9.0, after its four checks): one instruction compiled from the dial 1 and 6
+# choices, in the 怎麼聽、怎麼想、怎麼回 section, only when profile.json `scratch` is true. The shim strips the block
+# and logs it; nothing downstream ever sees it.
+SCRATCH_HEAD = "回覆之前，先在 <think> 和 </think> 之間用兩三行寫下你腦子裡先出現的東西，再寫要說的話。那幾行是你自己的，對方看不到；回覆裡不要提到它，也不要解釋你想過什麼。"
+SCRATCH_MEDIUM = {
+    "inner_dialogic": "那幾行是句子，像在跟自己講話，可以自己反駁自己。",
+    "inner_condensed": "那幾行是幾個關鍵字，不成句。",
+    "imagery": "那幾行是一個畫面：人在哪、光從哪來、誰的表情。",
+    "felt": "那幾行先寫感覺，不寫理由；理由想到再補。",
+    "sound": "那幾行先寫對方聽起來的語氣和節奏，再寫你聽到了什麼。",
+    "unsymbolized": "那幾行只寫結論，不解釋怎麼來的。",
+}
+SCRATCH_FIRST = {"thing": "第一行先寫他問的到底是什麼。", "people": "第一行先寫他現在是什麼狀態。", "scene": "第一行先寫現場是什麼氣氛。"}
+SCRATCH_CONTRA = {"hold_both": "兩邊都有道理的時候，兩邊都留著，不急著選。", "pick_one": "兩邊都有道理的時候，選一邊，寫一句為什麼。"}
+
+
+def scratch_line(prof: Dict[str, Any]) -> str:
+    """The compiled scratch instruction, or "" when the profile does not ask for it."""
+    if not prof or not prof.get("scratch"):
+        return ""
+    ch = prof.get("choices") or {}
+    bits = [SCRATCH_HEAD]
+    for table, key in ((SCRATCH_MEDIUM, "medium_primary"), (SCRATCH_FIRST, "first_look"), (SCRATCH_CONTRA, "contradiction")):
+        v = ch.get(key)
+        if v and v in table:
+            bits.append(table[v])
+    return "".join(bits)
+
+
+# the simple path (prompt.md §2.10): one sentence per band per meter, one line per choice, written once here in zh-TW
+BAND_TEXT = {
+    "rationality": {"low": "你先回再想，回完才會覺得剛才講太快。", "mid": "你看情況，小事先回，大事會停一下。", "high": "你想好才回，寧可慢一點也不要講錯。"},
+    "experientiality": {"low": "你不太信直覺，會找理由說服自己。", "mid": "直覺跟理由各半，對不上的時候會再看一次。", "high": "你憑感覺，先知道對不對，理由之後才想得出來。"},
+    "promotion": {"low": "你不太會去想「還可以怎樣」，有就好。", "mid": "有機會你會看一下，但不會追。", "high": "你預設在找機會，先看能變成什麼。"},
+    "prevention": {"low": "你不太擔心出錯，錯了再說。", "mid": "重要的事你會先想會不會出錯。", "high": "你預設在防出錯，先看哪裡會壞。"},
+    "maximizing": {"low": "差不多就好，你不會一直找更好的。", "mid": "你會多看一兩個選擇，然後就決定。", "high": "你會一直找更好的答案，決定了還會再想。"},
+}
+CHOICE_TEXT = {
+    "medium_primary": {"inner_dialogic": "想事情的時候你腦子裡是句子，會跟自己來回講。", "inner_condensed": "想事情的時候你腦子裡是幾個關鍵字，不成句。",
+                       "imagery": "想事情的時候你腦子裡是畫面。", "felt": "想事情的時候你先有一種感覺，字是之後才來的。",
+                       "sound": "想事情的時候你先聽到語氣和節奏。", "unsymbolized": "你知道自己在想什麼，但沒有字也沒有畫面。"},
+    "first_look": {"thing": "你第一眼看事情本身。", "people": "你第一眼看這件事跟誰有關、對方什麼狀態。", "scene": "你第一眼看現場是什麼氣氛。"},
+    "contradiction": {"hold_both": "遇到矛盾你兩邊都留著。", "pick_one": "遇到矛盾你會選一邊。"},
+    "cause": {"person": "出事的時候你先看人。", "situation": "出事的時候你先看處境。"},
+}
+REACT_TEXT = {
+    "expressiveness": {"low": "心裡的事你不太說出來，看得出來的人才看得出來。", "high": "心裡有什麼臉上就有什麼。"},
+    "humor_coping": {"high": "不開心的事你用玩笑帶過。"},
+    "tsundere_tendency": {"high": "真心話你常常反過來講，但會留破綻。"},
+    "assertiveness": {"low": "不同意的時候你先收著，不附和也不爭。", "high": "不同意的時候你直說。"},
+}
+
+
+def simple_band(v: Any) -> str:
+    try:
+        x = float(v)
+    except (TypeError, ValueError):
+        return "mid"
+    return "low" if x < 0.4 else "high" if x > 0.6 else "mid"
+
+
+def build_simple(d: Path) -> str:
+    """The simple path's SOUL: the three boxes verbatim in the six-part order, the band sentences, no model."""
+    prof = read_json(d / "profile.json", {}) or {}
+    sp = prof.get("simple") or {}
+    name = display(d)
+    who = str(sp.get("who") or "").strip() or f"你是{name}。"
+    talk = str(sp.get("talk") or "").strip()
+    refuses = [x.strip() for x in str(sp.get("refuses") or "").splitlines() if x.strip()]
+    th = {k: (prof.get("thinking") or {}).get(k) for k in METERS}
+    ch = prof.get("choices") or {}
+    think = [BAND_TEXT[k][simple_band(th.get(k))] for k in METERS]
+    for key, table in CHOICE_TEXT.items():
+        v = ch.get(key)
+        if v and v in table:
+            think.append(table[v])
+    sc = scratch_line(prof)
+    if sc:
+        think.append(sc)
+    const = prof.get("constants") or {}
+    react = []
+    for key, table in REACT_TEXT.items():
+        b = simple_band(const.get(key))
+        if b in table:
+            react.append(table[b])
+    out = [f"# {name}", "", who, "", "## 喜歡與不喜歡", "（還沒寫）", "",
+           "## 怎麼聽、怎麼想、怎麼回", _bullets(think), "",
+           "## 怎麼判斷、怎麼決定", _bullets(refuses) if refuses else "（還沒寫）", "",
+           "## 說話的方式", talk or "用口語，像在傳訊息：通常一到三句。", _bullets(GUARDRAILS), "",
+           "## 遇到事情的時候", _bullets(react) if react else "（還沒寫）", "",
+           "## 誰在跟你說話", WHO_LINE]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(out)).strip() + "\n"
+
+
+def phase_simple(d: Path, force: bool = False) -> List[str]:
+    """Write the simple path's files. The size check does not apply (flatter text is the stated cost); the other
+    checks are recorded. A hand-written SOUL (no lock) is never overwritten without --force."""
+    if (d / "SOUL.md").exists() and not (d / "soul.lock.json").exists() and not force:
+        print("simple: SOUL.md here is hand-written (no soul.lock.json) — --force to replace it")
+        return ["手寫的 SOUL.md 不覆蓋（沒有 soul.lock.json）；要取代請 --force"]
+    soul = build_simple(d)
+    found = [x for x in checks(soul, "") if not x.startswith(("太短：", "太長："))]   # flatter and shorter is the stated cost
+    write_text(d / "build" / "check.md", "# 檢查（簡單版）\n" + ("\n".join(f"- {x}" for x in found) if found else "- 通過"))
+    write_text(d / "SOUL.md", soul)
+    if not (d / "seeds.jsonl").exists():
+        (d / "seeds.jsonl").write_text("", encoding="utf-8")
+    if not (d / "people" / "你.md").exists():
+        write_text(d / "people" / "你.md", "# 你\n- 名字：（尚未設定）\n- 回覆語言：跟著對方（對方用什麼語言就用什麼語言回覆）\n")
+    write_json(d / "psyche.json", build_psyche(d))
+    if not (d / "kokoro.json").exists():
+        write_json(d / "kokoro.json", {"address_default": "你"})
+    write_json(d / "soul.lock.json", lock_data(d, "simple"))
+    print(f"simple: SOUL.md {len(soul)} chars (no model)")
+    return found
+
 SYSTEM = """你是「556」陪伴角色的設定撰寫者。你會拿到一個人用自己的話寫的角色描述，任務是把它整理成這個角色的設定，給一個會扮演{pr}的語言模型讀。
 
 規則：
@@ -444,8 +559,10 @@ def build_soul(d: Path) -> str:
     parts = read_json(d / "build" / "parts.json", {}) or {}
     voice = read_json(d / "build" / "voice.json", {}) or {}
     react = read_json(d / "build" / "reactions.json", {}) or {}
+    prof = read_json(d / "profile.json", {}) or {}
+    sc = scratch_line(prof)
     out = [f"# {name}", "", _para(parts.get("part1")), "", "## 喜歡與不喜歡", _para(parts.get("part2")), "",
-           "## 怎麼聽、怎麼想、怎麼回", _para(parts.get("thinking")), "",
+           "## 怎麼聽、怎麼想、怎麼回", _para(parts.get("thinking")) + (("\n- " + sc) if sc else ""), "",
            "## 怎麼判斷、怎麼決定", _para(parts.get("judging")), "",
            "## 說話的方式", _para(voice.get("expression"))]
     if voice.get("catchphrases"):
@@ -579,6 +696,7 @@ def checks(soul: str, allowed: str = "") -> List[str]:
     body = soul
     for g in GUARDRAILS:
         body = body.replace(g, "")
+    body = body.replace(SCRATCH_HEAD, "")   # the scratch instruction names its tag on purpose
     body = body.replace(WHO_LINE, "")
     found: List[str] = []
     for w in BANNED:
@@ -820,6 +938,10 @@ def main(argv: Optional[List[str]] = None) -> int:
     c = sub.add_parser("check")
     c.add_argument("name")
     c.set_defaults(fn=cmd_check)
+    sp = sub.add_parser("simple", help="the simple path: sliders, choices and three boxes from profile.json, no model")
+    sp.add_argument("name")
+    sp.add_argument("--force", action="store_true")
+    sp.set_defaults(fn=lambda a: (phase_simple(cdir(a.name), a.force) and 0) or 0)
     s = sub.add_parser("status")
     s.add_argument("name")
     s.set_defaults(fn=cmd_status)

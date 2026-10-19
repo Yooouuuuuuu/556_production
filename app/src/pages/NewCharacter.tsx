@@ -91,12 +91,23 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
     catch (e) { setNotice({ kind: 'err', text: String(e) }); }
   }
   function runAll() { setThenRest(true); run('intake', false); }
+  async function runSimple() {
+    if (!id || !profile) return;
+    setBusy(true); setNotice(null);
+    try {
+      await chars.saveProfile(id, { pronoun: profile.pronoun, closeness: profile.closeness ?? null, scratch: !!profile.scratch, simple: profile.simple ?? null, big5: profile.big5, constants: profile.constants, thinking: profile.thinking, choices: profile.choices });
+      const force = !!detail?.soul && !detail.character.phases.includes('assemble') ? confirm(t('newchar.simple_force')) : false;
+      const r = await chars.simple(id, force);
+      setDetail((d) => (d ? { ...d, job: r.job } : d));
+    } catch (e) { setNotice({ kind: 'err', text: String(e) }); } finally { setBusy(false); }
+  }
+  const simpleBox = (k: 'who' | 'talk' | 'refuses', v: string) => profile && setProfile({ ...profile, simple: { ...(profile.simple || {}), [k]: v } });
   function continueThin() { run('structure', true, false, 'structure'); }
   async function saveProfile() {
     if (!id || !profile) return;
     setBusy(true); setNotice(null);
     try {
-      const r = await chars.saveProfile(id, { pronoun: profile.pronoun, closeness: profile.closeness ?? null, big5: profile.big5, constants: profile.constants, thinking: profile.thinking, choices: profile.choices });
+      const r = await chars.saveProfile(id, { pronoun: profile.pronoun, closeness: profile.closeness ?? null, scratch: !!profile.scratch, simple: profile.simple ?? null, big5: profile.big5, constants: profile.constants, thinking: profile.thinking, choices: profile.choices });
       setProfile(r.profile); setNotice({ kind: 'ok', text: t('newchar.saved') });
     } catch (e) { setNotice({ kind: 'err', text: String(e) }); } finally { setBusy(false); }
   }
@@ -200,6 +211,18 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
                 <pre ref={logRef} className="max-h-56 overflow-y-auto whitespace-pre-wrap leading-relaxed">{detail.job.log || '…'}</pre>
               </div>
             )}
+            <details className="rounded-xl bg-white/5 p-3">
+              <summary className="cursor-pointer text-sm">{t('newchar.simple')}</summary>
+              <p className="text-xs opacity-60 mt-2">{t('newchar.simple_note')}</p>
+              {profile && (
+                <div className="grid gap-2 mt-2">
+                  <div><label className={label}>{t('newchar.simple_who')}</label><textarea className={`${field} min-h-[60px]`} rows={3} value={profile.simple?.who ?? ''} onChange={(e) => simpleBox('who', e.target.value)} /></div>
+                  <div><label className={label}>{t('newchar.simple_talk')}</label><textarea className={`${field} min-h-[60px]`} rows={3} value={profile.simple?.talk ?? ''} onChange={(e) => simpleBox('talk', e.target.value)} /></div>
+                  <div><label className={label}>{t('newchar.simple_refuses')}</label><textarea className={`${field} min-h-[60px]`} rows={3} value={profile.simple?.refuses ?? ''} onChange={(e) => simpleBox('refuses', e.target.value)} /></div>
+                  <div><button className={primary} disabled={busy || running} onClick={runSimple}>{t('newchar.simple_go')}</button></div>
+                </div>
+              )}
+            </details>
             {intake?.missing?.length > 0 && (
               <div className="rounded-xl bg-amber-500/10 p-3 text-sm space-y-2">
                 <div className="font-medium">{t('newchar.intake_title')}</div>
@@ -233,6 +256,10 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
                     </div>
                   ))}
                 </div>
+                <label className="flex items-center gap-2 text-sm rounded-lg bg-white/5 p-2">
+                  <input type="checkbox" checked={!!profile.scratch} onChange={(e) => setProfile({ ...profile, scratch: e.target.checked })} />
+                  <span>{t('newchar.scratch')}</span><span className="text-xs opacity-60">{t('newchar.scratch_note')}</span>
+                </label>
                 <div className="rounded-lg bg-white/5 p-2">
                   <label className={label}>{t('newchar.closeness')}</label>
                   <select className={field} value={profile.closeness ?? detail?.build?.structure?.closeness ?? ''} onChange={(e) => setProfile({ ...profile, closeness: e.target.value || null })}>

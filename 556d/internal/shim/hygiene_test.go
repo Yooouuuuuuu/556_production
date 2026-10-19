@@ -3,6 +3,7 @@ package shim
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 // A system prompt shaped like the one Hermes 7166071f builds for a character (docs/prompt/prompt.md §1.2):
@@ -99,5 +100,32 @@ func TestUnwrapReplyFunction(t *testing.T) {
 	kept, text = unwrapReplyFunction(nil, "plain")
 	if len(kept) != 0 || text != "plain" {
 		t.Errorf("no calls: %v %q", kept, text)
+	}
+}
+
+func TestStripThinkRemovesTheScratchBeforeToolParsing(t *testing.T) {
+	// a closed block before the reply
+	vis, sc := stripThink("<think>\n他聽起來有點累。先別問。\n</think>\n嗯，今天還好嗎？")
+	if vis != "嗯，今天還好嗎？" || sc != "<think>\n他聽起來有點累。先別問。\n</think>" {
+		t.Fatalf("closed block: visible %q scratch %q", vis, sc)
+	}
+	// an unterminated block (the model ran out of tokens) leaks nothing
+	vis, sc = stripThink("先說一句。\n<think>\n這裡還沒想完")
+	if vis != "先說一句。" || sc != "<think>\n這裡還沒想完" {
+		t.Fatalf("unterminated: visible %q scratch %q", vis, sc)
+	}
+	// a tool call written inside the scratch is not a tool call; one after it is
+	text := "<think>\n<tool_call>\n{\"name\": \"web_search\", \"arguments\": {}}\n</tool_call>\n</think>\n<tool_call>\n{\"name\": \"kokoro_search\", \"arguments\": {\"query\": \"x\"}}\n</tool_call>"
+	vis, sc = stripThink(text)
+	calls, cleaned := parseToolCalls(vis, func() time.Time { return time.Unix(0, 0) })
+	if len(calls) != 1 || calls[0]["function"].(map[string]any)["name"] != "kokoro_search" || cleaned != "" || !strings.Contains(sc, "web_search") {
+		t.Fatalf("tool call inside the scratch was parsed: calls %d cleaned %q", len(calls), cleaned)
+	}
+	// prose that mentions the tag mid-line is left alone; a reply without a block is unchanged
+	if vis, sc := stripThink("我不會寫 <think> 這種東西啦"); vis != "我不會寫 <think> 這種東西啦" || sc != "" {
+		t.Fatalf("mid-line mention: %q %q", vis, sc)
+	}
+	if vis, sc := stripThink("還沒啦，我這兩天都在對採購的單子。"); sc != "" || vis != "還沒啦，我這兩天都在對採購的單子。" {
+		t.Fatalf("plain reply changed: %q %q", vis, sc)
 	}
 }

@@ -33,7 +33,7 @@ The rest of this doc is the design as decided, with its test record.
 | Tier | What | Written by |
 |---|---|---|
 | Spirit card — `SOUL.md` (+ ST card import later) | identity, voice, habits | **human only** (frozen core) |
-| Lorebook (later, ST-style keyword triggers) | world-setting, canon | human; deterministic injection |
+| Lorebook — keyword triggers (built 0.8.10: kokoro `_with_triggers`, names only, `By name` lines) | the people she knows by name | deterministic: a name in the message → exact BM25 lookup |
 | Curated head — `MEMORY.md`/`USER.md` | top learned facts, always injected | her (background review) |
 | **DB tier — this doc** | long-tail facts, retrieved per turn | extraction pipeline |
 | FTS5 sessions | verbatim archive | automatic |

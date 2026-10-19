@@ -24,6 +24,34 @@ const toolsPrompt = "Tools are available in this conversation. Their signatures 
 
 var toolCallRE = regexp.MustCompile(`(?s)<tool_call>\s*(\{.*?\})\s*</tool_call>`)
 
+// The hidden scratch (docs/prompt/prompt.md §2.6): a character may think in a <think>…</think> block before her
+// visible reply. The shim is the one place that sees the raw model text, so the block is removed here — closed
+// pairs anywhere, and an open tag at the start of a line with no close (the model ran out of tokens) to the end —
+// before the tool-call parser runs, before Hermes stores, streams or checks anything. The text is returned so the
+// shim can log it (the fidelity eval needs to see it; nothing stores it).
+var (
+	thinkPairRE = regexp.MustCompile(`(?is)<(think|thinking|reasoning|thought)>.*?</(think|thinking|reasoning|thought)>[ \t]*\r?\n?`)
+	thinkOpenRE = regexp.MustCompile(`(?is)(?:^|\n)[ \t]*<(think|thinking|reasoning|thought)>.*$`)
+)
+
+// stripThink returns the visible text and the scratch it removed (closed blocks joined by a newline, an
+// unterminated tail last). A reply without a block comes back unchanged.
+func stripThink(text string) (string, string) {
+	if !strings.Contains(strings.ToLower(text), "<think") && !strings.Contains(strings.ToLower(text), "<reasoning") && !strings.Contains(strings.ToLower(text), "<thought") {
+		return text, ""
+	}
+	var scratch []string
+	visible := thinkPairRE.ReplaceAllStringFunc(text, func(block string) string {
+		scratch = append(scratch, strings.TrimSpace(block))
+		return ""
+	})
+	if loc := thinkOpenRE.FindStringIndex(visible); loc != nil {
+		scratch = append(scratch, strings.TrimSpace(visible[loc[0]:]))
+		visible = visible[:loc[0]]
+	}
+	return strings.TrimSpace(visible), strings.Join(scratch, "\n")
+}
+
 // marshal renders unordered Go values (response passthrough, SSE chunks) with raw UTF-8 and
 // Python-style separators. Text that reaches the model uses marshalOrdered instead.
 func marshal(v any) string {

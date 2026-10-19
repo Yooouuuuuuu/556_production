@@ -274,7 +274,7 @@ class KokoroMemoryProvider(MemoryProvider):
                 "記憶：每一回合會附上一段「Memory」。「Facts (long-term)」是你記得的事（標 [high] 的很確定，沒標的很可能對）；"
                 "「Notes (recent, dated)」是近期的紀錄，一行一件、帶日期。對不上的時候：對話本身最準；其次是最新的一條，不分種類；"
                 "事實和紀錄平手時事實優先。「[archived: …]」是對方不想被提起的話題——絕不說出內容，只有對方自己碰到時才問一句要不要聊。"
-                "記憶裡沒有的事就是不知道，不編、不猜。")
+                "「By name」是因為對方提到了某個名字而翻出來的那個人的事。記憶裡沒有的事就是不知道，不編、不猜。")
 
     # -- per turn ------------------------------------------------------------
     def prefetch(self, query: str, *, session_id: str = "") -> str:
@@ -293,8 +293,63 @@ class KokoroMemoryProvider(MemoryProvider):
             except Exception as exc2:
                 logger.warning("kokoro prefetch failed: %s", exc2)
                 return ""
+        block = self._with_triggers(query, block)
         self._last_count = sum(1 for line in block.splitlines() if line.startswith("- "))
         return block
+
+    # -- tier 3 keyword triggers (docs/prompt/prompt.md §2.2; 0.9.0) ---------
+    def _trigger_names(self) -> List[str]:
+        """The names worth a lookup when they appear in the message: the other characters on the roster, the people
+        she has a file for, and your name. Never the word 你."""
+        names = set()
+        if not self._home:
+            return []
+        try:
+            for sib in self._home.parent.iterdir():
+                if sib.is_dir() and sib.name != self._home.name and (sib / "companion.json").exists():
+                    names.add(self._display_name(sib.name))
+        except Exception:
+            pass
+        try:
+            for p in (self._home / "people").glob("*.md"):
+                names.add(p.stem)
+        except Exception:
+            pass
+        yn = self._your_name(self._cfg)
+        if yn:
+            names.add(yn)
+        return sorted(n for n in names if n and n != "你" and len(n) >= 2)
+
+    def _with_triggers(self, query: str, block: str) -> str:
+        """A name in the message fires an exact BM25 lookup for it (the lorebook tier, deterministic): up to
+        `trigger_k` rows per name that similarity did not already bring, under a By name title. Off with
+        kokoro.json `triggers: false`."""
+        if self._store is None or not self._cfg.get("triggers", True) or not query:
+            return block
+        k = int(self._cfg.get("trigger_k", 3))
+        seen = set(ln.strip() for ln in block.splitlines())
+        extra: List[str] = []
+        for name in self._trigger_names():
+            if name not in query:
+                continue
+            try:
+                rows = self._store.search(name, k=k, mode="bm25", phrase=True)
+            except Exception as exc:
+                logger.warning("kokoro trigger %r failed: %s", name, exc)
+                continue
+            for m in rows:
+                if getattr(m, "archived", False) or getattr(m, "superseded", False) or getattr(m, "held", False):
+                    continue
+                text = self._render(m.text)
+                if any(text in ln for ln in seen):
+                    continue
+                line = f"- {text}"
+                seen.add(line)
+                extra.append(line)
+        if not extra:
+            return block
+        tail = "By name:\n" + "\n".join(extra[: max(1, 2 * k)])
+        return (block + "\n" + tail) if block else ("Memory:\n" + tail)
 
     def recall_status(self) -> Optional[RecallStatus]:
         return RecallStatus("Kokoro", self._last_count, glyph=_GLYPH) if self._last_count else None

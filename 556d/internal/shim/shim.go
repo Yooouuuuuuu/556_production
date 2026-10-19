@@ -246,7 +246,14 @@ func (s *Shim) chat(w http.ResponseWriter, r *http.Request) {
 					if msg == nil {
 						msg = map[string]any{}
 					}
-					calls, cleaned := parseToolCalls(str(msg["content"]), time.Now)
+					visible, scratch := stripThink(str(msg["content"])) // her hidden scratch never leaves the shim
+					if scratch != "" {
+						if rs := []rune(scratch); len(rs) > 400 {
+							scratch = string(rs[:400]) + "…"
+						}
+						log.Printf("[shim] lane=%s scratch: %q", lane, scratch)
+					}
+					calls, cleaned := parseToolCalls(visible, time.Now)
 					calls, cleaned = unwrapReplyFunction(calls, cleaned) // the proxy's own reply function is text, not a tool
 					broken := len(calls) == 0 && (strings.TrimSpace(cleaned) == "" ||
 						strings.HasPrefix(strings.TrimSpace(cleaned), "[openmini/") ||

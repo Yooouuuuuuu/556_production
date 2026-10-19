@@ -260,7 +260,7 @@ as the character, with the full stack at a quiet state (state block on, no activ
 into trait answers), and the answers must land on the authored scores and choices. The instruments need
 zh-TW versions. This is sharper than a style-recognition eval and complements the fidelity probe of §2.3.
 
-### 2.6 Dials 1 and 6 as a process: the hidden scratch (proposed, four checks before it is decided)
+### 2.6 Dials 1 and 6 as a process: the hidden scratch (built 0.8.10, opt-in per character: `profile.json` `scratch`; the four checks answered below)
 
 A transformer has no state between tokens except the tokens: every token is produced by attending over the
 whole context, and its only thinking is the text it has already written. Attention is not flat — the start
@@ -284,6 +284,20 @@ To settle before it goes in: (1) the scratch must be short and must never leak �
 an unterminated tag at a block boundary, verify end to end on the streamed path; (2) the output checks must
 run on the visible text only, verify; (3) the scratch is not stored, so the fidelity eval needs a debug log
 to see it; (4) the shim's `<tool_call>` parser must ignore the think block, verify.
+
+**Answered 2026-10-19 (0.8.10).** The shim is the one place that sees the raw model text, and it never streams
+upstream (`stream` is forced off and the reply re-delivered), so the block is removed there — `stripThink` in
+`556d/internal/shim/textproto.go`: closed pairs anywhere, and an open tag at the start of a line with no close
+(the model ran out of tokens) to the end of the text — before the tool-call parser runs and before Hermes
+stores, streams or checks anything. That settles (1), (2) and (4) at once: Hermes, the hub, the app, Telegram,
+the memory observe, the appraisal and the output checks only ever receive the visible text; Hermes's own
+scrubbers (`agent/think_scrubber.py`, `strip_think_blocks` with its unterminated-at-line-start pattern) stay as a
+second net. (3): the shim logs the removed scratch, `[shim] lane=… scratch: "…"`, cut at four hundred runes;
+nothing stores it. A `<tool_call>` written inside the scratch is not a tool call (test in `hygiene_test.go`).
+The instruction itself is compiled by the skill from the dial 1 and 6 choices — `scratch_line` in
+`tools/soul_writer.py`: one head sentence, one per medium, one per 第一眼, one per 矛盾 — into 怎麼聽、怎麼想、怎麼回,
+on both paths, only when `profile.json` has `scratch: true` (the 確認 step's 回覆前先想 switch). Off by default:
+it costs output tokens every turn, and the first measurement of what it buys is the probe below.
 
 ### 2.7 The clock and dates (built 0.8.4: the line and the timezone; the cast's relative dates are untouched)
 
@@ -379,7 +393,7 @@ of the SOUL. The app page (設定 → 角色 → 新角色, 0.8.1) runs the same
 the proposals with their evidence for confirmation, and installs from the page; a package whose SOUL is hand-written
 (no lock file) is marked and never overwritten.
 
-### 2.10 The simple path (decided 2026-10-16 as the backup — sliders and choices, no skill; built with the app button)
+### 2.10 The simple path (built 0.8.10: `soul_writer.py simple`, the 簡單版 fold on the 產生 step — sliders, choices, three boxes, no model)
 
 The full path asks for ten written sections; some people will not write them. The backup is the deterministic
 compile of §2.5 kept as a first-class route, so a character exists after five minutes in Settings:
@@ -433,9 +447,17 @@ compile of §2.5 kept as a first-class route, so a character exists after five m
    (closer and tired = less careful), rendered only at extremes, folded into step 4. The first three touch the
    same strategy selector as dial 3 and come after step 4.
 6. **The cast** — when the test character scores above 西 on the probe: 西 through the skill from a fresh
-   description, approved as a diff; then 子晴 and 子睿.
-7. **The hidden scratch** — §2.6, after its four checks pass.
-8. **Keyword triggers** — tier 3 (§2.2), when a store has enough named things to need them.
+   description, approved as a diff; then 子晴 and 子睿. **0.8.10:** the probe exists (`tools/fidelity_probe.py`,
+   gold in `tests/fidelity/xi.json`, scoring test in `tests/test_fidelity_probe.py`) — recognition against the
+   three-SOUL lineup, twenty 像不像她會說 lines, ten A/B takes, on the text alone (no engine, a quiet block). 西's
+   description was drafted from her files into `characters/xi_v2/describe/` and run through the skill on gemini
+   (4,041 chars, forced past the size check by forty-one; blind read-back 7/9); the probe scored both SOULs 0.96
+   (recognition 7/8 each, voice 20/20, takes 10/10 — a tie at the ceiling; the gold must get harder). The cast's
+   files are untouched: the swap is the user's call on the diff.
+7. **The hidden scratch** — §2.6 ✅ built 0.8.10, opt-in (`scratch` in profile.json), the four checks answered.
+8. **Keyword triggers** — tier 3 (§2.2) ✅ built 0.8.10: kokoro's `_with_triggers` — a roster name, a person
+   file's name or your name in the message fires an exact BM25 lookup (`trigger_k` rows, default three) under a
+   `By name` title, minus what similarity already brought; `triggers: false` in kokoro.json turns it off.
 
 The 0.7.x manual checklist (one tick in fifty-five) is run on the clean prompt inside this cycle, not after
 it: the mailbox, forgetting, the two kinds of promise and the relay all touch the paths these changes touch.

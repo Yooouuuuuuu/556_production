@@ -161,3 +161,43 @@ def test_checks_allow_words_the_author_used():
     soul = '# x' + chr(10) * 2 + '你不喜歡 AI，覺得它比你聰明。' + chr(10) * 2 + '## 說話的方式' + chr(10) + chr(10).join(sw.GUARDRAILS)
     assert any('AI' in f for f in sw.checks(soul))
     assert not any('AI' in f for f in sw.checks(soul, allowed='不喜歡AI 因為感覺比他聰明'))
+
+
+def test_simple_path_compiles_from_sliders_and_three_boxes(tmp_path, monkeypatch):
+    d = _make_char(tmp_path, monkeypatch)
+    prof = sw.read_json(d / "profile.json")
+    prof["thinking"] = {"rationality": 0.2, "experientiality": 0.8, "promotion": 0.5, "prevention": 0.7, "maximizing": 0.3}
+    prof["choices"] = {"medium_primary": "imagery", "medium_secondary": None, "first_look": "people", "contradiction": "hold_both", "cause": "situation"}
+    prof["constants"] = {"self_esteem_stability": 0.5, "expressiveness": 0.3, "humor_coping": 0.7, "clinginess_cap": 0.5, "tsundere_tendency": 0.2, "assertiveness": 0.7, "chronotype": 0.5}
+    prof["simple"] = {"who": "你是阿凜，做超商大夜，偷畫貓。", "talk": "訊息很短，常常一句拆兩三則。", "refuses": "不畫免費的 logo\n不接客服工作"}
+    prof["closeness"] = "朋友"
+    sw.write_json(d / "profile.json", prof)
+    found = sw.phase_simple(d)
+    assert not [x for x in found if x.startswith(("太短", "太長"))]
+    soul = (d / "SOUL.md").read_text(encoding="utf-8")
+    assert soul.startswith("# 阿凜\n\n你是阿凜，做超商大夜，偷畫貓。")
+    for h in ("## 喜歡與不喜歡", "## 怎麼聽、怎麼想、怎麼回", "## 怎麼判斷、怎麼決定", "## 說話的方式", "## 遇到事情的時候", "## 誰在跟你說話"):
+        assert h in soul
+    assert "你先回再想" in soul and "你憑感覺" in soul and "想事情的時候你腦子裡是畫面" in soul and "第一眼看這件事跟誰有關" in soul
+    assert "- 不畫免費的 logo" in soul and "- 不接客服工作" in soul and "訊息很短" in soul
+    assert "心裡的事你不太說出來" in soul and "不開心的事你用玩笑帶過" in soul and "不同意的時候你直說" in soul
+    assert "<think>" not in soul                         # the scratch is off by default
+    assert (d / "people" / "你.md").exists() and (d / "seeds.jsonl").exists()
+    ps = sw.read_json(d / "psyche.json")
+    assert ps["thinking"]["prevention"] == 0.7 and ps["relationships"]["你"]["bond"] == 0.4
+    assert sw.read_json(d / "soul.lock.json")["model"] == "simple"
+    # the simple path never overwrites a hand-written SOUL
+    (d / "soul.lock.json").unlink()
+    (d / "SOUL.md").write_text("# 手寫的", encoding="utf-8")
+    assert "手寫" in sw.phase_simple(d)[0] and (d / "SOUL.md").read_text(encoding="utf-8") == "# 手寫的"
+
+
+def test_scratch_line_is_compiled_only_when_asked():
+    assert sw.scratch_line({}) == "" and sw.scratch_line({"scratch": False, "choices": {"medium_primary": "sound"}}) == ""
+    line = sw.scratch_line({"scratch": True, "choices": {"medium_primary": "sound", "first_look": "people", "contradiction": "pick_one"}})
+    assert line.startswith(sw.SCRATCH_HEAD) and "語氣和節奏" in line and "他現在是什麼狀態" in line and "選一邊" in line
+    # the checks do not flag the instruction's own tag words
+    soul = ("# 她\n\n你是她。\n\n## 喜歡與不喜歡\n- x\n\n## 怎麼聽、怎麼想、怎麼回\n- " + line + "\n\n## 怎麼判斷、怎麼決定\n- y\n\n"
+            "## 說話的方式\n- z\n\n## 遇到事情的時候\n- w\n\n## 誰在跟你說話\n" + sw.WHO_LINE)
+    assert not [x for x in sw.checks(soul) if "理論字或機器字" in x]
+
