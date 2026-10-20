@@ -46,7 +46,7 @@ system: "1 · System prompt — one copy per request, byte-stable until her rest
   cost: "×1, cached" {class: cost}
 
   stable: "stable tier" {
-    soul: "SOUL.md — her identity, first\n西: 2,871 bytes, 4 sections (hand-written, unchanged since 10-15) · a skill-written SOUL: 6 parts with 時間線 and 影響過你的人與事 inside\ncopied from characters/ID/ before every start (556d)" {class: ours}
+    soul: "SOUL.md — her identity, first\nthe main character's: 2,871 bytes, 4 sections (hand-written, unchanged since 10-15) · a skill-written SOUL: 6 parts with 時間線 and 影響過你的人與事 inside\ncopied from characters/ID/ before every start (556d)" {class: ours}
     vendor: "2–8 · Hermes's guidance, environment and profile text — not hers, dropped by the shim\nhelp (Nous Research + docs URL) · finishing the job · parallel tool calls · mid-turn steering · host, home, cwd, the Windows-shell paragraph · Python toolchain probe · active profile line\n3, 4 and 7 are also off in config.yaml; 3, 4, 5 appear only with tools anyway" {class: dropped}
     hint: "9 · Platform hint — one zh-TW line per platform (api_server, telegram, discord)\n「你在聊天視窗裡說話：純文字，不用 markdown…像在傳訊息，簡短自然。」\nplatform_hints.PLATFORM.replace, written by 556d before every start" {class: ours}
     soul -> vendor -> hint
@@ -73,7 +73,7 @@ system: "1 · System prompt — one copy per request, byte-stable until her rest
 
 history: "2 · History — every row in the window, replayed exactly as sent (api_content)" {
   cost: "×20+ rows (compression.protect_last_n: 20); each past user row still carries its memory block and its state block" {class: cost}
-  urow: "past user row = typed text + <memory-context> (+ By name) + <her-state> (clock, state, 想法)\n西's newest on 2026-10-15: 1,147 chars = 9 typed + 685 memory + 422 state" {class: ours}
+  urow: "past user row = typed text + <memory-context> (+ By name) + <her-state> (clock, state, 想法)\nthe main character's newest on 2026-10-15: 1,147 chars = 9 typed + 685 memory + 422 state" {class: ours}
   arow: "past assistant row = her reply as stored\nthe shim strips the hidden scratch before Hermes sees the text; Hermes strips closed <think> pairs as a second net" {class: ours}
 }
 

@@ -12,12 +12,12 @@ SOULs for the same character (the hand-written one and the skill's candidate) ar
                  → accuracy
 
 Usage:
-    python tools/fidelity_probe.py --gold tests/fidelity/xi.json --soul characters/xi/SOUL.md --soul characters/xi_v2/SOUL.md
-        [--lineup xi=characters/xi/SOUL.md,ziqing=characters/ziqing/SOUL.md,zirui=characters/zirui/SOUL.md]
-        [--people characters/xi/people/你.md] [--model gemini] [--judge gemini] [--out build/probe.json]
+    python tools/fidelity_probe.py --gold tests/fidelity/<id>.json --soul characters/<id>/SOUL.md [--soul <another SOUL.md>]
+        --lineup <id>=characters/<id>/SOUL.md,<other>=characters/<other>/SOUL.md,… --target <id>
+        [--people characters/<id>/people/你.md] [--model <name>] [--judge <name>] [--out build/probe.json]
 
 The lineup's entry for the probed character is the hand-written SOUL for every candidate, so recognition means
-"is this still the 西 the judge knows next to 子晴 and 子睿". Scores are fractions; the report is Markdown.
+"is this still the character the judge knows next to the others in the lineup". Scores are fractions; the report is Markdown.
 """
 from __future__ import annotations
 
@@ -200,8 +200,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--gold", required=True)
     ap.add_argument("--soul", action="append", required=True, help="a SOUL.md to probe (repeatable)")
-    ap.add_argument("--lineup", default="xi=characters/xi/SOUL.md,ziqing=characters/ziqing/SOUL.md,zirui=characters/zirui/SOUL.md")
-    ap.add_argument("--target", default="xi", help="the lineup id the judge should pick")
+    ap.add_argument("--lineup", required=True, help="id=path,id=path,… the SOULs the judge picks from (the target included)")
+    ap.add_argument("--target", required=True, help="the lineup id the judge should pick")
     ap.add_argument("--people", default="", help="people/你.md shown as the person file (default: next to the first SOUL)")
     ap.add_argument("--model", default=None, help="model name on the endpoint (default: the 寫靈魂 connection in home/models.json)")
     ap.add_argument("--judge", default=None, help="the judge's model (default: the same)")

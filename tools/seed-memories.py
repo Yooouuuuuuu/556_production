@@ -1,7 +1,7 @@
 """Load a character's seed memories (characters/<id>/seeds.jsonl) into its KeepsakeDB store.
 
 Run while 556d is up (the embedder at :55602) and the character is NOT running (the store has no owner):
-    python tools/seed-memories.py chihiro [--replace]
+    python tools/seed-memories.py <id> [--replace]
 
 Memories about you keep the subject word 你 (rendered as your name when injected); memories about the
 other characters name them. A seed with `at` (YYYY[-MM[-DD]]) is stored at that date. Existing seeds (same text) are

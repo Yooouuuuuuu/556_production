@@ -202,7 +202,7 @@ async function send<T>(path: string, method: 'POST' | 'PUT', body?: any): Promis
 
 export const chars = {
   list: () => get<{ characters: CharPackage[]; template: Record<string, string>; model: string; models: string[]; phases: string[] }>('/api/characters'),
-  create: (body: { id: string; display_name: string; pronoun: string; avatar?: string; from_example: boolean }) => send<{ character: CharPackage; output: string }>('/api/characters', 'POST', body),
+  create: (body: { id: string; display_name: string; pronoun: string; avatar?: string }) => send<{ character: CharPackage; output: string }>('/api/characters', 'POST', body),
   detail: (id: string) => get<CharDetail>(`/api/characters/${encodeURIComponent(id)}`),
   saveDescribe: (id: string, files: Record<string, string>) => send<{ saved: number; character: CharPackage }>(`/api/characters/${encodeURIComponent(id)}/describe`, 'PUT', { files }),
   saveProfile: (id: string, profile: Partial<CharProfile>) => send<{ profile: CharProfile }>(`/api/characters/${encodeURIComponent(id)}/profile`, 'PUT', { profile }),

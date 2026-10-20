@@ -30,7 +30,7 @@ import (
 )
 
 type Info struct {
-	Name            string   `json:"name"`         // profile directory name, e.g. "mane"
+	Name            string   `json:"name"`         // profile directory name, e.g. "a"
 	DisplayName     string   `json:"display_name"` // companion.json display_name, else the name
 	AvatarModel     string   `json:"avatar_model"` // path under assets/live2d
 	Active          bool     `json:"active"`

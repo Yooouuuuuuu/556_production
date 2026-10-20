@@ -4,7 +4,7 @@ Last verified 2026-10-19 (0.10.0) against Hermes `7166071f` (`agent/system_promp
 `556d/internal/api/hygiene.go`, `connections.go`, `package.go`, `characters.go`, `556d/internal/shim/shim.go`,
 `hygiene.go`, `textproto.go` and `testdata/`, `556d/internal/models/models.go`, `556d/internal/companions/manager.go`,
 `plugins/kokoro/__init__.py`, `plugins/psyche/__init__.py`, `engine.py` (`state_block`), `thinking.py`, `config.py`,
-`tools/soul_writer.py`, `tools/fidelity_probe.py`, `tests/fidelity/xi.json`, `new-companion.ps1`,
+`tools/soul_writer.py`, `tools/fidelity_probe.py`, `tests/fidelity/*.json`, `new-companion.ps1`,
 `install-character.ps1`, `characters/*/SOUL.md`; `CHANGELOG.md` 0.8.0–0.9.0 and Unreleased; `../DECISIONS.md`
 2026-10-16 and 2026-10-19. Graphs: `prompt.d2` (one request top to bottom, who writes each piece, how many copies it
 costs) and `character-files.d2` (her files: what the author writes, what the skill makes, what 556d copies before a
@@ -50,7 +50,7 @@ writes the blocks below in this order, and this is what each one is today:
 
 | # | Block | Today (0.10.0) | Mechanism |
 | --- | --- | --- | --- |
-| 1 | **SOUL.md** | her identity, first. The cast's hand-written SOULs (西: 2,871 bytes, 1,029 characters, four sections 你的背景, 你的性格, 誰在跟你說話, 說話的方式 — unchanged since 10-15); a skill-written SOUL carries the six parts with `## 時間線` and `## 影響過你的人與事` inside (§2.4). 556d copies it from `characters/<id>/` before every start | the author or `tools/soul_writer.py`; `556d/internal/api/package.go` |
+| 1 | **SOUL.md** | her identity, first. The cast's hand-written SOULs (the main character's: 2,871 bytes, 1,029 characters, four sections 你的背景, 你的性格, 誰在跟你說話, 說話的方式 — unchanged since 10-15); a skill-written SOUL carries the six parts with `## 時間線` and `## 影響過你的人與事` inside (§2.4). 556d copies it from `characters/<id>/` before every start | the author or `tools/soul_writer.py`; `556d/internal/api/package.go` |
 | 2 | Help guidance | dropped by the shim (paragraph prefix `You run on Hermes Agent (by Nous Research).`) | shim |
 | 3 | Finishing the job | off (`agent.task_completion_guidance: false`); Hermes adds it only with tools anyway; the shim drops it by prefix as well (`# Finishing the job`) | config + shim |
 | 4 | Parallel tool calls | off (`agent.parallel_tool_call_guidance: false`); tools only; prefix `# Parallel tool calls` | config + shim |
@@ -70,7 +70,7 @@ paragraph(s): help,steer,host,…`), logs the tool names it is offered whenever 
 Hermes prompt arrives without the help paragraph (the vendor text changed shape — the first thing to look at after
 a Hermes bump). `X556_SHIM_DUMP=<file>` writes her system message as received, before the filter, for the next
 audit. The config half (blocks 3, 4, 7, 9 and the empty toolsets) reaches new sessions only — a resumed session
-keeps the prompt pieces and the tool list it was born with (found on 真音, 0.8.5) — so the shim half is what
+keeps the prompt pieces and the tool list it was born with (found on the test character, 0.8.5) — so the shim half is what
 protects the cast's endless sessions.
 
 Not in her prompt, verified on 2026-10-15 and unchanged at the pinned Hermes commit: the coding posture and
@@ -107,7 +107,7 @@ Every row in the window is replayed exactly as it was sent. Hermes keeps two col
 `content`, the typed text the app shows, and `api_content`, the bytes the model actually received; replay
 substitutes `api_content`. So each past user row still carries the memory block and the state block that
 were glued onto it that turn — today including the clock line, the 想法 line and the By name rows. Measured on
-2026-10-15 in 西's live session (not re-measured on 10-19), last 40 user rows: 29 carried `<memory-context>`, 31
+2026-10-15 in the main character's live session (not re-measured on 10-19), last 40 user rows: 29 carried `<memory-context>`, 31
 carried `<her-state>`; the newest was 1,147 chars, of which 9 were typed, 685 memory, 422 state. With
 `compression.protect_last_n: 20` a request carries at least twenty such rows, so **a line injected per
 turn is paid twenty-plus times per request; a line in the system prompt once, and cached.** That is the
@@ -197,16 +197,16 @@ line must act on every turn.
 | 6 | shared history per person = seeds and person files, dated | the store (`seeds.jsonl` with an `at` field, stored at that date by `tools/seed-memories.py`) and `people/<name>.md` |
 
 As found on 2026-10-15 and still true on 10-19 (the cast is untouched, the three 說話的方式 sections hash the same):
-all three hand-written SOULs share a word-for-word identical 說話的方式 block; what separates 子睿 from 子晴 is a few
+all three hand-written SOULs share a word-for-word identical 說話的方式 block; what separates the second character from the third is a few
 adjectives. Ten stances per character (opinions she would argue about, some you disagree with) so a reader
 can predict her take on a new topic. Vagueness audit: 有主見 is not operational, 被放鴿子會記住，雖然嘴上說沒關係
-is. Validation — **built 0.8.10 as `tools/fidelity_probe.py`** with the gold `tests/fidelity/xi.json`: eight
+is. Validation — **built 0.8.10 as `tools/fidelity_probe.py`** with the gold `tests/fidelity/<id>.json` (written for the main character): eight
 prompts the SOUL answers as her and a blind judge picks her out of the three-SOUL lineup (recognition), ten lines
 she would say and ten she would not, answered 是／否 (voice), ten novel topics with her take and its opposite,
 answered A / B (takes); on the text alone, a quiet state block and no engine, through the 寫靈魂 connection
 (`--base-url` / `--model`, else `home/models.json`, key in `X556_API_KEY`); the scoring is tested in
 `tests/test_fidelity_probe.py`. One SOUL change at a time, keep it only if the score holds. First run 2026-10-19:
-the hand-written 西 and the skill's `xi_v2` both scored 0.96 — a tie at the ceiling, so the gold must get harder
+the main character's hand-written SOUL and her skill-made candidate both scored 0.96 — a tie at the ceiling, so the gold must get harder
 (§3 item 6).
 
 ### 2.4 The dated part of who she is lives in the SOUL (pinned groups retired, 2026-10-19)
@@ -253,14 +253,14 @@ before her reply, because prefetch never waits for the appraisal: energy, fatigu
 attachment anxiety, the hurt gate for this counterpart, bond, and whether a hurt is open on the ledger. Dial 4's
 line comes from the emotion side. One block, two writers; the separation is in the engine, not the layout.
 
-The 2026-10-14 examples (design, 西's trait text against the line that would differ from it):
+The 2026-10-14 examples (design: a trait sentence in the SOUL against the line that would differ from it; the sentences are generic examples, not a real character's):
 
-| Meter | Trait text in the SOUL (西) | 想法 line, only when it differs |
+| Meter | Trait text in the SOUL (example) | 想法 line, only when it differs |
 | --- | --- | --- |
 | rationality | 我通常先回再想，講完才發現不對 | 想法：這件事不小，她會想一下再回 |
 | experientiality | 沒把握的時候我憑感覺，不太會先問 | 想法：今天沒力氣猜，直接問他 |
-| promotion | 唱歌的事我先看能變成什麼 | 想法：這題她先看會不會出錯 |
-| prevention | 跟人有關的事我先看會不會出錯 | 想法：心情好，先看能變成什麼 |
+| promotion | 做事我先看能變成什麼 | 想法：這題她先看會不會出錯 |
+| prevention | 我先看會不會出錯，再想要不要做 | 想法：心情好，先看能變成什麼 |
 | maximizing | 差不多就好，我不會一直找更好的答案 | 想法：她會問清楚再答，不想隨便 |
 | dial 4 (no meter) | 看不清楚的時候我會往「他沒那麼在意我」想 | 想法：今天特別容易往壞處想 |
 
@@ -295,7 +295,7 @@ one-sentence versions are in §2.10).
 | 內在語言，壓縮式 | thinks in fragments and keywords, replies short and sure, rarely narrates the thinking |
 | 畫面 | explains by scenes and comparisons, remembers places and faces first: 「我腦中就是那個畫面」 |
 | 感覺與身體 | knows before she can say why, reports the feeling first and the reason later: 「就是有一種怪怪的感覺」 |
-| 聲音與節奏 | notices tone and rhythm before words, describes moods as sounds (西's primary) |
+| 聲音與節奏 | notices tone and rhythm before words, describes moods as sounds |
 | 無聲的想法 | knows what she thinks without words or pictures; answers plainly and struggles to explain how she got there |
 
 Dial 6, 情境權重: three separate choices, matching the instrument's factors.
@@ -306,12 +306,9 @@ Dial 6, 情境權重: three separate choices, matching the instrument's factors.
 | 遇到矛盾 | 兩邊都留著 / 選一邊 | 「兩邊都有道理」 and holds both, versus picks one and says so |
 | 事情的原因 | 先看人 / 先看處境 | blames the person or the circumstances when something goes wrong |
 
-Examples agreed: 西 — sound and felt sense first, verbalizes late; replies on feel, checks after;
-promotion in music, prevention with people; ruminates, satisfices; context first (who, what mood, then the
-ask); reads ambiguity as 他沒那麼在意我. 子晴 — dialogic inner speech; both deliberation scores moderate;
-promotion high; reflects, satisfices; relationship first; reads ambiguity as nothing. 子睿 — pictures and
-condensed inner speech; thinks before replying, stops at good enough; prevention high; moderate maximizer
-on code only; focal first; withholds judgement (資訊不足).
+An example of one agreed set (invented, not a real character): condensed inner speech with felt sense as the
+secondary; both deliberation scores moderate; promotion a little above prevention; a mild maximizer; the ask first
+(事情本身); picks a side when two things contradict; blames the circumstances.
 
 **Authoring and validation.** As designed: the author answers the instruments as the character — REI, RFQ and
 the Maximization short form for the meters, the IRQ and the Analysis–Holism scale for the choices — and the model
@@ -334,7 +331,7 @@ before the answer there is no medium and no order at all.
 So dials 1 and 6 become a process, not a style, through a short hidden scratch — two or three lines inside
 `<think>…</think>` before the visible reply. Dial 1 sets its medium (an inner-speech character writes
 sentences to herself; a condensed thinker fragments; an imagery character a scene; a felt-sense character
-the feeling first and no reason — 西: 「聽起來他有點累。有種被敷衍的感覺？先別問。」 子睿: 「問的是週末有沒有空。有。」).
+the feeling first and no reason — for example 「聽起來他有點累。有種被敷衍的感覺？先別問。」 for felt sense, 「問的是週末有沒有空。有。」 for a condensed thinker).
 Dial 6 sets its order (person first, the ask first, or the room first; whether a contradiction is kept or
 resolved). The scratch costs output tokens on that turn only and never enters history, the app, Telegram, the
 memory observe or any later request. An "image" in the scratch is text describing an image; the paradox stays
@@ -373,7 +370,7 @@ reaches every path (app, Telegram, voice, cue, relay — all run the same hook).
 start, and `HERMES_TIMEZONE` on every gateway, so the engine and Hermes agree; Hermes's own date paragraph is
 dropped by the shim regardless (0.8.5, its weekday was wrong). Dates in a skill-written SOUL are absolute and
 live only in 時間線 (§2.4); seeds carry `at` and `tools/seed-memories.py` stores them at that date (0.8.0). The
-cast's hand-written SOULs keep their relative dates (半年前四個人一起吃火鍋 drifts once she can see the clock)
+cast's hand-written SOULs keep their relative dates (a 「半年前…」 sentence drifts once she can see the clock)
 until the skill rewrites them (§3 item 6).
 
 ### 2.8 The vendor-text filter and the wrappers (built 0.8.4–0.8.6; the tools decision taken 2026-10-19: none at baseline)
@@ -399,7 +396,7 @@ order of cost, as built:
    sentence she still reads — kept, decided 2026-10-19, not worth a second filter.
 
 Settled (the 10-15 "open" items): prefix match over exact text; the memory-context note is kept; **option C** —
-no tools at baseline — taken 2026-10-19 after the 真音 test of 0.8.5 (`[]` → zero tools and a normal reply;
+no tools at baseline — taken 2026-10-19 after the 0.8.5 test on the test character (`[]` → zero tools and a normal reply;
 `[web]` → `web_search` / `web_extract` under the reworded preamble and a real search): in 79 turns the two kokoro
 tools were never called and a tool that does not exist eight times (`around-the-soul.md` §0, §2). Memory is
 injected, not a tool; an extension brings the scaffold back for that character only, and the preamble was
@@ -414,11 +411,11 @@ its own. The human-owned rule of §2.1 survives as: inputs human-owned, output g
 multiple-choice compile of §2.5 for dials 1 and 6 (the choices remain as recorded labels, see below) and the
 band templates for the meters; the simple path (§2.10) keeps both as the backup.
 
-**Not for the current cast.** The schema and the skill were tried on a new, disposable character first (阿凜,
-`templates/character/example`; 阿呆, the first made on the page). 西, 子晴 and 子睿 keep their files until a
-generated SOUL scores above them on the fidelity probe (§2.3); 西's description was written fresh from her
-existing files (`characters/xi_v2/describe/`, 0.8.10) and run through the skill, and her SOUL is replaced by the
-generated one only as a diff, approved (still pending, §3 item 6).
+**Not for the current cast.** The schema and the skill were tried on new, disposable characters first (an example
+description in `templates/character/example`; then a test character, the first made on the page). The cast keeps its
+files until a generated SOUL scores above them on the fidelity probe (§2.3); the main character's description was
+written fresh from her existing files (0.8.10) and run through the skill, and her SOUL is replaced by the generated
+one only as a diff, approved (still pending, §3 item 6).
 
 **The character package** — `characters/<id>/`, two kinds of content (graph: `character-files.d2`):
 
@@ -523,14 +520,14 @@ compile of §2.5 kept as a first-class route, so a character exists after five m
 ## 3. The order it was built in
 
 1. **Prompt hygiene** ✅ 0.8.4–0.8.6 — §2.8 items 1–3, the clock line and timezone (§2.7); the tools decision after
-   the 真音 test: option C taken (0.8.6). Seed `at` came with the skill (0.8.0). Absolute dates: only in
+   the test on the test character: option C taken (0.8.6). Seed `at` came with the skill (0.8.0). Absolute dates: only in
    skill-written SOULs; the cast's relative dates stay until item 6. Small, no new behaviour, and every later eval
    ran on a clean prompt.
 2. **Authoring groundwork** ✅ 0.8.0–0.8.3, 0.8.10 — the `describe/` template and `profile.json` schema, the
    skill's phase prompts and the 新角色 page (§2.9), the simple-path templates (§2.10); `install-character.ps1` +
    `seed-memories.py` as the page's install (psyche.json is the skill's output, seed dates from `at`); the
-   fidelity probe (§2.3). Disposable characters were written through the skill and installed (阿凜, 阿呆); the
-   probe's gold exists for 西 only, so no test character has been scored against a gold of its own. **Not built:
+   fidelity probe (§2.3). Disposable characters were written through the skill and installed (the example description, one made on the page); the
+   probe's gold exists for the main character only, so no test character has been scored against a gold of its own. **Not built:
    the blind questionnaire** (§2.5) — no such test exists in `tests/`, no zh-TW instruments in the repo.
 3. **The dated part of who she is** — §2.4: ✅ in the SOUL (時間線, 影響過你的人與事, written by the skill;
    seeds still go to the store for retrieval); the 0.8.7 pinned tags were retired, and the package is the character.
@@ -551,15 +548,15 @@ compile of §2.5 kept as a first-class route, so a character exists after five m
    for what she sidestepped, the precedent being the 2026-10-14 promise rule); the reading-care scalar in the
    theory of mind (closer and tired = less careful), rendered only at extremes, folded into item 4. The first three
    touch the same strategy selector as dial 3 and came after item 4.
-6. **The cast** — open: when a generated SOUL scores above 西 on the probe, 西 through the skill from a fresh
-   description, approved as a diff; then 子晴 and 子睿. **0.8.10:** the probe exists (`tools/fidelity_probe.py`,
-   gold in `tests/fidelity/xi.json`, scoring test in `tests/test_fidelity_probe.py`) — recognition against the
-   three-SOUL lineup, twenty 像不像她會說 lines, ten A/B takes, on the text alone (no engine, a quiet block). 西's
-   description was drafted from her files into `characters/xi_v2/describe/` and run through the skill (on gemini
-   through the proxy at the time; since 0.9.0 the skill and the probe use the 寫靈魂 connection) — 4,041 chars,
-   forced past the size check by forty-one; blind read-back 7/9; the probe scored both SOULs 0.96 (recognition 7/8
-   each, voice 20/20, takes 10/10 — a tie at the ceiling; the gold must get harder). The cast's files are
-   untouched: the swap is the user's call on the diff.
+6. **The cast** — open: when a generated SOUL scores above the main character's on the probe, the main character
+   through the skill from a fresh description, approved as a diff; then the other two. **0.8.10:** the probe exists
+   (`tools/fidelity_probe.py`, gold in `tests/fidelity/<id>.json` for the main character, scoring test in
+   `tests/test_fidelity_probe.py`) — recognition against the three-SOUL lineup, twenty 像不像她會說 lines, ten A/B
+   takes, on the text alone (no engine, a quiet block). The main character's skill-made candidate: her description
+   was drafted from her files and run through the skill (on gemini through the proxy at the time; since 0.9.0 the
+   skill and the probe use the 寫靈魂 connection) — 4,041 chars, forced past the size check by forty-one; blind
+   read-back 7/9; the probe scored both SOULs 0.96 (recognition 7/8 each, voice 20/20, takes 10/10 — a tie at the
+   ceiling; the gold must get harder). The cast's files are untouched: the swap is the user's call on the diff.
 7. **The hidden scratch** — §2.6 ✅ built 0.8.10, opt-in (`scratch` in profile.json), the four checks answered.
 8. **Keyword triggers** — tier 3 (§2.2) ✅ built 0.8.10: kokoro's `_with_triggers` — a roster name, a person
    file's name or your name in the message fires an exact BM25 lookup (`trigger_k` rows, default three) under a

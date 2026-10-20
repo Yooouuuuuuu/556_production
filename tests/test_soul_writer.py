@@ -21,12 +21,12 @@ def _j(d: dict) -> str:
 
 
 STRUCTURE = {
-    "events": [{"at": "2023-11", "text": "阿凜的漫畫第一次被轉貼", "left": "你被看見的時候會先躲起來。", "tags": ["comic"]},
-               {"at": "2026-09-02", "text": "阿凜在水彩課認識你", "left": "你記得第一個問你貓是誰的人。", "tags": ["history"]}],
-    "seeds": [{"text": "你在水彩課坐阿凜旁邊", "tags": ["you"]}, {"text": "阿凜在水彩課認識你", "tags": ["dup"]}],
+    "events": [{"at": "2023-11", "text": "角色甲的圖第一次被轉貼", "left": "你被看見的時候會先躲起來。", "tags": ["comic"]},
+               {"at": "2026-09-02", "text": "角色甲在畫畫課認識你", "left": "你記得第一個問你貓是誰的人。", "tags": ["history"]}],
+    "seeds": [{"text": "你在畫畫課坐角色甲旁邊", "tags": ["you"]}, {"text": "角色甲在畫畫課認識你", "tags": ["dup"]}],
     "stances": ["斷更不是罪"], "refusals": ["不畫免費的 logo"], "tensions": ["嘴上說隨便畫，心裡在意"],
     "cares_about": ["畫的東西有沒有被當真", "答應的事有沒有做到"], "vague": [],
-    "closeness": "還不算熟", "closeness_why": "水彩課認識一個多月",
+    "closeness": "還不算熟", "closeness_why": "畫畫課認識一個多月",
 }
 THINKING = {"big5": {"openness": 0.7, "conscientiousness": 0.4, "extraversion": 0.35, "agreeableness": 0.55, "neuroticism": 0.6},
             "constants": {"self_esteem_stability": 0.4, "expressiveness": 0.3, "humor_coping": 0.6, "clinginess_cap": 0.5,
@@ -38,9 +38,9 @@ VOICE = {"expression": "你的訊息很短，常常一句拆兩三則。", "catc
          "lines_yes": ["欸 你那個藍色太乾淨了", "先這樣 我要去補貨", "吼 不要講", "大夜最好的是沒人說早安", "貓不會問我在幹嘛"],
          "lines_no": ["謝謝你的肯定！", "請問有什麼可以幫你的嗎", "我會努力的", "親愛的你好嗎", "加油喔"]}
 REACTIONS = {"reactions": "生氣的時候你會變得很有禮貌。", "fallback": [{"when": "對方要你做助理的事", "she": "你會轉去講貓"}]}
-PARTS = {"part1": "你是阿凜，二十七歲，台中人，做超商大夜。你被看見的時候會先躲起來。", "part2": "- 喜歡無糖綠\n- 受不了「畫畫很療癒吧」",
+PARTS = {"part1": "你是角色甲，二十七歲，在圖書館上班。你被看見的時候會先躲起來。", "part2": "- 喜歡無糖綠\n- 受不了「畫畫很療癒吧」",
          "thinking": "想事情的時候你腦子裡是畫面。你先回再想。", "judging": "- 遇到有預算的人，就不送免費的圖。",
-         "people": {"你": "她在水彩課認識你，叫你的名字。", "小文": "店長，裝沒看到她在畫圖。"}}
+         "people": {"你": "她在畫畫課認識你，叫你的名字。", "小文": "店長，裝沒看到她在畫圖。"}}
 INTAKE = {"enough": True, "missing": []}
 VERIFY = {"medium_primary": "imagery", "first_look": "people", "contradiction": "hold_both", "cause": "situation",
           "rationality": "low", "experientiality": "high", "promotion": "mid", "prevention": "high", "maximizing": "low", "note": "從先回再想判斷"}
@@ -52,7 +52,7 @@ def _make_char(tmp: Path, monkeypatch) -> Path:
     (d / "describe").mkdir(parents=True)
     for stem in sw.DESCRIBE:
         (d / "describe" / f"{stem}.md").write_text(f"# x\n<!-- 提示 -->\n{stem} 的內容\n", encoding="utf-8")
-    sw.write_json(d / "companion.json", {"display_name": "阿凜", "avatar_model": "hiyori/Hiyori.model3.json"})
+    sw.write_json(d / "companion.json", {"display_name": "角色甲", "avatar_model": "hiyori/Hiyori.model3.json"})
     prof = json.loads((sw.TPL / "profile.json").read_text(encoding="utf-8"))
     sw.write_json(d / "profile.json", prof)
     return d
@@ -83,7 +83,7 @@ def test_full_pipeline_with_scripted_llm(tmp_path, monkeypatch):
     found = sw.phase_assemble(d, force=True, model="scripted")
     soul = (d / "SOUL.md").read_text(encoding="utf-8")
     # six-part order
-    idx = [soul.index(h) for h in ("# 阿凜", "## 喜歡與不喜歡", "## 怎麼聽、怎麼想、怎麼回", "## 怎麼判斷、怎麼決定", "## 說話的方式", "## 遇到事情的時候", "## 誰在跟你說話")]
+    idx = [soul.index(h) for h in ("# 角色甲", "## 喜歡與不喜歡", "## 怎麼聽、怎麼想、怎麼回", "## 怎麼判斷、怎麼決定", "## 說話的方式", "## 遇到事情的時候", "## 誰在跟你說話")]
     assert idx == sorted(idx)
     assert "你會這樣說：" in soul and "欸 你那個藍色太乾淨了" in soul
     assert "| 對方要你做助理的事 | 你會轉去講貓 |" in soul
@@ -96,7 +96,7 @@ def test_full_pipeline_with_scripted_llm(tmp_path, monkeypatch):
     assert rows[0]["tags"][0] == "timeline" and "comic" in rows[0]["tags"]   # events are the pinned timeline
     assert rows[1]["at"] == "2026-09-02"
     texts = [r["text"] for r in rows]
-    assert len(texts) == len(set(texts)) and any(t == "你在水彩課坐阿凜旁邊" for t in texts)
+    assert len(texts) == len(set(texts)) and any(t == "你在畫畫課坐角色甲旁邊" for t in texts)
     # people
     you = (d / "people" / "你.md").read_text(encoding="utf-8")
     assert you.startswith("# 你\n- 名字：（尚未設定）") and "叫你的名字" in you
@@ -121,10 +121,10 @@ def test_full_pipeline_with_scripted_llm(tmp_path, monkeypatch):
 
 
 def test_timeline_and_influences_live_in_the_soul():
-    st = {"events": [{"at": "2023-11", "text": "阿凜的漫畫第一次被轉貼"}, {"text": "沒有日期的事"}, {"at": "2019", "text": "搬到台中"}],
+    st = {"events": [{"at": "2023-11", "text": "角色甲的圖第一次被轉貼"}, {"text": "沒有日期的事"}, {"at": "2019", "text": "搬到新的城市"}],
           "influences": [{"text": "高中的美術老師，說你的線條有脾氣"}]}
     out = "\n".join(sw.timeline_sections(st))
-    assert "## 時間線" in out and out.index("2019 年，搬到台中") < out.index("2023 年 11 月，阿凜的漫畫第一次被轉貼") < out.index("沒有日期的事")
+    assert "## 時間線" in out and out.index("2019 年，搬到新的城市") < out.index("2023 年 11 月，角色甲的圖第一次被轉貼") < out.index("沒有日期的事")
     assert "## 影響過你的人與事" in out and "美術老師" in out
     assert sw.timeline_sections({}) == []
     soul = ("# x\n\n你是她。\n\n" + out + "\n## 喜歡與不喜歡\n- x\n\n## 怎麼聽、怎麼想、怎麼回\n- y\n\n## 怎麼判斷、怎麼決定\n- z\n\n"
@@ -168,7 +168,7 @@ def test_assemble_never_overwrites_a_hand_written_soul(tmp_path, monkeypatch):
     assert found and '手寫' in found[0]
     assert (d / 'SOUL.md').read_text(encoding='utf-8') == '# 手寫的' + chr(10)
     sw.phase_assemble(d, force=True)
-    assert (d / 'SOUL.md').read_text(encoding='utf-8').startswith('# 阿凜')
+    assert (d / 'SOUL.md').read_text(encoding='utf-8').startswith('# 角色甲')
 
 
 def test_checks_allow_words_the_author_used():
@@ -183,13 +183,13 @@ def test_simple_path_compiles_from_sliders_and_three_boxes(tmp_path, monkeypatch
     prof["thinking"] = {"rationality": 0.2, "experientiality": 0.8, "promotion": 0.5, "prevention": 0.7, "maximizing": 0.3}
     prof["choices"] = {"medium_primary": "imagery", "medium_secondary": None, "first_look": "people", "contradiction": "hold_both", "cause": "situation"}
     prof["constants"] = {"self_esteem_stability": 0.5, "expressiveness": 0.3, "humor_coping": 0.7, "clinginess_cap": 0.5, "tsundere_tendency": 0.2, "assertiveness": 0.7, "chronotype": 0.5}
-    prof["simple"] = {"who": "你是阿凜，做超商大夜，偷畫貓。", "talk": "訊息很短，常常一句拆兩三則。", "refuses": "不畫免費的 logo\n不接客服工作"}
+    prof["simple"] = {"who": "你是角色甲，在圖書館上班，偷畫貓。", "talk": "訊息很短，常常一句拆兩三則。", "refuses": "不畫免費的 logo\n不接客服工作"}
     prof["closeness"] = "朋友"
     sw.write_json(d / "profile.json", prof)
     found = sw.phase_simple(d)
     assert not [x for x in found if x.startswith(("太短", "太長"))]
     soul = (d / "SOUL.md").read_text(encoding="utf-8")
-    assert soul.startswith("# 阿凜\n\n你是阿凜，做超商大夜，偷畫貓。")
+    assert soul.startswith("# 角色甲\n\n你是角色甲，在圖書館上班，偷畫貓。")
     for h in ("## 喜歡與不喜歡", "## 怎麼聽、怎麼想、怎麼回", "## 怎麼判斷、怎麼決定", "## 說話的方式", "## 遇到事情的時候", "## 誰在跟你說話"):
         assert h in soul
     assert "你先回再想" in soul and "你憑感覺" in soul and "想事情的時候你腦子裡是畫面" in soul and "第一眼看這件事跟誰有關" in soul

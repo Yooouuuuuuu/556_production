@@ -4,7 +4,7 @@ phase stopping for review. The LLM is used only here, at authoring time; what it
 the files are written by code. Nothing regenerates on its own: a lock file records which inputs produced
 the outputs.
 
-    python tools/soul_writer.py init <id> --display 阿凜 [--from-example] [--avatar hiyori/Hiyori.model3.json]
+    python tools/soul_writer.py init <id> --display <名字> [--avatar hiyori/Hiyori.model3.json]
     python tools/soul_writer.py run <id> --phase all --model gemini|claude|opus|<name> [--yes] [--force]
     python tools/soul_writer.py run <id> --phase intake|structure|thinking|voice|reactions|parts|assemble|verify
     python tools/soul_writer.py check <id>        # the mechanical checks on SOUL.md, no LLM
@@ -873,7 +873,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     if d.exists() and any(d.iterdir()):
         raise SystemExit(f"{d} already exists and is not empty")
     (d / "describe").mkdir(parents=True, exist_ok=True)
-    src = TPL / "example" / "describe" if args.from_example else TPL / "describe"
+    src = TPL / "describe"
     for p in src.glob("*.md"):
         shutil.copy(p, d / "describe" / p.name)
     write_json(d / "companion.json", {"display_name": args.display, "avatar_model": args.avatar})
@@ -881,7 +881,7 @@ def cmd_init(args: argparse.Namespace) -> int:
     prof = json.loads((TPL / "profile.json").read_text(encoding="utf-8"))
     prof["pronoun"] = args.pronoun
     write_json(d / "profile.json", prof)
-    print(f"init: {d} — fill describe/*.md (or keep the example), then: soul_writer.py run {args.name} --phase all --yes")
+    print(f"init: {d} — fill describe/*.md, then: soul_writer.py run {args.name} --phase all --yes")
     return 0
 
 
@@ -974,7 +974,6 @@ def main(argv: Optional[List[str]] = None) -> int:
     a.add_argument("--display", required=True)
     a.add_argument("--avatar", default="hiyori/Hiyori.model3.json")
     a.add_argument("--pronoun", default="她")
-    a.add_argument("--from-example", action="store_true")
     a.set_defaults(fn=cmd_init)
     r = sub.add_parser("run")
     r.add_argument("name")

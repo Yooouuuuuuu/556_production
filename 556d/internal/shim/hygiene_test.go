@@ -8,9 +8,9 @@ import (
 
 // A system prompt shaped like the one Hermes 7166071f builds for a character (docs/prompt/prompt.md §1.2):
 // the SOUL first, then the vendor paragraphs, kokoro's block, the timestamp with its trailer.
-const sampleSystem = `# 西
+const sampleSystem = `# 角色甲
 
-你是西，三十歲。白天是內湖一家貿易公司的行政。
+你是角色甲，三十歲。白天在一家公司上班。
 
 ## 說話的方式
 - 用繁體中文，口語，像在傳訊息。
@@ -35,7 +35,7 @@ Shell: on this Windows host your ` + "`terminal`" + ` tool runs commands through
 
 Python toolchain: python3=missing, python=3.11.16, pip→python3.14, uv=installed.
 
-Active Hermes profile: xi. This session reads and writes D:/dev/556_production/home/profiles/xi/. Do NOT modify another profile's skills/plugins/cron/memories.
+Active Hermes profile: a. This session reads and writes C:/x/home/profiles/a/. Do NOT modify another profile's skills/plugins/cron/memories.
 
 你在聊天視窗裡說話：純文字，不用 markdown。
 
@@ -60,7 +60,7 @@ func TestFilterSystemDropsVendorTextKeepsHers(t *testing.T) {
 			t.Errorf("still contains %q", gone)
 		}
 	}
-	for _, keep := range []string{"# 西", "你是西，三十歲", "## 說話的方式", "你在聊天視窗裡說話", "記憶：每一回合", "關於製作人", "名字：（尚未設定）"} {
+	for _, keep := range []string{"# 角色甲", "你是角色甲，三十歲", "## 說話的方式", "你在聊天視窗裡說話", "記憶：每一回合", "關於製作人", "名字：（尚未設定）"} {
 		if !strings.Contains(got, keep) {
 			t.Errorf("lost %q", keep)
 		}
@@ -86,7 +86,7 @@ func TestFilterSystemLeavesForeignPromptsAlone(t *testing.T) {
 
 func TestUnwrapReplyFunction(t *testing.T) {
 	calls := []map[string]any{
-		{"function": map[string]any{"name": "openmini_reply", "arguments": `{"content": "哥？你怎麼了"}`}},
+		{"function": map[string]any{"name": "openmini_reply", "arguments": `{"content": "你怎麼了"}`}},
 		{"function": map[string]any{"name": "kokoro_search", "arguments": `{"query": "x"}`}},
 		{"function": map[string]any{"name": "default_api:openmini_reply", "arguments": `{"content": "第二句"}`}},
 	}
@@ -94,7 +94,7 @@ func TestUnwrapReplyFunction(t *testing.T) {
 	if len(kept) != 1 || kept[0]["function"].(map[string]any)["name"] != "kokoro_search" {
 		t.Fatalf("real tool call must survive: %v", kept)
 	}
-	if text != "哥？你怎麼了\n第二句" {
+	if text != "你怎麼了\n第二句" {
 		t.Errorf("text = %q", text)
 	}
 	kept, text = unwrapReplyFunction(nil, "plain")

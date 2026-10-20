@@ -96,7 +96,7 @@ today (0.10.0), dashed pink = later work (Discord, MCP). Discord and MCP stay da
 - `characters/<id>/` — the character package, the character itself (ignored except `characters/README.md`): authored
   `describe/01…10.md` and `profile.json`; generated `SOUL.md`, `seeds.jsonl`, `people/*.md`, `psyche.json`,
   `soul.lock.json`, `build/`. Backup = the package + `memory/<id>.db` + `psyche.db` + `state.db` from the profile;
-  everything else is rebuilt. `templates/character/` is the blank template (and 阿凜 as `example/`),
+  everything else is rebuilt. `templates/character/` is the blank template (and an example description as `example/`),
   `templates/companion/` the profile skeleton `new-companion.ps1` copies.
 - `556d/` (Go daemon), `app/` (Electron + React), `plugins/` (Python, inside Hermes by contract: kokoro, psyche),
   `tools/` (the soul skill, the fidelity probe, seeds, the simulator, diagnostics), `tests/` (pytest for the skill, the

@@ -17,7 +17,7 @@ func TestEffective(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	profile := filepath.Join(dir, "xi")
+	profile := filepath.Join(dir, "a")
 	_ = os.MkdirAll(profile, 0o755)
 
 	// no override file at all: the global config
@@ -27,11 +27,11 @@ func TestEffective(t *testing.T) {
 	}
 
 	// only the voice id differs; STT inherits; the key, base_url and model come from the global block
-	if err := SaveOverride(filepath.Join(profile, "voice.json"), Override{TTS: Provider{Kind: "fish-audio", Voice: "ref-xi"}, STT: Provider{Kind: Inherit}}); err != nil {
+	if err := SaveOverride(filepath.Join(profile, "voice.json"), Override{TTS: Provider{Kind: "fish-audio", Voice: "ref-a"}, STT: Provider{Kind: Inherit}}); err != nil {
 		t.Fatal(err)
 	}
 	e = Effective(global, profile)
-	if e.TTS.Voice != "ref-xi" || e.TTS.APIKey != "k" || e.TTS.BaseURL != "https://api.fish.audio" || e.TTS.Model != "s1" {
+	if e.TTS.Voice != "ref-a" || e.TTS.APIKey != "k" || e.TTS.BaseURL != "https://api.fish.audio" || e.TTS.Model != "s1" {
 		t.Fatalf("partial override: %+v", e.TTS)
 	}
 	if e.STT.Kind != "fish-audio" || e.STT.Language != "zh" || e.STT.APIKey != "k" {

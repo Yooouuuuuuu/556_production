@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.10.1 — 2026-10-20
+
+- **Housekeeping: nothing private in the repo.** Tracked files carry no character names, persona text, the user's own
+  framing or machine paths any more — code, tests, tools, templates, scripts and every doc including this changelog,
+  DECISIONS and the READMEs. Fixtures use placeholders (ids `a` / `b` / `c`, 角色甲 / 角色乙 / 角色丙, the user 小明); docs
+  say the main / second / third character or a test character. The example character package under `templates/character/`
+  and the real-character gold fixture under `tests/fidelity/` are gone, with the 從範例開始 option of the new-character page
+  and the skill's `--from-example`; `tools/fidelity_probe.py` takes `--lineup` and `--target` explicitly; the live smoke
+  scripts under `tests/live/` take character ids as arguments and find the repo from their own location; the kokoro
+  error text and the probe test point at the vendored KeepsakeDB. Default characters are future work. No behaviour change.
+
 ## 0.10.0 — 2026-10-19
 
 - **Docs brought current (last verified 2026-10-19).** `docs/prompt/` (prompt.md §1 is what runs today, §2–§3 carry
@@ -32,7 +43,7 @@
   `kokoro.json` (`llm`, `embedder`), `psyche.json` (`time.timezone_offset_h`) — so a fresh clone no longer depends on an
   ignored `home/config.yaml` that no script creates. `GET/PUT /api/connections`, `POST /api/connections/probe`.
 - **Cleaned out of the repo.** `556d.toml` keeps only ports and in-repo paths (the proxy URLs, model names, the qwen path,
-  `profile = "mane"`, the embedder block and the timezone are gone); `shim/routing.json` and its lanes `pro` / `code` are
+  `profile = "<id>"`, the embedder block and the timezone are gone); `shim/routing.json` and its lanes `pro` / `code` are
   gone — the shim has one lane, `auto/556`, pointed at the 對話 connection, and sends the key as a bearer token; `556.cmd`
   uses its own directory; the companion templates carry no endpoints and no zone; `tools/soul_writer.py` and
   `tools/fidelity_probe.py` take `--base-url`/`--model` or read the 寫靈魂 connection (key in `X556_API_KEY`), the
@@ -47,7 +58,7 @@
 - **Fix: the state block lost 轉變 and 原則 when it was full.** `max_lines` (8) now counts state lines only — the title and
   the clock are extra — and when the block still overflows the transition line goes first, then 心裡, 想法, 掛念;
   原則 always stays. The old slice counted the title, so with 想法, 對他 and 掛念 all present the last two lines were cut.
-- **Fix: the withheld register.** Six entries per counterpart (it was six in all, so 子晴's things pushed yours off), and an
+- **Fix: the withheld register.** Six entries per counterpart (it was six in all, so another character's things pushed yours off), and an
   unsaid thing leaves the register when the message really went out (`sent`), not when the urge fired — a silent turn
   or a failed send keeps it for the next occasion. Tests updated and added.
 - The pinned heading 影響過他的人與事 uses the generic 他 for every character (kokoro no longer reads a `pronoun` key
@@ -68,9 +79,9 @@
 - **The simple path** (§2.10). `soul_writer.py simple <id>` and the 簡單版 fold on the 產生 step: three boxes (who,
   how she talks, what she refuses) plus the sliders and choices become the same files with one zh-TW sentence per
   band, no model; the size check does not apply; a hand-written SOUL is never overwritten.
-- **The fidelity probe** (§2.3). `tools/fidelity_probe.py` with `tests/fidelity/xi.json`: a SOUL text answers as her,
+- **The fidelity probe** (§2.3). `tools/fidelity_probe.py` with `tests/fidelity/<id>.json` (the main character's gold): a SOUL text answers as her,
   a blind judge picks her out of the three-SOUL lineup; twenty 像不像她會說 lines; ten A/B takes — scores on the
-  text alone. 西's description drafted from her files (`characters/xi_v2`) and run through the skill on gemini;
+  text alone. The main character's description drafted from her files and run through the skill on gemini (her skill-made candidate);
   the cast is untouched until the user approves the diff.
 - 556d: `POST /api/characters/<id>/simple`; the daemon binary rebuilt (0.8.6 hygiene, the shim's scratch).
 
@@ -117,8 +128,8 @@
 
 ## 0.8.5 — 2026-10-16
 
-- Prompt hygiene, checked live on a second daemon with 真音 (the app untouched). Findings and fixes:
-  - a resumed session keeps the tool list and prompt pieces it was born with: 真音's 2026-10-03 session still carried
+- Prompt hygiene, checked live on a second daemon with the test character (the app untouched). Findings and fixes:
+  - a resumed session keeps the tool list and prompt pieces it was born with: the test character's 2026-10-03 session still carried
     seventeen tools and the switched-off guidance; a fresh session got the switches and exactly the two kokoro tools.
     The shim filter is therefore what protects the cast's endless sessions; the config switches reach new ones;
   - Hermes's own date line was wrong (Monday for a Tuesday). The shim now drops the whole date paragraph; the clock
@@ -127,7 +138,7 @@
     system message as received, for the next audit;
   - the tools test: `platform_toolsets: []` → zero tools and a normal reply; `[web]` → `web_search` / `web_extract`
     under the reworded preamble and a real search. Option C (no tools at baseline) is viable; not switched yet.
-- 真音's old session was ended for the test; her next start opens a fresh one.
+- The test character's old session was ended for the test; her next start opens a fresh one.
 
 ## 0.8.4 — 2026-10-16
 
@@ -150,19 +161,19 @@
   (default `Asia/Taipei`) is passed to every gateway as `HERMES_TIMEZONE`.
 - Tests: three shim hygiene tests; the two golden files regenerated from the Go code (`go test ./internal/shim -run
   Parity -update`) and reviewed — only the preamble changed; the psyche block test covers the clock line (47 pass).
-- Open from the same brief: tools at baseline (option C) waits for the 真音 test; Hermes's memory-context note stays.
+- Open from the same brief: tools at baseline (option C) waits for the test on the test character; Hermes's memory-context note stays.
 
 ## 0.8.3 — 2026-10-16
 
 - The skill's assembler: a list the model numbered itself (「1. …」) loses the numbers before it becomes bullets, a
   short item ending in a colon stays a sub-heading, and the digit check no longer counts list numbering after a
-  bullet — the rerun of 阿呆 had failed on sixteen such digits. A banned word the author used in the description
+  bullet — the rerun of a test character had failed on sixteen such digits. A banned word the author used in the description
   (AI, when she dislikes AI) passes the check and the prompt. Gemini is the model for every later test (the proxy's
   claude lane is running out); the page defaults to it.
 
 ## 0.8.2 — 2026-10-16
 
-- Found by the first character made on the page (阿呆, a ten-line description on gemini):
+- Found by the first character made on the page (a test character, a ten-line description on gemini):
   - the `你` person file described the character's own past as if it were yours (the description's 我 is the
     person talking to her; the prompt now says so, and the people instruction names who is who);
   - an undated event was given an invented year (`at` is filled only when the description gives a date);
@@ -178,7 +189,7 @@
 ## 0.8.1 — 2026-10-16
 
 - **設定 → 角色 → 新角色**: the soul skill in the app (`docs/app/app.md`, `docs/prompt/prompt.md` §2.9). Create a
-  package (id, name, 她／他, optionally from the example 阿凜), write the ten 描述 boxes with the template prompts as
+  package (id, name, 她／他, optionally from the example description), write the ten 描述 boxes with the template prompts as
   grey text, run the skill on gemini or claude — 「全部」 or one phase at a time — and follow its log live; the intake's
   questions show on the page. 確認 lists every proposed thinking meter and choice with the skill's one-line evidence
   (Big Five and the six constants under a fold); a slider or a select is your decision, 「全部接受提案」 fills what you
@@ -208,9 +219,9 @@
   outside 2,500–4,000 characters, a missing section; third-person drift is a warning. `verify` is a blind read-back —
   the model reads only the finished SOUL and names the dials, compared to the confirmed values. The models come
   straight from the proxy at :18765 (`--model gemini | claude | opus | <name>`); 556d need not run.
-- `templates/character/`: the blank `describe/` template and `profile.json`; `example/` is 阿凜, a disposable test
-  character (twenty-seven, convenience-store night shift in 台中, draws a four-panel comic), used for the first runs.
-  `characters/README.md` describes the layout. The cast (西, 子晴, 子睿) is untouched.
+- `templates/character/`: the blank `describe/` template and `profile.json`; `example/` is an example description
+  (a disposable test character), used for the first runs.
+  `characters/README.md` describes the layout. The cast is untouched.
 - First runs on the same description, both lanes. gemini flash: about 6.5 minutes for the seven phases, every check
   passed after the mechanical repairs (one simplified character, a list quoted as text), blind read-back 8 of 9.
   claude sonnet: about 11 minutes (the parts phase alone 151 s, which is why the per-call timeout is now 900 s), checks
@@ -227,7 +238,7 @@
 ## 0.7.9 — 2026-10-15
 
 - **Docs: `docs/prompt/`** — what she reads before she speaks, verified block by block against Hermes
-  `7166071f`, the plugins, the shim and 西's session store: the system prompt (the SOUL first, then about 5k
+  `7166071f`, the plugins, the shim and the main character's session store: the system prompt (the SOUL first, then about 5k
   chars of Hermes's own English guidance, environment and profile text, the trailer, and the shim's tools
   preamble), the history replayed with every past turn's memory and state blocks (`api_content`, so a per-turn
   line costs 20+ copies per request), and the last message's three pieces. With it the design for 0.8.0: three
@@ -241,8 +252,8 @@
 
 - **Fix (data): a conversation with another character rewrote the whole memory store.** kokoro built the counterpart
   pipeline with that character's name as the subject word, and KeepsakeDB's pipeline "migrated" the store to it —
-  every 「你…」 memory became 「子睿…」, and the main pipeline turned them back, taking real 子睿 mentions with it
-  (子晴's and 子睿's stores, 2026-10-14 22:06). Counterpart pipelines now pass no subject; KeepsakeDB 1.0.1 migrates only
+  every 「你…」 memory became one about that character by name, and the main pipeline turned them back, taking real mentions of that character with it
+  (the second and third characters' stores, 2026-10-14 22:06). Counterpart pipelines now pass no subject; KeepsakeDB 1.0.1 migrates only
   on an explicit `migrate_subject=True` (the Settings knob). The two stores were repaired from the last clean snapshot,
   the seed files and a reviewed rule, through the API (re-embedded, history kept).
 - **`vendor/` is two git submodules.** `vendor/hermes-agent` is pinned at upstream `7166071f` (fetched shallow) and
@@ -296,7 +307,7 @@
   kokoro.json), not only the one on stage; each character applies them at its next start. Memory language and
   embedder stay the selected character's own.
 - The developer-knob labels (556d's config registry) no longer say 她; the unnamed line in a person file reads
-  「稱呼對方「哥」」 instead of 「她叫你」, which was wrong for a character whose pronoun is 他.
+  「稱呼對方「…」」 (the character's default address term) instead of 「她叫你」, which was wrong for a character whose pronoun is 他.
 - 狀態 names the other characters by their display name (要問誰, 關係, 委屈帳) even before any conversation with them exists (the roster's names, not profile ids).
 
 ## 0.7.4 — 2026-10-14
@@ -311,7 +322,7 @@
   (a Telegram turn during the outage, an old cue) are swept.
 - **Two kinds of promise** (`docs/inner-life/inner-life.md` §13, §16). A loop opens only when she agreed in her
   reply (the appraisal reports `agreed`; declining is her SOUL's business). A promise that concerns only her and you
-  is forced through at its time, as before. A promise that needs another character (「幫你問子睿」: the appraisal fills
+  is forced through at its time, as before. A promise that needs another character (「幫你問某某」: the appraisal fills
   `ask`) is carried to that character at her free time (`ask_other`, through the relay), the answer is taken from that
   conversation's appraisal (loop state `asking` → `answered`), and the result comes back to you (`report_back`) only
   when she is up, outside your no-disturb hours and when your presence model says you are around; no answer → retry at
@@ -396,7 +407,7 @@
   cast): one just met, two old acquaintances who are a couple. Each has a SOUL with background, a
   psyche.json with personality, schedule, small life events and relationship priors per counterpart, person files
   for you and each other, and seed memories (`tools/seed-memories.py`). `install-character.ps1 <id>` makes the
-  profile. 真音 stays as the test agent.
+  profile. The test character stays as the test agent.
 - **狀態**: relationship table (closeness words, trust, attachment, hours, disclosure), the hurt ledger, feedback
   buttons on each feeling (太多 / 剛好 / 太少 → ±5 % on that emotion's gain, bounded, replayable), the characters'
   conversations. **設定 → 主動**: inter-agent on/off, turn cap, visibility.
@@ -429,7 +440,7 @@
   5 min, after every applied record and block, and at exit (`atexit`, since the gateway's drain never unloads
   plugins). `tools/psychesim.py` (week / day / seeds / replay) and 9 scenario tests (失聯 7 天, 連續熬夜, 半夜傳訊息,
   工作中, 忙碌度 0, 使用量, 提醒準時穿過免打擾, 等我一下, replay with a life); 30 tests in all.
-- Verified live on 真音: a reminder two minutes out → event turn → her words in the conversation → Telegram, stop 2 s.
+- Verified live on the test character: a reminder two minutes out → event turn → her words in the conversation → Telegram, stop 2 s.
 
 ## 0.5.0 — 2026-10-07
 
@@ -468,7 +479,7 @@
 
 ## 0.4.0 — 2026-10-06
 
-Her own process, one conversation, her memory, her Telegram, her voice. 真音 is the first character.
+Her own process, one conversation, her memory, her Telegram, her voice. A test character is the first character.
 Memory engine switch: **kokoro on KeepsakeDB** replaces mem0 + Qdrant.
 
 - **`plugins/kokoro`** — Hermes memory provider on KeepsakeDB (`D:\dev\KeepsakeDB`, installed into the
@@ -488,14 +499,14 @@ Memory engine switch: **kokoro on KeepsakeDB** replaces mem0 + Qdrant.
   channel bindings are strictly hers. API: `GET /api/companions`, `POST /api/companions/{name}/start|stop`,
   `GET/PUT /api/selected`; chat/history/memory/settings act on the selected companion
   (`?companion=` / `X-556-Companion` override); hub events carry `companion`.
-- **First character: 真音 (Mane)** — profile `home/profiles/mane` (fresh SOUL, kokoro.json with the
+- **First character: the test character** — profile `home/profiles/<id>` (fresh SOUL, kokoro.json with the
   fixed memory subject 製作人, companion.json), the app opens on her (`556d.toml daemon.profile`).
 - **Settings: Producer's name** → written through to the selected profile's `memories/USER.md`
   and `kokoro.json`; memory language / embedder write through to `kokoro.json`.
 - **Settings, two tiers**: non-technical knobs directly; a developer toggle (with warning) renders every
   other knob from the config registry (`/api/config`) and writes it into the right file; nothing stays
   fixed in a config file. Changing the memory subject or tokenizer now migrates / reindexes the store.
-- **Telegram, live**: 真音 answers DMs on her own bot account (token + allowlist in her profile's
+- **Telegram, live**: the test character answers DMs on her own bot account (token + allowlist in her profile's
   `.env`); memory pipeline runs on channel turns too.
 - **One route per character** (DECISIONS 2026-10-02): `hermes serve` removed; 556d talks to her gateway's
   OpenAI-compatible API server (`internal/hermesapi`: one non-stream chat request per turn,

@@ -36,7 +36,7 @@ Rules:
   existing loop, list its id under loops.closed and report the outcome as an event with that loop_id.
 - A loop of origin her_promise or counterpart_said is opened only for a real commitment: set "agreed": false when
   {pronoun} declined, dodged or did not actually commit in the reply. If fulfilling it means asking one of the OTHER
-  CHARACTERS listed below (e.g. 「幫你問子睿」), put their ids in "ask"; otherwise [].
+  CHARACTERS listed below (e.g. 「幫你問〈另一個角色〉」), put their ids in "ask"; otherwise [].
 - If {term} answers something {pronoun} was asking on someone's behalf (an open loop marked 代問), list that loop
   under loops.closed and report event_kind loop_resolved with the answer itself written in "cause".
 - The HURT LEDGER below lists what {pronoun} still holds against {term}. If {term} brings one of those matters up

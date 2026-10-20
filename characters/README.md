@@ -7,7 +7,7 @@ Inputs:
 - `describe/*.md` — ten short files in your own words (who she is, background, what happened and when, how she talks,
   how she thinks, how she relates, likes, stances, the people around her, other). The HTML comments are the template's
   prompts and are ignored; `templates/character/describe/` is the blank template, `templates/character/example/` a
-  filled one (阿凜, a disposable test character).
+  filled one (an example description, a disposable test character).
 - `profile.json` — the numbers and choices the engine reads: Big Five, the seven constants (self-esteem stability,
   expressiveness, humor coping, clinginess cap, tsundere tendency, assertiveness, chronotype), the five thinking meters,
   the dial 1 and 6 choices, pronoun, schedule, `closeness` (0.8.9) and `scratch` (0.8.10). The skill's thinking phase

@@ -276,8 +276,8 @@ func (s *SettingsStore) applyUserMDDir(profile string, v Settings) error {
 	if err != nil {
 		raw, _ = os.ReadFile(old) // first write: carry the old profile over
 	}
-	// how she addresses you until a name is set: kokoro.json address_default (製作人 for a blank companion; 哥 for a
-	// sibling); a long descriptive term is not worth quoting
+	// how she addresses you until a name is set: kokoro.json address_default (製作人 for a blank companion; a short
+	// kin or pet term for a close one); a long descriptive term is not worth quoting
 	nameLine := "- 名字：（尚未設定）"
 	if term := addressDefaultDir(profile); term != "" && len([]rune(term)) <= 2 {
 		nameLine = "- 名字：（尚未設定，稱呼對方「" + term + "」）"

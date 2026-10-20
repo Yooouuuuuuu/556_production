@@ -1,5 +1,5 @@
 # new-companion.ps1 — create a 556 character as a Hermes profile under home/profiles/<name>.
-#   .\new-companion.ps1 -Name sayo -DisplayName "小夜"
+#   .\new-companion.ps1 -Name <id> -DisplayName "<名字>"
 # Creates the profile with Hermes (cloned config), installs the template (companion.json, kokoro.json
 # with the fixed memory subject, psyche.json, SOUL skeleton, people/<you>.md, env.example), links the kokoro and
 # psyche plugins.

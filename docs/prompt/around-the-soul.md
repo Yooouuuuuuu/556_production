@@ -11,7 +11,7 @@ under 【她現在】 carries date, weekday and time on every turn. The memory-c
 sentence she still reads). The preamble is reworded (`textproto.go`: no product, no "function calling AI model", no
 "no native channel" claim) and a text `<tool_call>` to `openmini_reply` is unwrapped into reply text. kokoro's block
 is a zh-TW plugin prompt section (`kokoro.memory`, after the memory tier), tied to no toolset; psyche's note is zh-TW.
-The 真音 test of §2 ran on 2026-10-16 on a fresh session: `[]` → zero tools, a normal reply; `[web]` → two tools, a
+The §2 test on the test character ran on 2026-10-16 on a fresh session: `[]` → zero tools, a normal reply; `[web]` → two tools, a
 real search. What runs today is `prompt.md` §1; **everything below is the brief as written on 2026-10-15**, kept
 for the data and the reasoning — its present tense is that date's, and the places where the facts have since changed
 are marked inline.
@@ -19,7 +19,7 @@ are marked inline.
 Decision brief, 2026-10-15. `prompt.md` §1.2 lists the thirteen blocks of her system prompt; this page is
 about the twelve that are not the SOUL — what Hermes and the shim add — so that each can be kept, switched
 off, replaced or dropped on purpose before anything changes. Verified against Hermes `7166071f`, the
-plugins, the shim and the three live stores (西, 子晴, 子睿). Nothing described here was changed at the time of
+plugins, the shim and the three live stores (the cast). Nothing described here was changed at the time of
 writing (see the status block above for what has been since).
 
 ## 0. The facts that decide it
@@ -38,9 +38,9 @@ the tools left the baseline in 0.8.6):
 
 | Character | user turns | replies | calls to `kokoro_search` | calls to `kokoro_forget` | calls to a tool that does not exist |
 | --- | --- | --- | --- | --- | --- |
-| 西 | 31 | 34 | 0 | 0 | 3 |
-| 子晴 | 45 | 44 | 0 | 0 | 4 |
-| 子睿 | 3 | 4 | 0 | 0 | 1 |
+| the main character | 31 | 34 | 0 | 0 | 3 |
+| the second character | 45 | 44 | 0 | 0 | 4 |
+| the third character | 3 | 4 | 0 | 0 | 1 |
 
 The eight invented calls are all the same shape: the model emits a `<tool_call>` to `openmini_reply` with her
 reply as its `content` argument, Hermes answers "Tool 'openmini_reply' does not exist. Available tools:
@@ -57,9 +57,9 @@ text escapes Gemini's mid-reply output cuts (the proxy's own config note says th
 less natural than plain streamed text). That function is the model's real reply channel. Our shim then
 told the same model, in its text-protocol preamble as it was on 10-15, that it has "NO native/internal function-calling
 channel" and must "ALWAYS write the <tool_call> block as plain text" (reworded in 0.8.4). Every character's first reply, and
-now and then later (子晴 again with 42 messages in context), the model obeys both: it writes its reply as a
+now and then later (the second character again with 42 messages in context), the model obeys both: it writes its reply as a
 text `<tool_call>` to the function it knows, `openmini_reply` — confirmed in the proxy's own record of the
-turn, request with our preamble in, `<tool_call>{"name": "openmini_reply", "arguments": {"content": "哥？…"}}`
+turn, request with our preamble in, `<tool_call>{"name": "openmini_reply", "arguments": {"content": "…her reply…"}}`
 out (the records since 2026-09-30 show the same, sometimes as Gemini's `default_api:openmini_reply`). The shim parses that as a Hermes tool call, Hermes finds no such tool, and
 the second round trip is the model answering through the proxy's channel as it would have anyway. Two
 instructions about one channel; the collision is ours. It stops either way: with no tools at baseline
@@ -91,7 +91,7 @@ a product, a machine, a model or a path.
   (which is why the whole date paragraph could be dropped in the shim in 0.8.5 without touching Hermes).
 - An explicit empty list in `platform_toolsets` is honoured as "no toolsets" (`_get_platform_tools` keeps an
   explicitly saved list, even empty, instead of falling back to the platform default of ~20 tools). Confirmed on
-  真音 on 2026-10-16 (0.8.5: `[]` → zero tools and no preamble) and set on every character in 0.8.6; 556d also adds
+  the test character on 2026-10-16 (0.8.5: `[]` → zero tools and no preamble) and set on every character in 0.8.6; 556d also adds
   an empty list for a platform that has none (`connections.go`).
 
 ## 1. Block by block
@@ -132,7 +132,7 @@ the case for a model-driven search. What the data says: never called, eight misf
 | B. search only | needs a split of kokoro's single `tools` boolean into two | same scaffold, one schema fewer; the misfire is not about which tool exists |
 | C. no tools at baseline | `platform_toolsets: {api_server: [], telegram: []}`; blocks 3–5 vanish by themselves; the shim adds nothing; kokoro's block moves to a plugin section; the `openmini_reply` collision cannot happen (no preamble) | prompt shrinks by about 3,700 chars; she can no longer search on her own — which she never did; an extension (查網路 = `web`) brings the tools scaffold back for that character, so the preamble must be reworded anyway, not deleted |
 
-Recommendation: C, after one test on 真音 — a plain turn (prompt without tools, reply lands), then 查網路
+Recommendation: C, after one test on the test character — a plain turn (prompt without tools, reply lands), then 查網路
 switched on and a search turn (the preamble returns, `web_search` is called). The extension case is the
 reason the preamble is reworded rather than removed: it is the shim's own text, and its request and reply
 shapes are pinned by the golden files in `556d/internal/shim/testdata`, so the rewording is a regenerated golden,
@@ -187,6 +187,6 @@ As written on 2026-10-15; the Status column is 2026-10-19.
 | 10 voice message | keep | — | — | unchanged (not re-verified 10-19) |
 | 11 kokoro block | keep, zh-TW, plugin section | kokoro | 1 | built 0.8.4 |
 | 12 date / trailer | keep the date, drop the trailer | shim filter | 1 (date optional after the clock, §2.7) | **dropped whole** 0.8.5 (the clock line replaces the date) |
-| 13 tools + preamble | no tools at baseline (C), preamble reworded for extensions | config + shim | 1, after the 真音 test | preamble 0.8.4; C taken 0.8.6 |
+| 13 tools + preamble | no tools at baseline (C), preamble reworded for extensions | config + shim | 1, after the test on the test character | preamble 0.8.4; C taken 0.8.6 |
 | memory-context note | replace or accept | shim | 1 | kept as is (2026-10-19) |
 | her-state note | zh-TW | psyche | 1 | built 0.8.4 |

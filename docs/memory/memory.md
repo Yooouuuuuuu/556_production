@@ -140,7 +140,7 @@ The target engine exists: **KeepsakeDB** (then 0.1.x at `D:\dev\KeepsakeDB`; tod
 - 556d gained `-no-hermes` (shim + embedder + API only) so CLI harnesses can run without a second
   Hermes process owning the store.
 
-Smoke (2026-10-02): 「跟你說，我叫林承宇…我最喜歡吃麻辣鍋」→ two memories `姓名是林承宇，稱呼為承宇即可。`
+Smoke (2026-10-02): a self-introduction (a name, then 「…我最喜歡吃麻辣鍋」) → two memories: the name and how to address him
 (identity) and `最喜歡吃麻辣鍋。` (food); next fresh session 「我最愛吃的食物是什麼？」→ 「你最愛吃的食物是
 麻辣鍋。」 with the memory injected at cosine 0.62 `[high]`. Turn cost ≈ 24 s one-shot (model via shim +
 ≈ 7 s observe + startup); recall itself ≈ 2 ms + one embedding call.

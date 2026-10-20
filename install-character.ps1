@@ -1,5 +1,5 @@
 # install-character.ps1 — put one of the versioned characters (characters/<id>/) into a profile.
-#   .\install-character.ps1 -Name chihiro          (creates the profile with new-companion.ps1 if missing)
+#   .\install-character.ps1 -Name <id>              (creates the profile with new-companion.ps1 if missing)
 # Copies SOUL.md, companion.json, psyche.json and people/*.md over the profile's files. Seed memories are
 # loaded separately with seed-memories.py while 556d's embedder is up and the character is NOT running.
 param([Parameter(Mandatory = $true)][string]$Name)

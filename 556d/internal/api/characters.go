@@ -25,7 +25,7 @@ import (
 // build/). The skill runs as a subprocess of the venv's python — one job per package at a time, its
 // output in build/run.log — and install runs install-character.ps1 + seed-memories.py the same way.
 //   GET  /api/characters                     packages + the describe template prompts
-//   POST /api/characters                     {id, display_name, pronoun, avatar, from_example} → init
+//   POST /api/characters                     {id, display_name, pronoun, avatar} → init
 //   GET  /api/characters/{id}                describe texts, profile, build outputs, SOUL, job state
 //   PUT  /api/characters/{id}/describe       {files: {stem: text}}
 //   PUT  /api/characters/{id}/profile        {profile: {...}} (confirmed values; proposals are kept)
@@ -403,7 +403,6 @@ func (a *API) createCharacter(w http.ResponseWriter, r *http.Request) {
 		DisplayName string `json:"display_name"`
 		Pronoun     string `json:"pronoun"`
 		Avatar      string `json:"avatar"`
-		FromExample bool   `json:"from_example"`
 	}
 	if err := decodeJSON(r, &body); err != nil || !charID.MatchString(body.ID) || strings.TrimSpace(body.DisplayName) == "" {
 		writeJSON(w, 400, map[string]any{"error": "id (lowercase letters, digits, _ -) and display_name are required"})
@@ -423,9 +422,6 @@ func (a *API) createCharacter(w http.ResponseWriter, r *http.Request) {
 	}
 	if body.Avatar != "" && !strings.ContainsAny(body.Avatar, " \"'") {
 		args = append(args, "--avatar", body.Avatar)
-	}
-	if body.FromExample {
-		args = append(args, "--from-example")
 	}
 	cmd := exec.Command(a.venvPython(), args...)
 	cmd.Dir = a.mgr.Root()

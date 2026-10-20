@@ -15,7 +15,7 @@ classes: {
 tick: "engine tick (every minute while she runs)" {shape: oval}
 
 due: "due open loops — bypass the probability, fire on time:\nreminders you asked for (「明早八點提醒我」) · her promise to you (「等我一下」) — forced through every gate\n(a loop opens only when she agreed, 0.7.4)" {class: step}
-ask: "a promise that needs another character (「幫你問子睿」, loops.ask, 0.7.4):\nasked once at her free time (ask_other → relay; the mailbox keeps it if they are down, 0.7.5),\nanswered by that conversation's appraisal (asking → answered), reported back (report_back) only when she is up,\noutside your no-disturb hours and you are around; no answer for 48 h → 「問不到」" {class: step}
+ask: "a promise that needs another character (「幫你問某某」, loops.ask, 0.7.4):\nasked once at her free time (ask_other → relay; the mailbox keeps it if they are down, 0.7.5),\nanswered by that conversation's appraisal (asking → answered), reported back (report_back) only when she is up,\noutside your no-disturb hours and you are around; no answer for 48 h → 「問不到」" {class: step}
 forgot: "忘了 (0.7.5) — as it comes due she may forget it: P(remember) = 記性 (0.8 default) + 0.3 if important\n− 0.3 × how much worse than usual her mood is; a due item the platform could not deliver\nbacks off 5/15/60 min then hourly and after 6 h is 忘了 too. She does not see it; she owns it when you bring it up" {class: gate}
 
 urge: "urge λ = W × O × p̂_reply × D × 1[gates]; P(fire) = 1 − exp(−λ·Δt)" {

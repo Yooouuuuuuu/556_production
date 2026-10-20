@@ -49,10 +49,10 @@ strictly sorted.
 - The simple path writes the same files as the skill with band sentences and three boxes; the size check does not
   apply to it (flatter and shorter is the stated cost). A hand-written SOUL is never overwritten by either path.
 - The fidelity probe compares SOUL texts against a gold file written from what the character is, not against
-  each other, with a quiet state block and no engine, so a swap decision rests on the text. 西's candidate
-  (`characters/xi_v2`, drafted from her files, gemini) is measured against her hand-written SOUL; the cast stays
+  each other, with a quiet state block and no engine, so a swap decision rests on the text. The main character's
+  skill-made candidate (drafted from her files, gemini) is measured against her hand-written SOUL; the cast stays
   as it is until the user approves the diff. First run (gemini as her and as the judge, 2026-10-19 10:47): both SOULs
-  score 0.96 — recognition 7/8 (each once mistaken for 子晴), 像她會說 20/20, takes 10/10. A tie at the ceiling says
+  score 0.96 — recognition 7/8 (each once mistaken for the second character), 像她會說 20/20, takes 10/10. A tie at the ceiling says
   the candidate holds her and that this gold is too easy to separate them: the next gold needs harder lines (hers
   against a near miss, not against 客服話) and more prompts. The swap stays the user's call on the text diff.
 
@@ -82,7 +82,7 @@ strictly sorted.
 - Not here: the hidden scratch (§2.6), keyword triggers, the blind questionnaire.
 
 ## Decided (2026-10-19) — no tools at baseline; the avatar parked [prompt] [structure] [app]
-- Option C from `prompt/around-the-soul.md` §2, after the 真音 test: every character's `platform_toolsets` lists are empty
+- Option C from `prompt/around-the-soul.md` §2, after the test on the test character: every character's `platform_toolsets` lists are empty
   at baseline (556d removes `memory` from them before a start; `new-companion.ps1` writes empty lists). Memory is
   injected every turn by kokoro's prompt section and the Memory block and is not a tool; the two kokoro tools were
   never called in 79 turns, and without tools the three tool-only guidance blocks and the shim's preamble never appear.
@@ -104,13 +104,13 @@ strictly sorted.
   (long-term)`, `Notes (recent, dated)`) stay English: they are the pinned library's, explained in zh-TW.
 - The clock is the first line under 【她現在】, from the engine's own zone; the block's cap counts state lines, the
   clock is extra. `HERMES_TIMEZONE` comes from `556d.toml` (default Asia/Taipei) so Hermes's date line agrees.
-- Live check on a second daemon (new binary, spare ports, 真音): a resumed session keeps the tool list and the
-  prompt pieces it was born with — 真音's 2026-10-03 session still offered seventeen tools and the switched-off
+- Live check on a second daemon (new binary, spare ports, the test character): a resumed session keeps the tool list and the
+  prompt pieces it was born with — the test character's 2026-10-03 session still offered seventeen tools and the switched-off
   guidance; on a fresh session the config switches took and `[memory]` gave exactly the two kokoro tools. So the
   config half applies to new sessions, and the shim half is what protects the cast's endless sessions. Hermes's
   own date line came out wrong (Monday for 2026-10-13, a Tuesday), so the whole date paragraph is dropped now
   rather than after a week; the clock line carries date, weekday and time.
-- The 真音 tools test passed: with `platform_toolsets: []` she answers with zero tools and no preamble; with
+- The tools test on the test character passed: with `platform_toolsets: []` she answers with zero tools and no preamble; with
   `[web]` she gets `web_search` / `web_extract` under the reworded preamble and really searches. Option C is
   viable; switching the baseline is the user's call.
 - Not done here: the tools-at-baseline switch itself, Hermes's memory-context note (kept), the cast's relative
@@ -135,9 +135,9 @@ strictly sorted.
 - The slider-only path (§2.10) is the backup for people who will not write ten sections: the same outputs from
   sliders, choices and three short boxes, with template sentences, no LLM; the two paths compose. Built with the app
   button (0.8.1), not before.
-- The cast is untouched. The schema is tried on a new disposable character (阿凜, `templates/character/example`) on
+- The cast is untouched. The schema is tried on a new disposable character (an example description, `templates/character/example`) on
   both lanes, gemini flash and claude sonnet, with the same description, so the gap between the two can be seen before
-  a lane is chosen for the button. 西, 子晴 and 子睿 move only when a generated character beats them on the fidelity probe.
+  a lane is chosen for the button. The cast moves only when a generated character beats them on the fidelity probe.
 - Version order set by the user: 0.8.0 the skill, 0.8.1 the create-character button wired to it, everything else in
   `prompt.md` §3 after that.
 
@@ -219,7 +219,7 @@ strictly sorted.
   agrees is her SOUL and the relationship state she sees, not a numeric affection gate.
 - A promise that concerns only her and the other person (a wake-up call, 「等我一下」) is forced through every gate at
   its time, like a reminder you asked for. The 00:54 case showed the other kind: a promise that needs another
-  character (「幫你問子睿」) is carried to that character at her free time through the relay, answered by that
+  character (「幫你問某某」) is carried to that character at her free time through the relay, answered by that
   conversation's appraisal, and reported back only when she is up, outside your no-disturb hours and when your
   presence model says you are around. No answer → retry at the next free slot, give up after `ask_retry_max`.
 - The narrator cue behind a proactive turn is never the user's words: 556d tags it, the app hides it by default and
@@ -546,9 +546,8 @@ Design: `inner-life/inner-life.md` (its §0 lists every decision applied).
   channel-binding job that comes next. The sample Live2D model (Hiyori) stays for now. First job with
   her: channel connections (Telegram, Discord) in **pure text**; voice over channels is future work.
   Name: "Kokoro" was considered and dropped the same day because the memory provider plugin is
-  `kokoro` (her heart) and the user wants that name to stay. **Her name: 真音（まね, Mane）** —
-  decided 2026-10-02: マネ is what idols call their manager, hidden in a real name meaning "true
-  sound"; reads naturally in 繁中 (真音). Her name lands in: `SOUL.md` (fresh draft), settings
-  `companion_name`, `home/memory/mane.db`, the account handles (e.g. `@mane_556_bot`).
+  `kokoro` (her heart) and the user wants that name to stay. **Her name** — decided 2026-10-02 (the test
+  character's; chosen to fit the manager framing and read naturally in 繁中). Her name lands in: `SOUL.md`
+  (fresh draft), settings `companion_name`, `home/memory/<id>.db`, the account handles (e.g. `@<id>_556_bot`).
 - **MCP / channel list** — later; QQ excluded.
 - **Whether the Wardrobe schema is adopted** — it's one candidate, not presumed.

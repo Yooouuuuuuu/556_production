@@ -1,5 +1,5 @@
 """The fidelity probe's scoring with a scripted model (no proxy); the live comparison runs by hand:
-    python tools/fidelity_probe.py --gold tests/fidelity/xi.json --soul characters/xi/SOUL.md --soul characters/xi_v2/SOUL.md
+    python tools/fidelity_probe.py --gold tests/fidelity/<id>.json --soul characters/<id>/SOUL.md --lineup a=…,b=…,c=… --target a
 """
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
-sys.path.insert(0, "D:/dev/KeepsakeDB")
+sys.path.insert(0, str(ROOT / "vendor" / "keepsakedb"))
 import fidelity_probe as fp  # noqa: E402
 
 
@@ -25,11 +25,11 @@ class Scripted:
     def complete(self, system, user):
         self.calls.append((system, user))
         if system.startswith("你是盲測的評審"):
-            # the lineup is shuffled: find the letter whose SOUL is 西's
+            # the lineup is shuffled: find the letter whose SOUL is the target's
             for block in user.split("=== 角色 ")[1:]:
                 letter, body = block[0], block.split("===", 1)[1]
-                if body.lstrip().startswith("# 西"):
-                    return json.dumps({"who": letter, "why": "像西"})
+                if body.lstrip().startswith("# 角色甲"):
+                    return json.dumps({"who": letter, "why": "像角色甲"})
             return json.dumps({"who": "A", "why": "?"})
         if "像不像你會說的話" in system:
             lines = [ln.split(". ", 1)[1] if ". " in ln else ln for ln in user.splitlines()]
@@ -41,29 +41,38 @@ class Scripted:
         return "還沒啦，我這兩天都在對採購的單子。"
 
 
+def gold_fixture():
+    """A synthetic gold: eight prompts, ten lines she would say, ten she would not, ten takes — no real character."""
+    return {"name": "角色甲", "term": "你", "note": "synthetic",
+            "prompts": [f"話題{i}" for i in range(8)],
+            "would_say": [f"會說的第{i}句" for i in range(10)],
+            "would_not_say": [f"不會說的第{i}句" for i in range(10)],
+            "takes": [{"topic": f"題目{i}", "hers": f"看法甲{i}", "not": f"看法乙{i}"} for i in range(10)]}
+
+
 def test_probe_scores_a_soul_against_the_gold():
-    gold = json.loads((ROOT / "tests" / "fidelity" / "xi.json").read_text(encoding="utf-8"))
+    gold = gold_fixture()
     assert len(gold["would_say"]) == 10 and len(gold["would_not_say"]) == 10 and len(gold["takes"]) == 10 and len(gold["prompts"]) == 8
-    lineup = {"xi": "# 西\n\n你是西，三十歲。", "ziqing": "# 子晴\n\n你是二十五歲的子晴。", "zirui": "# 子睿\n\n你是子睿，二十五歲。"}
+    lineup = {"a": "# 角色甲\n\n你是角色甲，三十歲。", "b": "# 角色乙\n\n你是二十五歲的角色乙。", "c": "# 角色丙\n\n你是角色丙，二十五歲。"}
     llm = Scripted(gold)
-    r = fp.probe(llm, llm, soul=lineup["xi"], people="# 你\n- 子晴的哥哥", gold=gold, lineup=lineup, target="xi", seed=3)
+    r = fp.probe(llm, llm, soul=lineup["a"], people="# 你\n- 角色甲的朋友", gold=gold, lineup=lineup, target="a", seed=3)
     assert r["recognition"]["score"] == 1.0 and len(r["recognition"]["rows"]) == 8
     assert r["voice"]["score"] == 1.0 and len(r["voice"]["rows"]) == 20
     assert r["takes"]["score"] == 1.0 and len(r["takes"]["rows"]) == 10
     assert r["total"] == 1.0
-    md = fp.report({"a": r}, "tests/fidelity/xi.json", "scripted", "scripted")
+    md = fp.report({"a": r}, "tests/fidelity/a.json", "scripted", "scripted")
     assert "| a |" in md and "認得出來" in md
 
 
 def test_a_model_that_does_not_know_her_scores_low():
-    gold = json.loads((ROOT / "tests" / "fidelity" / "xi.json").read_text(encoding="utf-8"))
+    gold = gold_fixture()
     wrong = {**gold, "would_say": gold["would_not_say"], "takes": [{**it, "hers": it["not"], "not": it["hers"]} for it in gold["takes"]]}
-    lineup = {"xi": "# 西\n\n你是西。", "ziqing": "# 子晴\n\n你是子晴。", "zirui": "# 子睿\n\n你是子睿。"}
+    lineup = {"a": "# 角色甲\n\n你是角色甲。", "b": "# 角色乙\n\n你是角色乙。", "c": "# 角色丙\n\n你是角色丙。"}
     llm = Scripted(wrong)
-    r = fp.probe(llm, llm, soul=lineup["xi"], people="", gold=gold, lineup=lineup, target="xi", seed=3)
+    r = fp.probe(llm, llm, soul=lineup["a"], people="", gold=gold, lineup=lineup, target="a", seed=3)
     assert r["voice"]["score"] == 0.0 and r["takes"]["score"] == 0.0
 
 
 def test_reply_system_carries_the_person_file_and_a_quiet_block():
-    s = fp.reply_system("# 西\n你是西。", "# 你\n- 子晴的哥哥", "子晴的哥哥")
-    assert s.startswith("# 西") and "現在跟你說話的是子晴的哥哥" in s and "【她現在】" in s and "心情：整體平靜" in s
+    s = fp.reply_system("# 角色甲\n你是角色甲。", "# 你\n- 角色甲的朋友", "角色甲的朋友")
+    assert s.startswith("# 角色甲") and "現在跟你說話的是角色甲的朋友" in s and "【她現在】" in s and "心情：整體平靜" in s

@@ -69,7 +69,7 @@ daemon: "556d (Go, :55600) — hub around her, never inside, never a chat partic
   embedder: "embedder — llama-server on the port in models.json, started by 556d only when the vectors are local; else an embeddings endpoint"
 }
 
-mane: "a character — ONE process: hermes gateway run (HERMES_HOME = home/profiles/<id>)" {
+chara: "a character — ONE process: hermes gateway run (HERMES_HOME = home/profiles/<id>)" {
   api: "API server platform\n/v1/chat/completions · /api/sessions"
   tg: "Telegram adapter — her own bot"
   dc: "Discord adapter (later)" {class: proposed}
@@ -95,33 +95,33 @@ pkg.out -> daemon.prep: "copied before every start"
 daemon.conn -> daemon.prep
 daemon.conn -> daemon.shim: "the 對話 endpoint + key"
 daemon.conn -> daemon.embedder: "exe · GGUF · port (kind llama)"
-daemon.prep -> mane.cfg: "SOUL.md · psyche.json · people/ · config.yaml · kokoro.json"
+daemon.prep -> chara.cfg: "SOUL.md · psyche.json · people/ · config.yaml · kokoro.json"
 daemon.prep -> daemon.mgr: "complete → spawn; missing → the start is refused"
-daemon.hub -> mane.api: "one non-stream request per turn\nX-Hermes-Session-Id = her conversation"
-telegram -> mane.tg: "polling"
-mane.api -> mane.agent
-mane.tg -> mane.agent
-mane.dc -> mane.agent {class: proposed}
-mane.mcp -> mane.agent {class: proposed}
-mane.agent -> mane.state: "load history · append the turn"
-mane.agent -> mane.kokoro: "prefetch · sync_turn"
-mane.kokoro -> mane.store: "search · observe"
-mane.kokoro -> daemon.embedder: "embeddings"
-mane.agent -> mane.psyche: "after the reply: appraisal A (parallel to observe)"
-mane.psyche -> mane.psydb: "events · appraisals · snapshots"
-mane.psyche -> mane.agent: "prefetch: 【她現在】 state block, never waits"
-mane.psyche -> mane.api: "event turn (X-556-Event) into her one conversation (0.6.0)"
-mane.agent -> daemon.shim: "chat completions (reply · observe · A)"
+daemon.hub -> chara.api: "one non-stream request per turn\nX-Hermes-Session-Id = her conversation"
+telegram -> chara.tg: "polling"
+chara.api -> chara.agent
+chara.tg -> chara.agent
+chara.dc -> chara.agent {class: proposed}
+chara.mcp -> chara.agent {class: proposed}
+chara.agent -> chara.state: "load history · append the turn"
+chara.agent -> chara.kokoro: "prefetch · sync_turn"
+chara.kokoro -> chara.store: "search · observe"
+chara.kokoro -> daemon.embedder: "embeddings"
+chara.agent -> chara.psyche: "after the reply: appraisal A (parallel to observe)"
+chara.psyche -> chara.psydb: "events · appraisals · snapshots"
+chara.psyche -> chara.agent: "prefetch: 【她現在】 state block, never waits"
+chara.psyche -> chara.api: "event turn (X-556-Event) into her one conversation (0.6.0)"
+chara.agent -> daemon.shim: "chat completions (reply · observe · A)"
 daemon.shim -> llm
 daemon.embedder -> llm: "when the vectors come from an endpoint" {style.stroke-dash: 3}
-daemon.transcript -> mane.state: "read-only: history, live tail;\nat start: open + stamp her one session if none is live"
+daemon.transcript -> chara.state: "read-only: history, live tail;\nat start: open + stamp her one session if none is live"
 daemon.follower -> daemon.hub: "Telegram turns and event turns as chat events (badge)"
 daemon.mirror -> telegram: "sendMessage"
-daemon.memapi -> mane.store: "read-only + delete commands"
-daemon.psyapi -> mane.psydb: "read-only"
-daemon.tools -> mane.cfg: "platform_toolsets (extensions only)"
+daemon.memapi -> chara.store: "read-only + delete commands"
+daemon.psyapi -> chara.psydb: "read-only"
+daemon.tools -> chara.cfg: "platform_toolsets (extensions only)"
 daemon.psyapi -> pkg.out: "主動 sliders write the package's psyche.json too"
 daemon.mgr -> daemon.sup: "spawn · planned stop"
-daemon.sup -> mane: "process"
-daemon.relay -> mane.api: "the other character's words, as a user turn in her session with them"
-mane.psyche -> daemon.relay: "her event turn for another character (POST /api/relay)"
+daemon.sup -> chara: "process"
+daemon.relay -> chara.api: "the other character's words, as a user turn in her session with them"
+chara.psyche -> daemon.relay: "her event turn for another character (POST /api/relay)"

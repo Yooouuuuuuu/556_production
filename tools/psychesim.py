@@ -34,7 +34,7 @@ class Clock:
         return self.t
 
 
-def engine(tmp, name, clock, cfg, char="mane"):
+def engine(tmp, name, clock, cfg, char="test"):
     e = Engine(Path(tmp), char, cfg, db_path=Path(tmp) / f"{name}.db", now_fn=clock, llm=None)
     e.owner = True
     e.load()
@@ -125,7 +125,7 @@ def cmd_replay(cfg, t0):
         e.on_turn("早安", "早。", turn_id="b", platform="api_server", session_id="s")
         run(e, clock, 18)
         live = e.status()
-        e2 = Engine(Path(tmp), "mane", cfg, db_path=Path(tmp) / "r.db", now_fn=clock, llm=None)
+        e2 = Engine(Path(tmp), "test", cfg, db_path=Path(tmp) / "r.db", now_fn=clock, llm=None)
         e2.owner = True
         e2.load()
         rep = e2.status()

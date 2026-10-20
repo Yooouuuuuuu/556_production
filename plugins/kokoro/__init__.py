@@ -66,7 +66,7 @@ class KokoroMemoryProvider(MemoryProvider):
         try:
             import keepsakedb  # noqa: F401
         except Exception:
-            return "keepsakedb is not installed in the Hermes venv (uv pip install -e D:/dev/KeepsakeDB)"
+            return "keepsakedb is not installed in the Hermes venv (setup-vendor.ps1 installs vendor/keepsakedb)"
         return f"{_CONFIG_NAME} missing in HERMES_HOME"
 
     # -- lifecycle -----------------------------------------------------------

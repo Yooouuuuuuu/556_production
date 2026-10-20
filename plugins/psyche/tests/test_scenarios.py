@@ -27,7 +27,7 @@ def cfg(**over):
 
 
 def make(tmp_path, name, clock, c=None):
-    e = Engine(tmp_path, "mane", c or cfg(), db_path=tmp_path / f"{name}.db", now_fn=clock, llm=None)
+    e = Engine(tmp_path, "test", c or cfg(), db_path=tmp_path / f"{name}.db", now_fn=clock, llm=None)
     e.owner = True
     e.load()
     e.live = True  # urges are decided live only (nothing is sent: no worker consumes the queue)
@@ -208,8 +208,8 @@ def _fired(e, kind):
 def test_promise_needs_agreement(tmp_path):
     clock = Clock(T0)
     e = make(tmp_path, "agree", clock)
-    e.record_appraisal({"events": [], "loops": {"new": [{"what": "幫製作人問子睿", "origin": "her_promise", "cue_time": None, "importance": 0.8,
-                                                           "agreed": False, "ask": ["zirui"]}], "closed": []}, "farewell": False},
+    e.record_appraisal({"events": [], "loops": {"new": [{"what": "幫製作人問角色丙", "origin": "her_promise", "cue_time": None, "importance": 0.8,
+                                                           "agreed": False, "ask": ["c"]}], "closed": []}, "farewell": False},
                        turn_id="t1", counterpart="製作人", platform="api_server")
     assert e.loops == {}                      # she did not commit: nothing to come back to
     e.record_appraisal({"events": [], "loops": {"new": [{"what": "明早八點提醒製作人", "origin": "counterpart_said", "cue_time": None,
@@ -228,25 +228,25 @@ def test_promise_to_you_is_forced_even_at_night(tmp_path):
 
 def test_promise_through_another_character(tmp_path):
     clock = Clock(T0)                         # Monday 20:00, awake, free
-    c = cfg(relationships={"zirui": {}})
+    c = cfg(relationships={"c": {}})
     e = make(tmp_path, "ask", clock, c)
-    lid = _promise(e, "幫製作人問子睿有沒有對象", ["zirui"])
-    assert e.loops[lid]["ask"] == ["zirui"] and "zirui" in e.others
+    lid = _promise(e, "幫製作人問角色丙有沒有對象", ["c"])
+    assert e.loops[lid]["ask"] == ["c"] and "c" in e.others
     run(e, clock, 0.6)                        # the cue time (30 min) passes: she goes to ask, never speaks to you
     assert _fired(e, "return_promise") == [] and _fired(e, "report_back") == []
     asks = _fired(e, "ask_other")
-    assert len(asks) == 1 and asks[0][1] == "zirui"
-    assert e.loops[lid]["state"] == "asking" and e.loops[lid]["asking"] == "zirui" and e.loops[lid]["tries"] == 0
-    assert "替製作人問的" in e.state_block(counterpart="zirui") and "已去問zirui" in e.state_block()
-    # her question went out; 子睿 answers, and the appraisal of THAT conversation closes the loop with the answer
-    e.on_event_reply("【事件】…", "弟，你現在有對象嗎？", platform="api_server", counterpart="zirui")
+    assert len(asks) == 1 and asks[0][1] == "c"
+    assert e.loops[lid]["state"] == "asking" and e.loops[lid]["asking"] == "c" and e.loops[lid]["tries"] == 0
+    assert "替製作人問的" in e.state_block(counterpart="c") and "已去問c" in e.state_block()
+    # her question went out; 角色丙 answers, and the appraisal of THAT conversation closes the loop with the answer
+    e.on_event_reply("【事件】…", "你現在有對象嗎？", platform="api_server", counterpart="c")
     assert e.loops[lid]["tries"] == 1               # it went out (556d keeps it if he is down)
-    e.record_appraisal({"events": [{"event_kind": "loop_resolved", "cause": "子睿說他目前單身", "v": 0.2, "R": 0.5, "u": 0.1, "cert": 1.0,
+    e.record_appraisal({"events": [{"event_kind": "loop_resolved", "cause": "角色丙說他目前單身", "v": 0.2, "R": 0.5, "u": 0.1, "cert": 1.0,
                                     "agent": "other", "intent": 0.5, "devalue": 0.0, "ambiguity": 0.0, "other_focus": 0.5, "other_v": 0.0,
                                     "appeal": 0.0, "q": 0.5, "loop_id": lid}],
-                        "loops": {"new": [], "closed": [lid]}, "farewell": False}, turn_id="t9", counterpart="zirui", platform="api_server")
-    assert e.loops[lid]["state"] == "answered" and e.loops[lid]["answer"] == "子睿說他目前單身"
-    assert "問到了：子睿說他目前單身" in e.state_block()
+                        "loops": {"new": [], "closed": [lid]}, "farewell": False}, turn_id="t9", counterpart="c", platform="api_server")
+    assert e.loops[lid]["state"] == "answered" and e.loops[lid]["answer"] == "角色丙說他目前單身"
+    assert "問到了：角色丙說他目前單身" in e.state_block()
     # the report waits for a decent hour: it is 20:40, allowed; it fires at once and is one of her messages to you
     run(e, clock, 0.1)
     reps = _fired(e, "report_back")
@@ -256,12 +256,12 @@ def test_promise_through_another_character(tmp_path):
 
 def test_ask_once_then_wait_then_give_up_in_the_morning(tmp_path):
     clock = Clock(T0 + 2.5 * 3600)            # 22:30
-    c = cfg(relationships={"zirui": {}}, proactive={"ask_give_up_h": 20.0})
+    c = cfg(relationships={"c": {}}, proactive={"ask_give_up_h": 20.0})
     e = make(tmp_path, "giveup", clock, c)
-    lid = _promise(e, "幫製作人問子睿週末有沒有空", ["zirui"])
-    run(e, clock, 0.6)                        # asked once; 556d keeps the message if 子睿 is down, so she only waits
+    lid = _promise(e, "幫製作人問角色丙週末有沒有空", ["c"])
+    run(e, clock, 0.6)                        # asked once; 556d keeps the message if 角色丙 is down, so she only waits
     assert len(_fired(e, "ask_other")) == 1 and e.loops[lid]["state"] == "asking"
-    e.on_event_reply("【事件】…", "弟，你週末有空嗎？", platform="api_server", counterpart="zirui")
+    e.on_event_reply("【事件】…", "你週末有空嗎？", platform="api_server", counterpart="c")
     assert e.loops[lid]["tries"] == 1
     run(e, clock, 30)                         # no answer for 20 h: she gives up, and tells you in the morning, once
     assert len(_fired(e, "ask_other")) == 1
@@ -380,7 +380,7 @@ def _slight(e, turn_id, cp="製作人", v=-0.6, R=0.7, intent=0.8):
 def test_hurt_ledger_holds_memory_then_releases_as_old_account(tmp_path):
     clock = Clock(T0)
     mem = _memory_db(tmp_path, "t1")
-    e = Engine(tmp_path, "mane", cfg(character={"forgets": False}), db_path=tmp_path / "led.db", now_fn=clock, llm=None, memory_db=mem)
+    e = Engine(tmp_path, "test", cfg(character={"forgets": False}), db_path=tmp_path / "led.db", now_fn=clock, llm=None, memory_db=mem)
     e.owner = True
     e.load()
     e.live = True
@@ -409,7 +409,7 @@ def test_hurt_ledger_holds_memory_then_releases_as_old_account(tmp_path):
 def test_hurt_ledger_repaired_comes_back_plain_and_small_slights_never_open(tmp_path):
     clock = Clock(T0)
     mem = _memory_db(tmp_path, "t1")
-    e = Engine(tmp_path, "mane", cfg(character={"forgets": False}), db_path=tmp_path / "rep.db", now_fn=clock, llm=None, memory_db=mem)
+    e = Engine(tmp_path, "test", cfg(character={"forgets": False}), db_path=tmp_path / "rep.db", now_fn=clock, llm=None, memory_db=mem)
     e.owner = True
     e.load()
     e.live = True
@@ -463,7 +463,7 @@ def test_replay_and_fast_forward_with_a_life(tmp_path):
     run(e, clock, 6)
     live = rounded(e.status())
     live["fires"] = fires(e)
-    e2 = Engine(tmp_path, "mane", cfg(), db_path=tmp_path / "life.db", now_fn=clock, llm=None)
+    e2 = Engine(tmp_path, "test", cfg(), db_path=tmp_path / "life.db", now_fn=clock, llm=None)
     e2.owner = True
     e2.load()                                # snapshot + replay of turns / events at their ticks
     r2 = rounded(e2.status())

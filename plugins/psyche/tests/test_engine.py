@@ -24,7 +24,7 @@ def cfg():
 
 
 def make(tmp_path, name, clock):
-    e = Engine(tmp_path, "mane", cfg(), db_path=tmp_path / f"{name}.db", now_fn=clock, llm=None)
+    e = Engine(tmp_path, "test", cfg(), db_path=tmp_path / f"{name}.db", now_fn=clock, llm=None)
     e.owner = True
     e.load()
     return e
@@ -59,7 +59,7 @@ def test_replay_rebuilds_the_same_state(tmp_path):
     e.step_to(clock.t)
     live = rounded(e.status())
     assert any(i[1] == "disappointment" for i in live["instances"])
-    e2 = Engine(tmp_path, "mane", cfg(), db_path=tmp_path / "a.db", now_fn=clock, llm=None)  # a restart: snapshot + replay
+    e2 = Engine(tmp_path, "test", cfg(), db_path=tmp_path / "a.db", now_fn=clock, llm=None)  # a restart: snapshot + replay
     e2.owner = True
     e2.load()
     assert rounded(e2.status()) == live
@@ -148,7 +148,7 @@ def test_second_process_is_read_only(tmp_path):
     clock = Clock(T0)
     e = make(tmp_path, "o", clock)
     assert e.acquire_owner(111)
-    other = Engine(tmp_path, "mane", cfg(), db_path=tmp_path / "o.db", now_fn=clock, llm=None)
+    other = Engine(tmp_path, "test", cfg(), db_path=tmp_path / "o.db", now_fn=clock, llm=None)
     assert not other.acquire_owner(222)
     clock.t = T0 + 60
     assert other.acquire_owner(222)  # the heartbeat went stale: ownership moves

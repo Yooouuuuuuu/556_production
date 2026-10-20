@@ -204,15 +204,15 @@ def test_the_register_keeps_six_per_counterpart(tmp_path):
     e = make(tmp_path, "cap", clock)
     yours = ["其實很在意他說的話", "想說自己最近很累", "上次的事還沒道歉", "想問他週末有沒有空", "覺得他最近變了", "其實不喜歡那家店",
              "想告訴他媽媽的事", "對工作的事很煩"]
-    hers = ["想跟子晴說考試的事", "欠子晴一句謝謝", "子晴借的書還沒還"]
+    hers = ["想跟角色甲說考試的事", "欠角色甲一句謝謝", "角色甲借的書還沒還"]
     for i, what in enumerate(yours):
         e.record_appraisal({"events": [], "loops": {"new": [], "closed": []}, "withheld": {"new": [{"what": what, "importance": 0.5 + i * 0.05}], "said": []},
                             "farewell": False}, turn_id=f"a{i}", counterpart=MAIN, platform="api_server")
     for i, what in enumerate(hers):
         e.record_appraisal({"events": [], "loops": {"new": [], "closed": []}, "withheld": {"new": [{"what": what, "importance": 0.9}], "said": []},
-                            "farewell": False}, turn_id=f"b{i}", counterpart="ziqing", platform="api_server")
+                            "farewell": False}, turn_id=f"b{i}", counterpart="b", platform="api_server")
     assert sum(1 for w in e.withheld if w["counterpart"] == MAIN) == 6      # six per counterpart …
-    assert sum(1 for w in e.withheld if w["counterpart"] == "ziqing") == 3  # … not six in all
+    assert sum(1 for w in e.withheld if w["counterpart"] == "b") == 3  # … not six in all
     assert "其實很在意他說的話" not in [w["what"] for w in e.withheld]       # the lightest two of yours fell off
 
 

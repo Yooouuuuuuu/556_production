@@ -36,7 +36,7 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
   const [profile, setProfile] = useState<CharProfile | null>(null);
   const [notice, setNotice] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({ id: '', display_name: '', pronoun: '她', from_example: false });
+  const [form, setForm] = useState({ id: '', display_name: '', pronoun: '她' });
   const [thenRest, setThenRest] = useState(false); // 「全部」: after a clean intake, continue from structure
   const logRef = useRef<HTMLPreElement>(null);
 
@@ -71,10 +71,10 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
   async function create() {
     setBusy(true); setNotice(null);
     try {
-      const r = await chars.create({ id: form.id.trim(), display_name: form.display_name.trim(), pronoun: form.pronoun, from_example: form.from_example });
+      const r = await chars.create({ id: form.id.trim(), display_name: form.display_name.trim(), pronoun: form.pronoun });
       await refreshList();
       setId(r.character.id);
-      setForm({ id: '', display_name: '', pronoun: '她', from_example: false });
+      setForm({ id: '', display_name: '', pronoun: '她' });
     } catch (e) { setNotice({ kind: 'err', text: String(e) }); } finally { setBusy(false); }
   }
   async function saveDescribe() {
@@ -160,10 +160,9 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
           <summary className="cursor-pointer text-sm">{t('newchar.create')}</summary>
           <div className="grid grid-cols-2 gap-3 mt-3">
             <div><label className={label}>{t('newchar.id')}</label><input className={field} value={form.id} placeholder="lin" onChange={(e) => setForm({ ...form, id: e.target.value.toLowerCase() })} /></div>
-            <div><label className={label}>{t('newchar.display')}</label><input className={field} value={form.display_name} placeholder="阿凜" onChange={(e) => setForm({ ...form, display_name: e.target.value })} /></div>
+            <div><label className={label}>{t('newchar.display')}</label><input className={field} value={form.display_name} placeholder={t("newchar.display")} onChange={(e) => setForm({ ...form, display_name: e.target.value })} /></div>
             <div><label className={label}>{t('newchar.pronoun')}</label>
               <select className={field} value={form.pronoun} onChange={(e) => setForm({ ...form, pronoun: e.target.value })}><option value="她">她</option><option value="他">他</option></select></div>
-            <label className="flex items-center gap-2 text-sm mt-5"><input type="checkbox" checked={form.from_example} onChange={(e) => setForm({ ...form, from_example: e.target.checked })} />{t('newchar.from_example')}</label>
           </div>
           <button className={`${primary} mt-3`} disabled={busy || !form.id.trim() || !form.display_name.trim()} onClick={create}>{t('newchar.create_go')}</button>
         </details>

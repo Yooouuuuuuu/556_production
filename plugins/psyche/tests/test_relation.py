@@ -28,9 +28,9 @@ def cfg(**over):
 FRIENDS = {MAIN: {"bond": 0.5, "hours": 60, "warmth": 0.4}}  # the hurt scenarios happen between people who know each other
 
 
-def make(tmp_path, name, clock, c=None, char="mane"):
+def make(tmp_path, name, clock, c=None, char="test"):
     e = Engine(tmp_path, char, c or cfg(), db_path=tmp_path / f"{name}.db", now_fn=clock, llm=None,
-               names_fn=lambda p: {"sayo": "小夜", "chihiro": "千尋", "yuma": "悠真"}.get(p, p))
+               names_fn=lambda p: {"b": "角色乙", "c": "角色丙", "d": "角色丁"}.get(p, p))
     e.owner = True
     e.load()
     e.live = True
@@ -159,11 +159,11 @@ def test_tsundere_sweep_changes_the_strategy(tmp_path):
 
 
 def test_three_characters_a_month(tmp_path):
-    """A (mane) talks to you daily and to chihiro weekly; the couple prior (chihiro ↔ yuma) is high. After a
-    month her attachment to you has grown from zero, her bond with chihiro moved a little, and nothing about
+    """A (test) talks to you daily and to c weekly; the couple prior (c ↔ d) is high. After a
+    month her attachment to you has grown from zero, her bond with c moved a little, and nothing about
     the couple leaked into her state (she only has her own relationships)."""
     c = cfg()
-    c["relationships"] = {"chihiro": {"bond": 0.4, "hours": 60, "trust_alpha": 4, "trust_beta": 1, "attachment_strength": 0.3}}
+    c["relationships"] = {"c": {"bond": 0.4, "hours": 60, "trust_alpha": 4, "trust_beta": 1, "attachment_strength": 0.3}}
     clock = Clock(T0)
     e = make(tmp_path, "trio", clock, c)
     for day in range(30):
@@ -173,17 +173,17 @@ def test_three_characters_a_month(tmp_path):
             appraise(e, clock, ev("asked_about_her", q=0.6, ppr={"understood": 0.7, "validated": 0.7, "cared": 0.7}, she_disclosed=True))
         if day % 7 == 3:
             clock.t += 600
-            e.on_turn("千尋：最近錄音順嗎？", "嗯，還行。", turn_id=f"c{day}", platform="api_server", session_id="s_chihiro", counterpart="chihiro")
-            appraise(e, clock, ev("asked_about_her", q=0.7, ppr={"understood": 0.8, "validated": 0.7, "cared": 0.8}, she_disclosed=True), cp="chihiro")
+            e.on_turn("角色丙：最近順嗎？", "嗯，還行。", turn_id=f"c{day}", platform="api_server", session_id="s_c", counterpart="c")
+            appraise(e, clock, ev("asked_about_her", q=0.7, ppr={"understood": 0.8, "validated": 0.7, "cared": 0.8}, she_disclosed=True), cp="c")
         run(e, clock, 23)
-    you, chi = e._rel(MAIN), e._rel("chihiro")
+    you, chi = e._rel(MAIN), e._rel("c")
     assert you["attachment"] > 0.03 and you["hours"] > 5
     assert chi["bond"] >= 0.35 and chi["attachment"] >= 0.3
-    assert "chihiro" in e.others and e.others["chihiro"]["contact"]["last_turn_at"] is not None
-    b = e.state_block(counterpart="chihiro")
-    assert "對千尋：" in b
+    assert "c" in e.others and e.others["c"]["contact"]["last_turn_at"] is not None
+    b = e.state_block(counterpart="c")
+    assert "對角色丙：" in b
     st = e.status()
-    assert set(st["rel"]) >= {MAIN, "chihiro"}
+    assert set(st["rel"]) >= {MAIN, "c"}
 
 
 def test_feedback_calibrates_the_gain(tmp_path):

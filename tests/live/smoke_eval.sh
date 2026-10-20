@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Live smoke (foreground, self-terminating; 556d must NOT be running). 0.5.0 eval set: the LLM eval set on a fresh throwaway character (foreground, self-terminating).
 set -u
-R=/d/dev/556_production
+R=$(cd "$(dirname "$0")/../.." && pwd)
 S="$R/tests/live/out"; mkdir -p "$S"
 D=http://127.0.0.1:55600
-PY=/d/dev/556_production/vendor/hermes-agent/.venv/Scripts/python.exe
-H=/d/dev/556_production/vendor/hermes-agent/.venv/Scripts/hermes.exe
+PY=$R/vendor/hermes-agent/.venv/Scripts/python.exe
+H=$R/vendor/hermes-agent/.venv/Scripts/hermes.exe
 P=$R/home/profiles/probe
-PW=D:/dev/556_production/home/profiles/probe
+PW="$(cd "$R" && pwd -W)/home/profiles/probe"
 LOG="$S/556d.smoke12.log"
 cd "$R"
 # never beside the app: the daemon owns :55600 and the app connects to whatever listens there
