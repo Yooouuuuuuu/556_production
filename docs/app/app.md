@@ -79,6 +79,9 @@ What landed since:
 - **0.9.0** (2026-10-19): 設定 → 全域 → **模型連線** — master endpoint with 檢查 (lists the endpoint's models), 對話／記憶／寫靈魂
   follow it or carry their own, the vectors (local llama-server or an embeddings endpoint), the timezone; what is missing is
   listed and a character does not start until it is complete; the new-character page shows the configured model.
+- **0.10.2** (2026-10-28): no UI change beyond two fixes — the new-character page keeps typed description text (a phase
+  run saves unsaved boxes first; a reload after a job never wipes them), and the 設定 save no longer crashes on an empty
+  list. Under the hood a restart within 20 s no longer leaves the psyche engine read-only.
 - **0.10.1** (2026-10-20): no UI change beyond the new-character page losing the 從範例開始 option (the example package is
   gone; default characters are future work).
 - **0.10.0** (2026-10-19): no UI change beyond wording — the 能力 page says there are no tools at baseline, the

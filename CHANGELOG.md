@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.10.2 — 2026-10-28
+
+- **psyche: a restart within 20 s no longer runs read-only.** The engine's owner lock is a heartbeat row; a process that
+  started while the previous one's heartbeat was still fresh opened psyche.db read-only and stayed so for its whole
+  life — no state block updates, no appraisals — which the app's stop → start on a restart-required setting hits every
+  time. A clean stop now releases the lock at once, and an engine that started read-only asks for the lock every 2 s and
+  takes over in place when it frees (`test_clean_stop_releases_the_lock_and_a_waiting_engine_takes_over`).
+- **The package copy of psyche.json carries no machine value.** The 主動 sliders write the profile's psyche.json and the
+  package's; the package copy now drops `time.timezone_offset_h`, which 556d writes into the profile before every start
+  from 設定 → 模型連線 (`packageCopy`, tested).
+- **kokoro registers its prompt section once.** Hermes calls a memory provider's `register` twice (the plugin loader, then
+  the memory-provider loader); the second registration was refused with a warning in the gateway log. No behaviour change.
+- **Settings save no longer crashes the page.** `GET/PUT /api/connections` and the probe return empty lists, never null
+  (`missing`, `models`); the page guards both.
+- **State block: 在睡覺 once; the shim drops Hermes's plugin-section wrapper** (`## Plugin Context: …` heading and the
+  `<!-- hermes-plugin-section… -->` comments) from the system prompt like the other vendor text.
+- **New-character page keeps what you typed.** Running a phase saves unsaved description boxes first (what is typed is
+  what runs); a reload after a job never wipes text that was typed but not saved.
+
 ## 0.10.1 — 2026-10-20
 
 - **Housekeeping: nothing private in the repo.** Tracked files carry no character names, persona text, the user's own

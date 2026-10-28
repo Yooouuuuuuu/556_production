@@ -39,11 +39,16 @@ Active Hermes profile: a. This session reads and writes C:/x/home/profiles/a/. D
 
 你在聊天視窗裡說話：純文字，不用 markdown。
 
+<!-- hermes-plugin-sections:start -->
+## Plugin Context: kokoro.memory
+<!-- hermes-plugin-section-chars:339 -->
+
 記憶：每一回合會附上一段「Memory」。
 
 關於製作人：
 # 你
 - 名字：（尚未設定）
+<!-- hermes-plugin-sections:end -->
 
 Conversation started: Monday, October 13, 2026 (CST, UTC+08:00)
 Today's date (as of the last context rebuild): Thursday, October 16, 2026 — trust this over the start date for what day it is now; query tools for exact time.
@@ -55,7 +60,7 @@ func TestFilterSystemDropsVendorTextKeepsHers(t *testing.T) {
 	got := filterSystem(sampleSystem)
 	for _, gone := range []string{"Nous Research", "Finishing the job", "Parallel tool calls", "Mid-turn user steering",
 		"User home directory", "git-bash", "Python toolchain", "Active Hermes profile", "Model: auto/556", "Provider: custom", "Platform: api_server",
-		"Conversation started", "Today's date"} {
+		"Conversation started", "Today's date", "Plugin Context", "hermes-plugin-section"} {
 		if strings.Contains(got, gone) {
 			t.Errorf("still contains %q", gone)
 		}

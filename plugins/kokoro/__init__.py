@@ -413,11 +413,18 @@ class KokoroMemoryProvider(MemoryProvider):
         return []  # everything lives under HERMES_HOME (memory/, backups/, logs/)
 
 
+_SECTION_REGISTERED = False
+
+
 def register(ctx) -> None:
+    global _SECTION_REGISTERED
     provider = KokoroMemoryProvider()
     ctx.register_memory_provider(provider)
+    if _SECTION_REGISTERED:  # Hermes calls register twice (the plugin loader, then the memory-provider loader): one section
+        return
     try:  # the memory rule + 關於你 as a frozen prompt section (after the memory tier), no longer tied to the toolset gate
         ctx.register_system_prompt_section("kokoro.memory", provider.prompt_section, position="after_memory", max_chars=4000)
+        _SECTION_REGISTERED = True
     except Exception as exc:  # noqa: BLE001 — an older Hermes without sections: fall back to the provider block
         logger.warning("kokoro: prompt section not registered (%s); using system_prompt_block", exc)
         provider.system_prompt_block = lambda: (provider._memory_block_text() + provider._your_profile_block())  # type: ignore[method-assign]

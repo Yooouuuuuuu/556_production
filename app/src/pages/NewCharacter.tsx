@@ -39,12 +39,13 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
   const [form, setForm] = useState({ id: '', display_name: '', pronoun: '她' });
   const [thenRest, setThenRest] = useState(false); // 「全部」: after a clean intake, continue from structure
   const logRef = useRef<HTMLPreElement>(null);
+  const describeDirty = useRef(false); // typed but not saved: a reload (a job ending) must not wipe it
 
   const refreshList = () => chars.list().then((r) => { setList(r.characters); setTemplate(r.template); setModel(r.model || ''); }).catch((e) => setNotice({ kind: 'err', text: String(e) }));
-  const load = (cid: string) => chars.detail(cid).then((d) => { setDetail(d); setDescribe(d.describe); setProfile(d.profile); }).catch((e) => setNotice({ kind: 'err', text: String(e) }));
+  const load = (cid: string) => chars.detail(cid).then((d) => { setDetail(d); if (!describeDirty.current) setDescribe(d.describe); setProfile(d.profile); }).catch((e) => setNotice({ kind: 'err', text: String(e) }));
 
   useEffect(() => { refreshList(); }, []);
-  useEffect(() => { if (id) { setDetail(null); load(id); } }, [id]);
+  useEffect(() => { if (id) { setDetail(null); describeDirty.current = false; load(id); } }, [id]);
 
   // follow a running job: poll its log, reload the package when it ends
   const running = !!detail?.job?.running;
@@ -80,14 +81,16 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
   async function saveDescribe() {
     if (!id) return;
     setBusy(true); setNotice(null);
-    try { await chars.saveDescribe(id, describe); setNotice({ kind: 'ok', text: t('newchar.saved') }); await load(id); refreshList(); }
+    try { await chars.saveDescribe(id, describe); describeDirty.current = false; setNotice({ kind: 'ok', text: t('newchar.saved') }); await load(id); refreshList(); }
     catch (e) { setNotice({ kind: 'err', text: String(e) }); } finally { setBusy(false); }
   }
   async function run(phase: string, yes: boolean, force = false, from?: string) {
     if (!id) return;
     setNotice(null);
-    try { const r = await chars.run(id, { phase, from, yes, force }); setDetail((d) => (d ? { ...d, job: r.job } : d)); }
-    catch (e) { setNotice({ kind: 'err', text: String(e) }); }
+    try {
+      if (describeDirty.current || (detail && JSON.stringify(describe) !== JSON.stringify(detail.describe))) { await chars.saveDescribe(id, describe); describeDirty.current = false; } // what is typed is what runs: unsaved boxes are saved first
+      const r = await chars.run(id, { phase, from, yes, force }); setDetail((d) => (d ? { ...d, job: r.job } : d));
+    } catch (e) { setNotice({ kind: 'err', text: String(e) }); }
   }
   function runAll() { setThenRest(true); run('intake', false); }
   async function runSimple() {
@@ -177,7 +180,7 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
             {STEMS.map((stem) => (
               <div key={stem}>
                 <label className={label}>{stem.slice(3)}</label>
-                <textarea className={`${field} min-h-[72px]`} rows={3} value={describe[stem] ?? ''} placeholder={template[stem] || ''} onChange={(e) => setDescribe({ ...describe, [stem]: e.target.value })} />
+                <textarea className={`${field} min-h-[72px]`} rows={3} value={describe[stem] ?? ''} placeholder={template[stem] || ''} onChange={(e) => { describeDirty.current = true; setDescribe({ ...describe, [stem]: e.target.value }); }} />
               </div>
             ))}
             <button className={primary} disabled={busy || running} onClick={saveDescribe}>{t('newchar.save')}</button>

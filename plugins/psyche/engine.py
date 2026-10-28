@@ -105,6 +105,8 @@ class Engine:
         self._migrate()
         self.lock = threading.RLock()
         self.owner = False
+        self._pid: Optional[int] = None
+        self.owner_retry_s = 2.0                        # a read-only engine asks for the lock this often
         self.live = False                      # True only while the tick thread runs (sends happen)
         self._stop = threading.Event()
         self._tick_thread: Optional[threading.Thread] = None
@@ -374,6 +376,12 @@ class Engine:
         self.conn.execute("INSERT INTO owner(id, pid, heartbeat) VALUES (1, ?, ?) ON CONFLICT(id) DO UPDATE SET pid=excluded.pid, heartbeat=excluded.heartbeat", (pid, now))
         self.conn.commit()
         return True
+
+    def release_owner(self, pid: int) -> None:
+        """A clean stop hands the lock back at once, so the next start of this profile (a restart from the app)
+        need not wait OWNER_STALE_S — before 0.10.2 a restart within that window ran read-only for its whole life."""
+        self.conn.execute("DELETE FROM owner WHERE id = 1 AND pid = ?", (pid,))
+        self.conn.commit()
 
     def heartbeat(self, pid: int) -> None:
         self.conn.execute("UPDATE owner SET heartbeat = ? WHERE id = 1 AND pid = ?", (self.now_fn(), pid))
@@ -1427,10 +1435,30 @@ class Engine:
         return self._q.qsize()
 
     def start(self, pid: int) -> bool:
+        self._pid = pid
+        self._stop.clear()
         self.owner = self.acquire_owner(pid)
         if not self.owner:
-            logger.info("psyche: another process owns %s; read-only here", self.db_path)
+            logger.info("psyche: another process owns %s; read-only here until its heartbeat goes stale", self.db_path)
+            self._waiter = threading.Thread(target=self._wait_for_owner, args=(pid,), name="psyche-wait-owner", daemon=True)
+            self._waiter.start()
             return False
+        self._run_as_owner(pid)
+        return True
+
+    def _wait_for_owner(self, pid: int) -> None:
+        """Read-only until the lock frees (the previous process stopped cleanly or its heartbeat went stale), then
+        the engine becomes the owner in place — the process does not have to be restarted a second time."""
+        while not self._stop.wait(timeout=self.owner_retry_s):
+            with self.lock:
+                if self.acquire_owner(pid):
+                    self.owner = True
+                    break
+        if self.owner and not self._stop.is_set():
+            self._run_as_owner(pid)
+            logger.info("psyche: took over %s (the previous owner is gone)", self.db_path)
+
+    def _run_as_owner(self, pid: int) -> None:
         self.load()
         self.live = True
         self._stop.clear()
@@ -1469,6 +1497,12 @@ class Engine:
                     self.snapshot()
             except Exception:  # noqa: BLE001
                 logger.exception("psyche stop snapshot failed")
+            if self._pid is not None:
+                try:
+                    self.release_owner(self._pid)
+                except Exception:  # noqa: BLE001
+                    logger.exception("psyche owner release failed")
+            self.owner = False   # stop runs twice (on_unload, then atexit): the second pass has nothing to write
 
     # ------------------------------------------------------------------ expression layer: the state block
     def state_block(self, *, t: Optional[float] = None, term: Optional[str] = None, counterpart: str = MAIN) -> str:
@@ -1505,7 +1539,8 @@ class Engine:
                 act_zh = "在跟" + term + "聊天"
             d_now = self.local(t)
             clock = f"現在：{d_now.strftime('%Y/%m/%d')}（{'一二三四五六日'[d_now.weekday()]}）{d_now.strftime('%H:%M')}"
-            lines = [f"【{self.pr}現在】", clock, f"在做：{act_zh}，{L.energy_word(self.energy, self.activity)}"]
+            ew = L.energy_word(self.energy, self.activity)
+            lines = [f"【{self.pr}現在】", clock, f"在做：{act_zh}" + ("" if ew == act_zh else f"，{ew}")]   # asleep: one word, not 在睡覺，在睡覺
             _, oct_zh, strength = model.octant(self.mood)
             mood_word = f"{model.intensity_word(strength)}{oct_zh}" if strength >= 0.2 else "平靜"
             feelings = []

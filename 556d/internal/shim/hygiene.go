@@ -45,7 +45,28 @@ var (
 	hygieneWarnOnce sync.Once
 )
 
-// filterSystem removes the vendor paragraphs and trailer lines from one system message.
+// pluginWrapperLine is a line Hermes wraps a plugin prompt section in: an English heading that names the plugin
+// ("## Plugin Context: kokoro.memory") and HTML comments for its own reconstruction. The model needs none of them.
+func pluginWrapperLine(line string) bool {
+	t := strings.TrimSpace(line)
+	return strings.HasPrefix(t, "<!-- hermes-plugin-section") || strings.HasPrefix(t, "## Plugin Context: ")
+}
+
+// stripPluginWrapper removes those lines from a paragraph; "" when nothing else was in it.
+func stripPluginWrapper(p string) (string, bool) {
+	if !strings.Contains(p, "hermes-plugin-section") && !strings.Contains(p, "## Plugin Context: ") {
+		return p, false
+	}
+	var out []string
+	for _, ln := range strings.Split(p, "\n") {
+		if !pluginWrapperLine(ln) {
+			out = append(out, ln)
+		}
+	}
+	return strings.TrimSpace(strings.Join(out, "\n")), true
+}
+
+// filterSystem removes the vendor paragraphs, the trailer lines and the plugin-section wrapper from one system message.
 func filterSystem(content string) string {
 	if content == "" || !strings.Contains(content, "\n") {
 		return content
@@ -84,6 +105,15 @@ func filterSystem(content string) string {
 			}
 			dropped = append(dropped, shortName(isVendor))
 			continue
+		}
+		if q, touched := stripPluginWrapper(p); touched {
+			if !containsPrefix(dropped, "plugin-wrapper") {
+				dropped = append(dropped, "plugin-wrapper")
+			}
+			if q == "" {
+				continue
+			}
+			p = q
 		}
 		kept = append(kept, p)
 	}

@@ -139,7 +139,7 @@ func (c Config) Resolve(job string) Endpoint {
 
 // Missing lists, in the user's words, what is not set yet; empty means every job can run.
 func (c Config) Missing() []string {
-	var out []string
+	out := []string{} // never nil: the UI reads .length on it
 	need := func(label string, e Endpoint) {
 		if e.BaseURL == "" {
 			out = append(out, label+"：網址")
@@ -280,7 +280,7 @@ func Probe(ctx context.Context, e Endpoint) ([]string, error) {
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		return nil, fmt.Errorf("回應不是模型清單：%v", err)
 	}
-	var ids []string
+	ids := []string{} // never nil: an endpoint that lists nothing is an empty list, not null
 	for _, d := range body.Data {
 		if d.ID != "" {
 			ids = append(ids, d.ID)

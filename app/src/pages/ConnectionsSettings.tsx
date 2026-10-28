@@ -90,7 +90,7 @@ export function ConnectionsSettings() {
     setProbes((p) => ({ ...p, [job]: { busy: true, models: [] } }));
     try {
       const r = await api.probeConnection({ base_url: ep.base_url, api_key: ep.api_key || '', job });
-      setProbes((p) => ({ ...p, [job]: { busy: false, models: r.models, error: r.ok ? undefined : r.error } }));
+      setProbes((p) => ({ ...p, [job]: { busy: false, models: r.models || [], error: r.ok ? undefined : r.error } }));
     } catch (e) {
       setProbes((p) => ({ ...p, [job]: { busy: false, models: [], error: String(e) } }));
     }
@@ -102,7 +102,8 @@ export function ConnectionsSettings() {
     try {
       const r = await api.updateConnections(c);
       take(r);
-      setNotice({ kind: r.missing.length ? 'warn' : 'ok', text: r.missing.length ? t('conn.saved_missing') : (r.restart_required ? t('settings.saved_restart') : t('settings.saved')) });
+      const missingNow = r.missing || [];
+      setNotice({ kind: missingNow.length ? 'warn' : 'ok', text: missingNow.length ? t('conn.saved_missing') : (r.restart_required ? t('settings.saved_restart') : t('settings.saved')) });
     } catch (e) {
       setNotice({ kind: 'err', text: String(e) });
     } finally {

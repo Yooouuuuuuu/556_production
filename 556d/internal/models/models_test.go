@@ -32,6 +32,9 @@ func TestNothingIsAssumed(t *testing.T) {
 	if m := c.Missing(); len(m) != 0 {
 		t.Fatalf("full config reported missing: %v", m)
 	}
+	if b, _ := json.Marshal(c.Missing()); string(b) != "[]" {
+		t.Fatalf("an empty missing list must serialize as [], not null: %s", b)
+	}
 	c.Timezone = "Mars/Olympus"
 	if m := c.Missing(); len(m) != 1 || !strings.Contains(m[0], "時區") {
 		t.Fatalf("bad zone must be reported: %v", m)

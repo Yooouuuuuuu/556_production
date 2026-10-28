@@ -192,12 +192,32 @@ func (a *API) psycheSettingsHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if pkg := a.packageFile(name, "psyche.json"); pkg != "" { // the package is the character: the sliders write it too
-			_ = os.WriteFile(pkg, append(out, '\n'), 0o644)
+			_ = os.WriteFile(pkg, packageCopy(cur), 0o644)
 		}
 		writeJSON(w, http.StatusOK, map[string]any{"companion": name, "settings": cur, "restart_required": restart})
 	default:
 		http.Error(w, "GET or PUT", http.StatusMethodNotAllowed)
 	}
+}
+
+// packageCopy is psyche.json as the package keeps it: the same settings without time.timezone_offset_h, which is
+// this machine's zone (written into the profile before every start from 設定 → 模型連線) and not part of who she is.
+func packageCopy(cur map[string]any) []byte {
+	cp := make(map[string]any, len(cur))
+	for k, v := range cur {
+		cp[k] = v
+	}
+	if t, ok := cur["time"].(map[string]any); ok {
+		tt := make(map[string]any, len(t))
+		for k, v := range t {
+			if k != "timezone_offset_h" {
+				tt[k] = v
+			}
+		}
+		cp["time"] = tt
+	}
+	out, _ := json.MarshalIndent(cp, "", "  ")
+	return append(out, '\n')
 }
 
 // Commands for the engine (single writer): 556d only appends to the commands table, like memory deletes.

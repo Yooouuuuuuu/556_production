@@ -154,6 +154,26 @@ def test_second_process_is_read_only(tmp_path):
     assert other.acquire_owner(222)  # the heartbeat went stale: ownership moves
 
 
+def test_clean_stop_releases_the_lock_and_a_waiting_engine_takes_over(tmp_path):
+    import time as _time
+    clock = Clock(T0)
+    first = Engine(tmp_path, "test", cfg(), db_path=tmp_path / "o.db", now_fn=clock, llm=None)
+    assert first.start(111)
+    second = Engine(tmp_path, "test", cfg(), db_path=tmp_path / "o.db", now_fn=clock, llm=None)
+    second.owner_retry_s = 0.05
+    assert not second.start(222)          # a restart 2 s after the stop: before 0.10.2 this stayed read-only for good
+    first.stop(drain_s=0)                 # the clean stop hands the lock back at once (no OWNER_STALE_S wait)
+    assert first.conn.execute("SELECT COUNT(*) FROM owner").fetchone()[0] == 0
+    for _ in range(100):
+        if second.owner and second.live:
+            break
+        _time.sleep(0.02)
+    assert second.owner and second.live   # the waiting engine became the owner in place
+    assert "【" in second.state_block()
+    second.stop(drain_s=0)
+    assert not second.owner
+
+
 def test_failed_appraisal_changes_nothing(tmp_path):
     clock = Clock(T0)
     e = make(tmp_path, "f", clock)
