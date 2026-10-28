@@ -75,19 +75,16 @@ DEFAULTS: Dict[str, Any] = {
         "timeout_s": 60,
         "retries": 1,
     },
-    "life": {  # §14 her own life: the schedule template (local hours), busyness mode, projects, small events (rule table)
+    "life": {  # §14 her own life. Only a neutral schedule lives here (the engine needs one to tell day from night);
+        # what she is working on and the small events of her days come from the package's psyche.json `life`, written by
+        # the soul skill from profile.json (the new-character page: a sample, the description's draft, or your own words).
+        # Before 0.11.0 this block carried one character's life and every package without its own inherited it.
         "schedule": {"bedtime": 23.5, "wake": 7.5, "bedtime_delay_max_h": 1.5,
                      "work": [[9.5, 12.5], [14.0, 18.0]], "hobby": [[10.0, 12.0], [15.0, 17.0]], "meals": [[12.5, 13.5], [18.5, 19.5]]},
         "busyness_mode": "work",          # work | hobby | none
         "wake_on_message": True,
-        "projects": [{"title": "新歌的 demo", "stage": "錄音", "difficulty": 0.5, "progress": 0.0}],
-        "small_events": [
-            {"text": "錄音一次就過，很順", "v": 0.5, "R": 0.4, "p": 0.12, "kind": "work", "share": True},
-            {"text": "咖啡店新出的季節限定很好喝", "v": 0.3, "R": 0.2, "p": 0.15, "kind": "life", "share": True},
-            {"text": "耳機突然壞了", "v": -0.3, "R": 0.3, "p": 0.06, "kind": "life", "share": True},
-            {"text": "有點頭痛，應該是睡不夠", "v": -0.4, "R": 0.4, "p": 0.05, "kind": "unwell", "share": True},
-            {"text": "下午的會議臨時取消，多了一段空檔", "v": 0.2, "R": 0.2, "p": 0.1, "kind": "work", "share": False},
-        ],
+        "projects": [],                   # [{"title", "stage", "difficulty" 0-1, "progress" 0-1}] — the first one advances in work time
+        "small_events": [],               # [{"text", "v" -1..1, "R", "p" daily chance, "kind" life|work|unwell|project, "share"}]
     },
     "needs": {"k_aff": 0.08, "protest_end_h": 24, "despair_end_h": 120, "need_mood_coupling": 0.1,
               "attachment_strength": 0.4},   # fixed until L5 grows it (0.7.0)

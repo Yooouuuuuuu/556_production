@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { chars, CharDetail, CharPackage, CharProfile } from '../api';
+import { chars, CharDetail, CharPackage, CharProfile, LifeSample, LifeSpec } from '../api';
 import { t } from '../i18n';
 
 // 設定 → 角色 → 新角色: the soul skill behind 556d (docs/prompt/prompt.md §2.9). One page, four sections for the
@@ -26,10 +26,107 @@ const label = 'block text-xs opacity-70 mb-1';
 const btn = 'px-3 py-1.5 rounded-lg text-sm bg-white/10 hover:bg-white/20 disabled:opacity-40';
 const primary = 'px-4 py-2 rounded-xl bg-pink-500/80 hover:bg-pink-500 text-white disabled:opacity-40 text-sm';
 
+// 日子與作息: a compact editor over the engine's own shape (psyche.json `life`, docs/inner-life §14). Hours are decimal
+// local hours; busy and meal blocks read "9.5-12.5, 14-18"; small events are one per line with a leading + (good),
+// - (bad) or ! (unwell). What is saved into profile.json `life` is the full engine shape, so the skill writes it as is.
+const blocksText = (b?: number[][]) => (b || []).map((x) => `${x[0]}-${x[1]}`).join(', ');
+const parseBlocks = (s: string): number[][] =>
+  s.split(/[,，]/).map((x) => x.trim()).filter(Boolean)
+    .map((x) => x.split(/[-–~]/).map((n) => Number(n.trim())))
+    .filter((p) => p.length === 2 && p.every((n) => Number.isFinite(n)));
+const eventsText = (ev?: LifeSpec['small_events']) => (ev || []).map((e) => `${e.kind === 'unwell' ? '!' : (e.v ?? 0) < 0 ? '-' : '+'} ${e.text}`).join('\n');
+const parseEvents = (s: string): NonNullable<LifeSpec['small_events']> => {
+  const out: NonNullable<LifeSpec['small_events']> = [];
+  for (const raw of s.split('\n')) {
+    const l = raw.trim();
+    if (!l) continue;
+    const m = l.match(/^([+\-!！＋－])\s*(.*)$/);
+    const sign = m ? m[1] : '+';
+    const text = (m ? m[2] : l).trim();
+    if (!text) continue;
+    if (sign === '!' || sign === '！') out.push({ text, v: -0.4, R: 0.4, p: 0.05, kind: 'unwell', share: true });
+    else if (sign === '-' || sign === '－') out.push({ text, v: -0.3, R: 0.3, p: 0.1, kind: 'life', share: true });
+    else out.push({ text, v: 0.3, R: 0.3, p: 0.1, kind: 'life', share: true });
+  }
+  return out;
+};
+// the structure phase's draft of her day (build/structure.json `life`: wake, bedtime, busy, busyness_mode, project, small_events) → the engine shape
+function lifeFromStructure(st: any): LifeSpec | null {
+  if (!st || typeof st !== 'object') return null;
+  const out: LifeSpec = {};
+  const sched: NonNullable<LifeSpec['schedule']> = {};
+  if (typeof st.wake === 'number') sched.wake = st.wake;
+  if (typeof st.bedtime === 'number') sched.bedtime = st.bedtime;
+  if (Array.isArray(st.busy)) sched.work = st.busy.filter((p: any) => Array.isArray(p) && p.length === 2).map((p: any) => [Number(p[0]), Number(p[1])]);
+  if (Object.keys(sched).length) out.schedule = sched;
+  if (['work', 'hobby', 'none'].includes(st.busyness_mode)) out.busyness_mode = st.busyness_mode;
+  if (st.project && typeof st.project.title === 'string' && st.project.title.trim()) out.projects = [{ title: st.project.title.trim(), stage: (st.project.stage || '進行中').trim(), difficulty: 0.5, progress: 0 }];
+  if (Array.isArray(st.small_events)) {
+    const ev = st.small_events.filter((e: any) => e && typeof e.text === 'string' && e.text.trim())
+      .map((e: any) => ({ text: e.text.trim(), v: Math.max(-1, Math.min(1, Number(e.v) || 0)), R: 0.3, p: 0.1, kind: 'life', share: true }));
+    if (ev.length) out.small_events = ev;
+  }
+  return Object.keys(out).length ? out : null;
+}
+function sampleSpec(s: LifeSample): LifeSpec {
+  const { id, name, note, ...spec } = s;
+  void id; void name; void note;
+  return spec;
+}
+
+function LifeEditor({ life, onChange }: { life: LifeSpec; onChange(next: LifeSpec): void }) {
+  const s = life.schedule || {};
+  const pj = (life.projects || [])[0] || { title: '', stage: '', difficulty: 0.5 };
+  const [busy, setBusy] = useState(blocksText(s.work));
+  const [meals, setMeals] = useState(blocksText(s.meals));
+  const [events, setEvents] = useState(eventsText(life.small_events));
+  const setS = (patch: Partial<NonNullable<LifeSpec['schedule']>>) => onChange({ ...life, schedule: { ...s, ...patch } });
+  const setP = (patch: Partial<typeof pj>) => {
+    const next = { ...pj, ...patch };
+    onChange({ ...life, projects: (next.title || '').trim() ? [{ difficulty: 0.5, progress: 0, ...next }] : [] });
+  };
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        <div><label className={label}>{t('newchar.life_wake')}</label><input className={field} type="number" step={0.5} min={0} max={24} value={s.wake ?? ''} onChange={(e) => setS({ wake: Number(e.target.value) })} /></div>
+        <div><label className={label}>{t('newchar.life_bedtime')}</label><input className={field} type="number" step={0.5} min={0} max={24} value={s.bedtime ?? ''} onChange={(e) => setS({ bedtime: Number(e.target.value) })} /></div>
+        <div><label className={label}>{t('newchar.life_busy')}</label><input className={field} value={busy} placeholder={t('newchar.life_blocks_hint')} onChange={(e) => setBusy(e.target.value)} onBlur={() => setS({ work: parseBlocks(busy) })} /></div>
+        <div><label className={label}>{t('newchar.life_meals')}</label><input className={field} value={meals} placeholder={t('newchar.life_blocks_hint')} onChange={(e) => setMeals(e.target.value)} onBlur={() => setS({ meals: parseBlocks(meals) })} /></div>
+        <div>
+          <label className={label}>{t('newchar.life_mode')}</label>
+          <select className={field} value={life.busyness_mode || 'work'} onChange={(e) => onChange({ ...life, busyness_mode: e.target.value as LifeSpec['busyness_mode'] })}>
+            <option value="work">{t('newchar.life_mode_work')}</option>
+            <option value="hobby">{t('newchar.life_mode_hobby')}</option>
+            <option value="none">{t('newchar.life_mode_none')}</option>
+          </select>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div><label className={label}>{t('newchar.life_project')}</label><input className={field} value={pj.title || ''} onChange={(e) => setP({ title: e.target.value })} /></div>
+        <div><label className={label}>{t('newchar.life_stage')}</label><input className={field} value={pj.stage || ''} onChange={(e) => setP({ stage: e.target.value })} /></div>
+      </div>
+      {(pj.title || '').trim() && (
+        <div className="flex items-center gap-3 text-sm">
+          <span className="w-24 text-xs opacity-70">{t('newchar.life_difficulty')}</span>
+          <input type="range" min={0} max={1} step={0.05} className="flex-1" value={pj.difficulty ?? 0.5} onChange={(e) => setP({ difficulty: Number(e.target.value) })} />
+          <span className="w-10 text-right tabular-nums">{(pj.difficulty ?? 0.5).toFixed(2)}</span>
+        </div>
+      )}
+      <div>
+        <label className={label}>{t('newchar.life_events')}</label>
+        <textarea className={`${field} min-h-[96px]`} value={events} onChange={(e) => setEvents(e.target.value)} onBlur={() => onChange({ ...life, small_events: parseEvents(events) })} />
+        <div className="text-xs opacity-60 mt-1">{t('newchar.life_events_hint')}</div>
+      </div>
+    </div>
+  );
+}
+
 export function NewCharacter({ onBack }: { onBack(): void }) {
   const [list, setList] = useState<CharPackage[]>([]);
   const [template, setTemplate] = useState<Record<string, string>>({});
   const [model, setModel] = useState('');
+  const [lifeSamples, setLifeSamples] = useState<LifeSample[]>([]); // templates/life/*.json, served with the package list
+  const [lifeKey, setLifeKey] = useState(0); // remounts the life editor when a sample / the draft / clear replaces its text
   const [id, setId] = useState<string | null>(null);
   const [detail, setDetail] = useState<CharDetail | null>(null);
   const [describe, setDescribe] = useState<Record<string, string>>({});
@@ -41,7 +138,7 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
   const logRef = useRef<HTMLPreElement>(null);
   const describeDirty = useRef(false); // typed but not saved: a reload (a job ending) must not wipe it
 
-  const refreshList = () => chars.list().then((r) => { setList(r.characters); setTemplate(r.template); setModel(r.model || ''); }).catch((e) => setNotice({ kind: 'err', text: String(e) }));
+  const refreshList = () => chars.list().then((r) => { setList(r.characters); setTemplate(r.template); setModel(r.model || ''); setLifeSamples(r.life_samples || []); }).catch((e) => setNotice({ kind: 'err', text: String(e) }));
   const load = (cid: string) => chars.detail(cid).then((d) => { setDetail(d); if (!describeDirty.current) setDescribe(d.describe); setProfile(d.profile); }).catch((e) => setNotice({ kind: 'err', text: String(e) }));
 
   useEffect(() => { refreshList(); }, []);
@@ -97,7 +194,7 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
     if (!id || !profile) return;
     setBusy(true); setNotice(null);
     try {
-      await chars.saveProfile(id, { pronoun: profile.pronoun, closeness: profile.closeness ?? null, scratch: !!profile.scratch, simple: profile.simple ?? null, big5: profile.big5, constants: profile.constants, thinking: profile.thinking, choices: profile.choices });
+      await chars.saveProfile(id, { pronoun: profile.pronoun, closeness: profile.closeness ?? null, scratch: !!profile.scratch, simple: profile.simple ?? null, big5: profile.big5, constants: profile.constants, thinking: profile.thinking, choices: profile.choices, life: profile.life ?? null });
       const force = !!detail?.soul && !detail.character.phases.includes('assemble') ? confirm(t('newchar.simple_force')) : false;
       const r = await chars.simple(id, force);
       setDetail((d) => (d ? { ...d, job: r.job } : d));
@@ -109,7 +206,7 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
     if (!id || !profile) return;
     setBusy(true); setNotice(null);
     try {
-      const r = await chars.saveProfile(id, { pronoun: profile.pronoun, closeness: profile.closeness ?? null, scratch: !!profile.scratch, simple: profile.simple ?? null, big5: profile.big5, constants: profile.constants, thinking: profile.thinking, choices: profile.choices });
+      const r = await chars.saveProfile(id, { pronoun: profile.pronoun, closeness: profile.closeness ?? null, scratch: !!profile.scratch, simple: profile.simple ?? null, big5: profile.big5, constants: profile.constants, thinking: profile.thinking, choices: profile.choices, life: profile.life ?? null });
       setProfile(r.profile); setNotice({ kind: 'ok', text: t('newchar.saved') });
     } catch (e) { setNotice({ kind: 'err', text: String(e) }); } finally { setBusy(false); }
   }
@@ -268,6 +365,25 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
                     {CLOSENESS.map((o) => <option key={o} value={o}>{o}</option>)}
                   </select>
                   <div className="text-xs opacity-60 mt-1">{detail?.build?.structure?.closeness_why || t('newchar.closeness_hint')}</div>
+                </div>
+                <div className="rounded-lg bg-white/5 p-2 space-y-2">
+                  <label className={label}>{t('newchar.life')}</label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select className={`${field} w-auto`} value="" onChange={(e) => { const s = lifeSamples.find((x) => x.id === e.target.value); if (s) { setProfile({ ...profile, life: sampleSpec(s) }); setLifeKey((k) => k + 1); } }}>
+                      <option value="">{t('newchar.life_sample')}</option>
+                      {lifeSamples.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                    {lifeFromStructure(detail?.build?.structure?.life) && (
+                      <button className={btn} onClick={() => { setProfile({ ...profile, life: lifeFromStructure(detail?.build?.structure?.life) }); setLifeKey((k) => k + 1); }}>{t('newchar.life_from_describe')}</button>
+                    )}
+                    {profile.life && <button className={btn} onClick={() => { setProfile({ ...profile, life: null }); setLifeKey((k) => k + 1); }}>{t('newchar.life_clear')}</button>}
+                  </div>
+                  {profile.life ? (
+                    <LifeEditor key={lifeKey} life={profile.life} onChange={(next) => setProfile({ ...profile, life: next })} />
+                  ) : (
+                    <p className="text-xs opacity-60">{t('newchar.life_none')}</p>
+                  )}
+                  <div className="text-xs opacity-60">{t('newchar.life_hint')}</div>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   {Object.keys(CHOICES).map((k) => (

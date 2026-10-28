@@ -10,7 +10,9 @@ Inputs:
   filled one (an example description, a disposable test character).
 - `profile.json` — the numbers and choices the engine reads: Big Five, the seven constants (self-esteem stability,
   expressiveness, humor coping, clinginess cap, tsundere tendency, assertiveness, chronotype), the five thinking meters,
-  the dial 1 and 6 choices, pronoun, schedule, `closeness` (0.8.9) and `scratch` (0.8.10). The skill's thinking phase
+  the dial 1 and 6 choices, pronoun, schedule, `closeness` (0.8.9), `scratch` (0.8.10) and `life` (0.11.0: her day — wake and
+  bedtime, busy and meal blocks, kind of busy, the thing in hand, small events — from the new-character page: a sample
+  under `templates/life/`, the structure phase's draft, or your own). The skill's thinking phase
   proposes the meters and choices with one line of evidence each (`proposed`); you confirm by filling the null fields
   or run with `--yes`.
 - `companion.json` (display name, avatar) and `kokoro.json` (keys merged into the profile's kokoro.json, e.g.
@@ -26,8 +28,9 @@ Outputs (regenerate explicitly; `soul.lock.json` records which inputs produced t
 - `people/*.md` — how she sees you (`你.md`, also carries your name and reply language from Settings) and each other
   character.
 - `psyche.json` — the engine's file, built from `profile.json` and the template: `thinking` and `thinking_choices` for
-  the thinking module (0.8.8), `relationships.你` from `closeness`. 556d copies it into her profile before every start,
-  and the app's 主動 sliders write it here too.
+  the thinking module (0.8.8), `relationships.你` from `closeness`, `life` from `profile.json` (0.11.0). 556d copies
+  it into her profile before every start, and the app's 主動 sliders write it here too; since 0.11.0 the skill merges
+  into the file that is here instead of rebuilding it from the template, so the sliders survive a re-run.
 - `build/` — one JSON per phase (intake, structure, thinking, voice, reactions, parts, verify), `check.md`, `verify.md`,
   the raw model replies under `build/raw/`, and `run.log` (the output of the last job 556d ran for this package).
 
@@ -66,7 +69,9 @@ is the world you want.
 psyche.json and people/*.md from the package into the profile (people/你.md only when the profile has none — the app
 maintains it with your name and reply language), the app's 主動 sliders write the package's psyche.json as well, and
 556d writes the model, memory and plugin settings from `home/models.json`. So a profile can be deleted and rebuilt, and
-an edit made in the package wins at her next start. The dated, always-on part of who she is — `## 時間線`,
+an edit made in the package wins at her next start — and reaches the model at the first turn: Hermes continues a
+session with the prompt it stored when the session opened, so 556d also drops that stored prompt before every start
+(0.11.0). The dated, always-on part of who she is — `## 時間線`,
 `## 影響過你的人與事` — is SOUL text (the skill writes it from the description); the same events are also seeds, for
 retrieval.
 

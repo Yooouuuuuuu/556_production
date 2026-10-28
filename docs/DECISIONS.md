@@ -5,6 +5,25 @@ One record for the whole project. Each heading carries its date and its part in 
 replaces; the designs themselves are in the part folders. Entries are grouped as they were written, not
 strictly sorted.
 
+## Decided (2026-10-28) — a resumed session re-reads her files: 556d drops the stored prompt, no new session [prompt] [app]
+- Hermes continues a session with the system prompt it stored when the session opened, byte for byte, so an edited
+  SOUL, people file or plugin section never reached the model until a new session (seen twice: the 0.10.0 memory rule
+  on an old session, the scratch line on the test character). The first idea — open a new session and carry the recent
+  turns over — was dropped for the smaller one: Hermes rebuilds a session whose stored prompt is null, that turn, from
+  the files, and stores the new bytes; so 556d clears the stored prompt of her live sessions before every start
+  (`Transcript.ForgetStoredPrompts`). Same conversation, same history, one prefix-cache miss per restart.
+
+## Decided (2026-10-28) — her day lives in the package; the engine's code has no life of its own [inner-life] [structure]
+- `plugins/psyche/config.py` carried one character's life (a demo in 錄音) and every package without a `life` section
+  inherited it — a hidden default with persona in it, the class 0.9.0 removed elsewhere. Now the code keeps a neutral
+  schedule only (projects and small events empty); the package's psyche.json `life` is written by the skill from
+  profile.json `life`, which the new-character page fills from a sample (`templates/life/`, neutral sets to use, edit
+  or replace), the structure phase's draft of the description, or your own words. What she works on follows the package
+  at every start; the snapshot keeps progress per title. The closeness band (the skill asks it and the page shows it,
+  but a description that says 認識很久 can still start at 剛認識 when nobody confirms) is parked for a later version.
+- Re-running the skill keeps what the package's psyche.json already has (the 主動 sliders): assemble merges into the
+  file instead of rebuilding it from the template, and the package copy never carries this machine's zone.
+
 ## Decided (2026-10-19) — the dated part of who she is is SOUL text; the package is the character [prompt] [structure]
 - Pinned groups are retired the same day (see the entry below): once it was settled that this content does not grow
   through conversation, "fixed and in every request" means SOUL. The skill writes `## 時間線` (absolute dates, oldest

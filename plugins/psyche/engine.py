@@ -349,8 +349,11 @@ class Engine:
         seen: set = set()
         self.share_backlog = [x for x in s.get("share_backlog", []) if not (x.get("what") in seen or seen.add(x.get("what")))]
         self.withheld = [dict(w) for w in s.get("withheld", []) if w.get("what")]
-        if s.get("projects"):
-            self.projects = [dict(p) for p in s["projects"]]
+        # what she works on is the package's list (psyche.json life.projects); the snapshot only carries progress, kept
+        # per title. Before 0.11.0 a snapshot's projects replaced the config's, so a changed package never reached her.
+        saved = {str(p.get("title")): p for p in s.get("projects") or [] if isinstance(p, dict)}
+        self.projects = [{**p, "progress": float(saved.get(str(p.get("title")), {}).get("progress", p.get("progress", 0.0)))}
+                         for p in self.cfg.get("life", {}).get("projects", [])]
         self.day = {**self.day, **s.get("day", {})}
         self.rel = {p: {**RL.fresh(self.cfg.get("relationships", {}).get(p, {}), self.cfg["character"]), **r} for p, r in s.get("rel", {}).items()}
         self.ledger = {p: list(v) for p, v in s.get("ledger", {}).items()}

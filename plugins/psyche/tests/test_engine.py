@@ -180,3 +180,33 @@ def test_failed_appraisal_changes_nothing(tmp_path):
     before = rounded(e.status())
     e.record_appraisal(None, raw="garbage", error="ValueError: no JSON", turn_id="t1", counterpart="製作人", platform="api_server")
     assert rounded(e.status()) == before
+
+
+def test_projects_follow_the_package_and_keep_progress_by_title(tmp_path):
+    clock = Clock(T0)
+    c = cfg()
+    c["life"]["projects"] = [{"title": "甲案", "stage": "進行中", "difficulty": 0.5, "progress": 0.0}]
+    e = Engine(tmp_path, "test", c, db_path=tmp_path / "p.db", now_fn=clock, llm=None)
+    e.owner = True
+    e.load()
+    e.projects[0]["progress"] = 0.4
+    e.snapshot()
+    # the same package again: progress survives the restart
+    e2 = Engine(tmp_path, "test", c, db_path=tmp_path / "p.db", now_fn=clock, llm=None)
+    e2.owner = True
+    e2.load()
+    assert [p["title"] for p in e2.projects] == ["甲案"] and e2.projects[0]["progress"] == 0.4
+    # the package changed what she works on: the new list wins, a new title starts from zero
+    c2 = cfg()
+    c2["life"]["projects"] = [{"title": "乙案", "stage": "開頭", "difficulty": 0.3, "progress": 0.0}]
+    e3 = Engine(tmp_path, "test", c2, db_path=tmp_path / "p.db", now_fn=clock, llm=None)
+    e3.owner = True
+    e3.load()
+    assert [p["title"] for p in e3.projects] == ["乙案"] and e3.projects[0]["progress"] == 0.0
+    # no projects in the package: nothing in hand, whatever the snapshot remembers
+    c3 = cfg()
+    c3["life"]["projects"] = []
+    e4 = Engine(tmp_path, "test", c3, db_path=tmp_path / "p.db", now_fn=clock, llm=None)
+    e4.owner = True
+    e4.load()
+    assert e4.projects == []

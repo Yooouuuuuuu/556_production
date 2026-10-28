@@ -43,6 +43,14 @@ func (a *API) companionsHandler(w http.ResponseWriter, r *http.Request) {
 		if _, err := ensurePromptHygiene(a.mgr.Dir(name)); err != nil {
 			log.Printf("[hygiene] %s: %v", name, err) // her prompt keeps the vendor switches on; the shim still filters
 		}
+		// Hermes continues a session with the system prompt it stored when the session opened, byte for byte (prefix
+		// cache), so a changed SOUL, people file or plugin section would never reach the model on a resumed session.
+		// Dropping the stored prompt makes the next turn rebuild it from her files; the conversation itself stays.
+		if n, err := a.mgr.Transcript(name).ForgetStoredPrompts(); err != nil {
+			log.Printf("[api] %s: stored system prompt not cleared (%v); a resumed session keeps the prompt it was opened with", name, err)
+		} else if n > 0 {
+			log.Printf("[api] %s: cleared the stored system prompt of %d live session(s); Hermes rebuilds it from her files on the next turn", name, n)
+		}
 		info, err := a.mgr.Start(name)
 		if err != nil {
 			writeJSON(w, 400, map[string]any{"error": err.Error()})

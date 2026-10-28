@@ -293,6 +293,31 @@ func (t *Transcript) DiscardOrphans(sessionID, text string, before float64) (int
 	return n, nil
 }
 
+// ForgetStoredPrompts drops the system prompt Hermes stored for every live session, so the next turn of each rebuilds
+// it from her files (SOUL.md, people/*.md, the plugin sections) instead of replaying the bytes the session opened
+// with. 556d calls it before every start; the conversation and its history are untouched. Returns how many sessions
+// had a stored prompt; a profile without a state.db yet is 0.
+func (t *Transcript) ForgetStoredPrompts() (int, error) {
+	if _, err := os.Stat(t.path); err != nil {
+		return 0, nil
+	}
+	db, err := t.open(false)
+	if err != nil {
+		return 0, err
+	}
+	defer db.Close()
+	res, err := db.Exec(`UPDATE sessions SET system_prompt = NULL, system_prompt_hash = NULL
+		WHERE ended_at IS NULL AND (system_prompt IS NOT NULL OR system_prompt_hash IS NOT NULL)`)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	// Hermes keeps prompt bodies in system_prompts keyed by hash and prunes the unreferenced ones itself; do the same
+	// here so the old bytes do not linger until its next housekeeping.
+	_, _ = db.Exec(`DELETE FROM system_prompts WHERE NOT EXISTS (SELECT 1 FROM sessions WHERE sessions.system_prompt_hash = system_prompts.hash)`)
+	return int(n), nil
+}
+
 // LastUserIsCue reports whether a session's newest user row is a narrator cue — an event turn in
 // flight whose answer has not landed yet.
 func (t *Transcript) LastUserIsCue(sessionID string) bool {

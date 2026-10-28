@@ -1,0 +1,24 @@
+{
+  "name": "上班族",
+  "note": "朝九晚六，中午和晚上吃飯；手上有一個案子在推。",
+  "schedule": {
+    "bedtime": 23.5,
+    "wake": 7.5,
+    "bedtime_delay_max_h": 1.5,
+    "work": [[9.5, 12.5], [14.0, 18.0]],
+    "hobby": [[20.0, 22.0]],
+    "meals": [[12.5, 13.5], [18.5, 19.5]]
+  },
+  "busyness_mode": "work",
+  "wake_on_message": true,
+  "projects": [
+    {"title": "手上的案子", "stage": "進行中", "difficulty": 0.5, "progress": 0.0}
+  ],
+  "small_events": [
+    {"text": "咖啡店新出的季節限定很好喝", "v": 0.3, "R": 0.2, "p": 0.12, "kind": "life", "share": true},
+    {"text": "下午的會議臨時取消，多了一段空檔", "v": 0.2, "R": 0.2, "p": 0.1, "kind": "work", "share": false},
+    {"text": "同事帶了點心來分", "v": 0.2, "R": 0.2, "p": 0.1, "kind": "work", "share": true},
+    {"text": "耳機突然壞了", "v": -0.3, "R": 0.3, "p": 0.06, "kind": "life", "share": true},
+    {"text": "有點頭痛，應該是睡不夠", "v": -0.4, "R": 0.4, "p": 0.05, "kind": "unwell", "share": true}
+  ]
+}

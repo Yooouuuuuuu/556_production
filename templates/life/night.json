@@ -1,0 +1,24 @@
+{
+  "name": "夜貓子（在家）",
+  "note": "中午起床、凌晨睡；沒有上班，做自己的東西。",
+  "schedule": {
+    "bedtime": 3.5,
+    "wake": 11.5,
+    "bedtime_delay_max_h": 2.0,
+    "work": [[15.0, 19.0], [22.0, 24.0], [0.0, 2.0]],
+    "hobby": [[15.0, 19.0], [22.0, 24.0], [0.0, 2.0]],
+    "meals": [[12.5, 13.5], [20.0, 21.0]]
+  },
+  "busyness_mode": "hobby",
+  "wake_on_message": true,
+  "projects": [
+    {"title": "自己的小作品", "stage": "慢慢做", "difficulty": 0.4, "progress": 0.0}
+  ],
+  "small_events": [
+    {"text": "半夜的街很安靜，很好做事", "v": 0.2, "R": 0.2, "p": 0.12, "kind": "life", "share": true},
+    {"text": "一口氣看完一整季", "v": 0.3, "R": 0.2, "p": 0.08, "kind": "life", "share": true},
+    {"text": "便利商店的關東煮賣完了", "v": -0.2, "R": 0.2, "p": 0.08, "kind": "life", "share": true},
+    {"text": "白天被樓上施工吵醒", "v": -0.4, "R": 0.4, "p": 0.06, "kind": "unwell", "share": true},
+    {"text": "網路斷了半小時", "v": -0.3, "R": 0.3, "p": 0.05, "kind": "life", "share": true}
+  ]
+}

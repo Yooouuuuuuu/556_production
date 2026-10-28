@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.11.0 — 2026-10-28
+
+- **A changed SOUL reaches her on the next turn, in the same conversation.** Hermes continues a session with the system
+  prompt it stored when the session opened, byte for byte (its prefix cache), so an edited SOUL.md, people file or
+  plugin section never reached the model on a resumed session — the test character's scratch line and the 0.10.0 memory
+  rule both sat unseen behind the prompt the session had opened with. Before every start 556d now drops the stored
+  prompt of her live sessions (`Transcript.ForgetStoredPrompts`, tested); Hermes logs "rebuilding from scratch this
+  turn", rebuilds from her files and stores the new bytes. No new session, nothing copied, the history untouched
+  (DECISIONS 2026-10-28).
+- **Her day comes from the package, not from the engine's code.** `plugins/psyche/config.py` carried one character's
+  life — a demo in 錄音, "錄音一次就過" — and every package without its own `life` inherited it; the test character
+  denied a recording he had never done. The code keeps only a neutral schedule, no projects, no small events. The
+  new-character page's 確認 step gains **日子與作息**: pick a sample day (`templates/life/*.json` — 上班族, 學生,
+  自由工作者, 夜貓子 — served as `life_samples` with the package list), take the structure phase's draft from the
+  description (`build/structure.json` `life`, a new key in its prompt), or write your own: wake, bedtime, busy and meal
+  blocks, kind of busy, the thing in hand with its stage and difficulty, small events one per line (+ good, - bad,
+  ! unwell). Saved as profile.json `life` in the engine's own shape; `build_psyche` writes profile.life, else the draft,
+  else the template's neutral day (`templates/companion/psyche.json` now carries it visibly). The engine takes what she
+  works on from the package at every start and keeps progress per title from the snapshot — before, a snapshot's
+  projects overrode the package for good.
+- **Re-running the skill keeps the package's psyche.json.** `assemble` used to rebuild psyche.json from the template, so
+  the 主動 sliders and anything hand-set were wiped by any re-run; it now starts from the package's file and overwrites
+  only the keys it derives (character numbers from profile.json, cares_about, thinking, life, relationships). The
+  package copy never carries this machine's zone.
+
 ## 0.10.2 — 2026-10-28
 
 - **psyche: a restart within 20 s no longer runs read-only.** The engine's owner lock is a heartbeat row; a process that

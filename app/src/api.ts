@@ -191,7 +191,11 @@ declare global {
 // the generated SOUL and files) and the soul skill run as a 556d job. See docs/prompt/prompt.md §2.9.
 export type CharPackage = { id: string; display_name: string; avatar_model: string; describe_filled: number; describe_total: number; phases: string[]; has_soul: boolean; installed: boolean; running: boolean; job_kind: string; lock: any; stale: string[] };
 export type CharJob = { running: boolean; kind: string; phase: string; model: string; started_at: number | null; exit_code: number; error: string; log: string };
-export type CharProfile = { pronoun?: string; closeness?: string | null; scratch?: boolean; simple?: { who?: string; talk?: string; refuses?: string } | null; big5?: Record<string, number | null>; constants?: Record<string, number | null>; thinking?: Record<string, number | null>; choices?: Record<string, string | null>; schedule?: any; proposed?: { big5?: Record<string, number | null>; constants?: Record<string, number | null>; thinking?: Record<string, number | null>; choices?: Record<string, string | null>; evidence?: Record<string, string>; model?: string; at?: string } | null };
+// Her day as the engine keeps it (psyche.json `life`): hours are decimal local hours; `v` is how good or bad a small
+// event feels (−1..1), `p` its daily chance. A package without one gets the neutral schedule and no projects or events.
+export type LifeSpec = { schedule?: { wake?: number; bedtime?: number; bedtime_delay_max_h?: number; work?: number[][]; hobby?: number[][]; meals?: number[][] }; busyness_mode?: 'work' | 'hobby' | 'none'; wake_on_message?: boolean; projects?: { title: string; stage?: string; difficulty?: number; progress?: number }[]; small_events?: { text: string; v?: number; R?: number; p?: number; kind?: string; share?: boolean }[] };
+export type LifeSample = LifeSpec & { id: string; name: string; note?: string };
+export type CharProfile = { pronoun?: string; closeness?: string | null; scratch?: boolean; simple?: { who?: string; talk?: string; refuses?: string } | null; big5?: Record<string, number | null>; constants?: Record<string, number | null>; thinking?: Record<string, number | null>; choices?: Record<string, string | null>; schedule?: any; life?: LifeSpec | null; proposed?: { big5?: Record<string, number | null>; constants?: Record<string, number | null>; thinking?: Record<string, number | null>; choices?: Record<string, string | null>; evidence?: Record<string, string>; model?: string; at?: string } | null };
 export type CharDetail = { character: CharPackage; describe: Record<string, string>; profile: CharProfile | null; build: Record<string, any>; check: string; verify: string; soul: string; seeds: number; people: string[]; job: CharJob };
 
 async function send<T>(path: string, method: 'POST' | 'PUT', body?: any): Promise<T> {
@@ -201,7 +205,7 @@ async function send<T>(path: string, method: 'POST' | 'PUT', body?: any): Promis
 }
 
 export const chars = {
-  list: () => get<{ characters: CharPackage[]; template: Record<string, string>; model: string; models: string[]; phases: string[] }>('/api/characters'),
+  list: () => get<{ characters: CharPackage[]; template: Record<string, string>; model: string; models: string[]; phases: string[]; life_samples: LifeSample[] }>('/api/characters'),
   create: (body: { id: string; display_name: string; pronoun: string; avatar?: string }) => send<{ character: CharPackage; output: string }>('/api/characters', 'POST', body),
   detail: (id: string) => get<CharDetail>(`/api/characters/${encodeURIComponent(id)}`),
   saveDescribe: (id: string, files: Record<string, string>) => send<{ saved: number; character: CharPackage }>(`/api/characters/${encodeURIComponent(id)}/describe`, 'PUT', { files }),

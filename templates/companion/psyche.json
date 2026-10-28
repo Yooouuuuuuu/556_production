@@ -56,5 +56,46 @@
     "timeout_s": 60,
     "retries": 1
   },
-  "llm": null
+  "llm": null,
+  "life": {
+    "schedule": {
+      "bedtime": 23.5,
+      "wake": 7.5,
+      "bedtime_delay_max_h": 1.5,
+      "work": [
+        [
+          9.5,
+          12.5
+        ],
+        [
+          14.0,
+          18.0
+        ]
+      ],
+      "hobby": [
+        [
+          10.0,
+          12.0
+        ],
+        [
+          15.0,
+          17.0
+        ]
+      ],
+      "meals": [
+        [
+          12.5,
+          13.5
+        ],
+        [
+          18.5,
+          19.5
+        ]
+      ]
+    },
+    "busyness_mode": "work",
+    "wake_on_message": true,
+    "projects": [],
+    "small_events": []
+  }
 }

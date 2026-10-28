@@ -81,7 +81,8 @@ a product, a machine, a model or a path.
 - kokoro's static block (11) was, on 10-15, injected only while the memory toolset was exposed
   (`memory_provider_tools_exposed`, the same gate as the tool schemas). No tools → the memory rule and
   `people/你.md` would vanish too, unless kokoro moved them to a plugin prompt section
-  (`register_system_prompt_section`, position `after_memory`, frozen per session). **Done in 0.8.4**: the section is
+  (`register_system_prompt_section`, position `after_memory`, frozen per session; since 0.11.0 re-read at the first turn after a restart, because 556d drops the session's
+  stored prompt before every start). **Done in 0.8.4**: the section is
   `kokoro.memory`, in zh-TW, independent of any toolset.
 - The shim's preamble (13) is added only when the lane has no native tool calling and the request carries
   tools. It is ours; it can be reworded freely but not removed while tools exist, because it is the

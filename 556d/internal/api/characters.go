@@ -212,6 +212,28 @@ func (a *API) packageSummary(id string) map[string]any {
 	}
 }
 
+// loadLifeSamples reads templates/life/*.json — the sample days the new-character page offers (作息, 手上的事, 日常小事)
+// to use as they are, edit, or replace with your own. Each carries its file stem as `id`; sorted by file name.
+func loadLifeSamples(dir string) []map[string]any {
+	out := []map[string]any{} // never nil: the page reads .length
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return out
+	}
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".json") {
+			continue
+		}
+		m, ok := readJSONFile(filepath.Join(dir, e.Name())).(map[string]any)
+		if !ok {
+			continue
+		}
+		m["id"] = strings.TrimSuffix(e.Name(), ".json")
+		out = append(out, m)
+	}
+	return out
+}
+
 func (a *API) charactersHandler(w http.ResponseWriter, r *http.Request) {
 	if cors(w, r, "GET, POST, PUT, OPTIONS") {
 		return
@@ -232,7 +254,8 @@ func (a *API) charactersHandler(w http.ResponseWriter, r *http.Request) {
 			for _, id := range ids {
 				list = append(list, a.packageSummary(id))
 			}
-			writeJSON(w, 200, map[string]any{"characters": list, "template": a.describeTemplate(), "model": a.soulModel(), "models": []string{a.soulModel()}, "phases": skillPhases})
+			writeJSON(w, 200, map[string]any{"characters": list, "template": a.describeTemplate(), "model": a.soulModel(), "models": []string{a.soulModel()}, "phases": skillPhases,
+				"life_samples": loadLifeSamples(filepath.Join(a.mgr.Root(), "templates", "life"))})
 		case http.MethodPost:
 			a.createCharacter(w, r)
 		default:

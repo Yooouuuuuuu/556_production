@@ -214,6 +214,7 @@ P_STRUCTURE = """從描述整理出下面幾樣，輸出 JSON：
 - "tensions": {pr}自己也沒想清楚的矛盾，兩到三條。
 - "cares_about": {pr}在乎什麼，五到七條短句（評估{pr}心情時會用到，例：「答應的事有沒有做到」）。
 - "closeness": {pr}跟「跟{pr}說話的人」現在有多熟，五選一："剛認識"、"還不算熟"、"朋友"、"很熟"、"很親近"；附 "closeness_why" 一句證據。描述沒提就 "朋友"。
+- "life": {pr}的日子，描述有寫到的才填，沒寫的欄位用 null：{{"wake": 起床時間（小時，例 7.5）, "bedtime": 睡覺時間（小時，例 23.5；凌晨一點寫 1）, "busy": [[開始, 結束], ...] 忙的時段（上班、上課；小時）, "busyness_mode": "work"（上班上課）|"hobby"（做自己的事）|"none"（不忙）, "project": {{"title": "{pr}手上在做的一件事", "stage": "到哪個階段"}}, "small_events": [{{"text": "會發生在{pr}日子裡的一件小事，一句", "v": -1 到 1 好壞}}] 三到六條}}；描述完全沒寫就 null。
 - "vague": 描述裡太空泛、猜不出行為的句子，每條 {{"line": "原句", "why": "為什麼"}}；沒有就空陣列。
 
 {describe}"""
@@ -680,8 +681,60 @@ CLOSENESS = {
 }
 
 
+def _overlay(tpl: Dict[str, Any], cur: Dict[str, Any]) -> Dict[str, Any]:
+    """The template with the package's current values on top: what was set outside the skill (the 主動 sliders,
+    anything hand-edited) stays, and a key the template gained since still appears."""
+    for k, v in cur.items():
+        if isinstance(v, dict) and isinstance(tpl.get(k), dict):
+            tpl[k] = _overlay(tpl[k], v)
+        else:
+            tpl[k] = v
+    return tpl
+
+
+def life_from_structure(st_life: Any) -> Optional[Dict[str, Any]]:
+    """The structure phase's draft of her day (wake, bedtime, busy, busyness_mode, project, small_events) in the engine's
+    shape (psyche.json `life`, docs/inner-life §14); None when the description gave nothing."""
+    if not isinstance(st_life, dict):
+        return None
+    out: Dict[str, Any] = {}
+    sched: Dict[str, Any] = {}
+    for key in ("wake", "bedtime"):
+        v = st_life.get(key)
+        if isinstance(v, (int, float)) and 0 <= float(v) < 24:
+            sched[key] = float(v)
+    busy = st_life.get("busy")
+    if isinstance(busy, list):
+        blocks = [[float(b[0]), float(b[1])] for b in busy if isinstance(b, (list, tuple)) and len(b) == 2
+                  and all(isinstance(x, (int, float)) for x in b)]
+        if blocks:
+            sched["work"] = blocks
+    if sched:
+        out["schedule"] = sched
+    if st_life.get("busyness_mode") in ("work", "hobby", "none"):
+        out["busyness_mode"] = st_life["busyness_mode"]
+    pj = st_life.get("project")
+    if isinstance(pj, dict) and str(pj.get("title") or "").strip():
+        out["projects"] = [{"title": str(pj["title"]).strip(), "stage": str(pj.get("stage") or "進行中").strip(), "difficulty": 0.5, "progress": 0.0}]
+    evs = []
+    for e in st_life.get("small_events") or []:
+        if isinstance(e, dict) and str(e.get("text") or "").strip():
+            try:
+                v = max(-1.0, min(1.0, float(e.get("v") or 0.0)))
+            except (TypeError, ValueError):
+                v = 0.0
+            evs.append({"text": str(e["text"]).strip(), "v": v, "R": 0.3, "p": 0.1, "kind": "life", "share": True})
+    if evs:
+        out["small_events"] = evs
+    return out or None
+
+
 def build_psyche(d: Path) -> Dict[str, Any]:
-    base = json.loads(PSYCHE_TPL.read_text(encoding="utf-8-sig"))
+    # Not a rebuild from the template (before 0.10.3 it was, and every assemble wiped the 主動 sliders): the package's
+    # psyche.json is the base, the skill overwrites only the keys it derives from profile.json and the structure phase.
+    base = _overlay(json.loads(PSYCHE_TPL.read_text(encoding="utf-8-sig")), read_json(d / "psyche.json", {}) or {})
+    if isinstance(base.get("time"), dict):
+        base["time"].pop("timezone_offset_h", None)   # this machine's zone lives in the profile copy only (556d writes it)
     prof = read_json(d / "profile.json", {}) or {}
     st = read_json(d / "build" / "structure.json", {}) or {}
     ch = base.setdefault("character", {})
@@ -702,6 +755,11 @@ def build_psyche(d: Path) -> Dict[str, Any]:
     base["thinking_choices"] = {k: (prof.get("choices") or {}).get(k) for k in ("medium_primary", "medium_secondary", "first_look", "contradiction", "cause")}
     if isinstance(prof.get("schedule"), dict):
         base.setdefault("life", {})["schedule"] = prof["schedule"]
+    # her day (0.11.0): profile.json `life` (the page: a sample, the draft, or your own) wins; else the structure phase's
+    # draft; else the package keeps what it has (the template's neutral schedule, nothing in hand, no small events)
+    life = prof.get("life") if isinstance(prof.get("life"), dict) else life_from_structure(st.get("life"))
+    if life:
+        base["life"] = _overlay(base.get("life") or {}, life)
     band = str(prof.get("closeness") or st.get("closeness") or "").strip()
     if band in CLOSENESS:
         base.setdefault("relationships", {})["你"] = dict(CLOSENESS[band])

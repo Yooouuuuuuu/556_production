@@ -1,0 +1,24 @@
+{
+  "name": "自由工作者",
+  "note": "在家接案，晚起，下午和深夜工作；客戶的案子在改。",
+  "schedule": {
+    "bedtime": 1.5,
+    "wake": 9.5,
+    "bedtime_delay_max_h": 2.0,
+    "work": [[11.0, 14.0], [20.0, 24.0]],
+    "hobby": [[15.0, 18.0]],
+    "meals": [[14.0, 15.0], [19.0, 20.0]]
+  },
+  "busyness_mode": "work",
+  "wake_on_message": true,
+  "projects": [
+    {"title": "客戶的案子", "stage": "修改中", "difficulty": 0.6, "progress": 0.0}
+  ],
+  "small_events": [
+    {"text": "客戶一次就過稿", "v": 0.5, "R": 0.4, "p": 0.08, "kind": "work", "share": true},
+    {"text": "貓跳到鍵盤上，打了一堆亂碼", "v": 0.2, "R": 0.2, "p": 0.1, "kind": "life", "share": true},
+    {"text": "外送晚了半小時才到", "v": -0.2, "R": 0.2, "p": 0.08, "kind": "life", "share": true},
+    {"text": "客戶半夜傳來新的修改意見", "v": -0.4, "R": 0.4, "p": 0.06, "kind": "work", "share": true},
+    {"text": "坐太久，腰很酸", "v": -0.3, "R": 0.4, "p": 0.06, "kind": "unwell", "share": true}
+  ]
+}

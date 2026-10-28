@@ -215,3 +215,48 @@ def test_scratch_line_is_compiled_only_when_asked():
             "## 說話的方式\n- z\n\n## 遇到事情的時候\n- w\n\n## 誰在跟你說話\n" + sw.WHO_LINE)
     assert not [x for x in sw.checks(soul) if "理論字或機器字" in x]
 
+
+def test_assemble_keeps_what_the_package_already_set(tmp_path):
+    # the 主動 sliders (and anything hand-set) live in the package's psyche.json; re-running the skill must not wipe them,
+    # while the keys the skill derives from profile.json win, and the machine's zone never enters the package
+    d = tmp_path / "c"
+    (d / "build").mkdir(parents=True)
+    (d / "profile.json").write_text(json.dumps({"constants": {"expressiveness": 0.2}, "pronoun": "他"}), encoding="utf-8")
+    (d / "build" / "structure.json").write_text(json.dumps({}), encoding="utf-8")
+    (d / "psyche.json").write_text(json.dumps({"proactive": {"daily_cap": 5, "speak": "never"}, "character": {"expressiveness": 0.9, "humor_coping": 0.1},
+                                       "time": {"tick_s": 30, "timezone_offset_h": 8}}), encoding="utf-8")
+    out = sw.build_psyche(d)
+    assert out["proactive"]["daily_cap"] == 5 and out["proactive"]["speak"] == "never"   # kept
+    assert out["character"]["expressiveness"] == 0.2                                    # profile.json wins for what it carries
+    assert out["character"]["humor_coping"] == 0.1                                      # a hand-set constant the profile does not name stays
+    assert out["time"]["tick_s"] == 30 and "timezone_offset_h" not in out["time"]        # the package never carries the zone
+    assert "appraisal" in out and "expression" in out                                   # template keys the package lacked appear
+    fresh = tmp_path / "n"
+    (fresh / "build").mkdir(parents=True)
+    (fresh / "profile.json").write_text(json.dumps({}), encoding="utf-8")
+    assert "proactive" not in sw.build_psyche(fresh)                                   # no package file yet: the template as before
+
+
+def test_her_day_comes_from_the_profile_then_the_draft_then_the_template(tmp_path):
+    # profile.json `life` (the page) wins; else the structure phase's draft, converted to the engine's shape; else the
+    # template's neutral day — a schedule, nothing in hand, no small events (the idol defaults are gone from the code)
+    d = tmp_path / "c"
+    (d / "build").mkdir(parents=True)
+    (d / "profile.json").write_text(json.dumps({}), encoding="utf-8")
+    (d / "build" / "structure.json").write_text(json.dumps({}), encoding="utf-8")
+    out = sw.build_psyche(d)
+    assert out["life"]["projects"] == [] and out["life"]["small_events"] == [] and out["life"]["schedule"]["wake"] == 7.5
+    draft = {"wake": 9.5, "bedtime": 1, "busy": [[11, 14], [20, 24]], "busyness_mode": "work",
+             "project": {"title": "客戶的案子", "stage": "修改中"}, "small_events": [{"text": "客戶一次就過稿", "v": 0.5}, {"text": "", "v": 1}, {"text": "外送晚到", "v": -0.2}]}
+    (d / "build" / "structure.json").write_text(json.dumps({"life": draft}, ensure_ascii=False), encoding="utf-8")
+    out = sw.build_psyche(d)
+    assert out["life"]["schedule"]["wake"] == 9.5 and out["life"]["schedule"]["bedtime"] == 1.0 and out["life"]["schedule"]["work"] == [[11.0, 14.0], [20.0, 24.0]]
+    assert out["life"]["schedule"]["meals"] == [[12.5, 13.5], [18.5, 19.5]]      # what the draft does not name keeps the template's value
+    assert out["life"]["projects"] == [{"title": "客戶的案子", "stage": "修改中", "difficulty": 0.5, "progress": 0.0}]
+    assert [e["text"] for e in out["life"]["small_events"]] == ["客戶一次就過稿", "外送晚到"] and out["life"]["small_events"][1]["v"] == -0.2
+    mine = {"schedule": {"wake": 12.0}, "busyness_mode": "hobby", "projects": [], "small_events": [{"text": "半夜很安靜", "v": 0.2, "R": 0.3, "p": 0.1, "kind": "life", "share": True}]}
+    (d / "profile.json").write_text(json.dumps({"life": mine}, ensure_ascii=False), encoding="utf-8")
+    out = sw.build_psyche(d)
+    assert out["life"]["schedule"]["wake"] == 12.0 and out["life"]["busyness_mode"] == "hobby" and out["life"]["projects"] == []
+    assert out["life"]["small_events"][0]["text"] == "半夜很安靜"
+    assert sw.life_from_structure(None) is None and sw.life_from_structure({"wake": None, "small_events": []}) is None

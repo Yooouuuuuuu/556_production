@@ -1,6 +1,6 @@
 # The app — 556 Production (Electron + React)
 
-Living doc; last verified 2026-10-19 (0.10.0). The shape decided on 2026-09-30 (notes below) still holds.
+Living doc; last verified 2026-10-28 (0.11.0). The shape decided on 2026-09-30 (notes below) still holds.
 What landed since:
 
 - **0.3.0** (2026-10-01): one app owns 556d's lifecycle; office window with 聊天, 名單, 記憶, 設定 (two tiers
@@ -79,6 +79,11 @@ What landed since:
 - **0.9.0** (2026-10-19): 設定 → 全域 → **模型連線** — master endpoint with 檢查 (lists the endpoint's models), 對話／記憶／寫靈魂
   follow it or carry their own, the vectors (local llama-server or an embeddings endpoint), the timezone; what is missing is
   listed and a character does not start until it is complete; the new-character page shows the configured model.
+- **0.11.0** (2026-10-28): 新角色 → 確認 gains **日子與作息** — a sample day to pick (`templates/life/`), the
+  description's draft, or your own: wake, bedtime, busy and meal blocks, kind of busy, the thing in hand, small events
+  one per line (+ good, - bad, ! unwell); saved as profile.json `life`, written by the skill into psyche.json. Under the
+  hood a SOUL or people-file edit reaches her at the first turn after a restart (556d drops the session's stored
+  prompt), and re-running the skill keeps the 主動 sliders.
 - **0.10.2** (2026-10-28): no UI change beyond two fixes — the new-character page keeps typed description text (a phase
   run saves unsaved boxes first; a reload after a job never wipes them), and the 設定 save no longer crashes on an empty
   list. Under the hood a restart within 20 s no longer leaves the psyche engine read-only.

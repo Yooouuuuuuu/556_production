@@ -316,7 +316,8 @@ it was settled that this content does not grow through conversation, "fixed and 
 ## What she reads, and the knobs (0.10.0)
 
 **System prompt, once per session** — kokoro's section `kokoro.memory` (`register_system_prompt_section`, position
-`after_memory`, at most 4 000 chars, frozen into the session like every section): the zh-TW memory rule (how to read
+`after_memory`, at most 4 000 chars, frozen into the session like every section, until the next restart: since 0.11.0 556d drops the session's stored
+prompt before every start and the first turn rebuilds it): the zh-TW memory rule (how to read
 the block: `[high]` is certain, plain is probably right, notes are dated, `[archived: …]` is never spoken — only asked
 about when the other side touches it, `By name` is why a person came up, what is not in memory is unknown — no
 guessing), then 關於<her term for you>：`people/你.md` (first 2 000 chars; `memories/USER.md` as the legacy
