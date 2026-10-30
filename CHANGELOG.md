@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.12.1 — 2026-10-30
+
+- **Re-seeding replaces, it no longer piles up.** `tools/seed-memories.py` (run by every install) removes the seed rows
+  the package no longer has — only rows the seeding wrote (`meta.seed`), never what she learned in conversation — then
+  adds the missing ones. Before, matching by exact text alone meant that re-running the skill (which rewrites every
+  seed's wording) left an installed character with near-duplicate seeds. `--keep-old` keeps them; `--replace` is gone.
+
 ## 0.12.0 — 2026-10-30
 
 - **關係: how close you start is a bar; what you went through together is memory.** The new-character page's 描述

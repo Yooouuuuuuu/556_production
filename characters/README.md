@@ -25,8 +25,9 @@ Outputs (regenerate explicitly; `soul.lock.json` records which inputs produced t
   (with five lines she would say and five she would not), 遇到事情的時候 (with a fallback table), 誰在跟你說話. Inside the
   background, `## 時間線` (absolute dates, oldest first) and `## 影響過你的人與事` — the dated, always-on part of who she
   is; the only place digits are allowed, not counted in the 2,500–4,000 budget (0.10.0).
-- `seeds.jsonl` — memories to load with `tools/seed-memories.py`; a row with `at` (YYYY, YYYY-MM or YYYY-MM-DD) is
-  stored at that date. Memories about you keep the subject word 你; the others are named. Rows tagged `shared` are
+- `seeds.jsonl` — memories to load with `tools/seed-memories.py` (every install runs it; since 0.12.1 it also removes
+  the seed rows the package no longer has, never what she learned in conversation); a row with `at` (YYYY, YYYY-MM or
+  YYYY-MM-DD) is stored at that date. Memories about you keep the subject word 你; the others are named. Rows tagged `shared` are
   `profile.json` `shared_past` turned into memory by the structure phase (0.12.0): the model only splits and phrases
   under the same rules, adds nothing, and the verify phase checks them against the SOUL; they never enter SOUL.md or
   people/你.md, so later real memories outrank them like any other row.

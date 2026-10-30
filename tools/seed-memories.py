@@ -34,7 +34,7 @@ def _ts(at) -> float | None:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("name")
-    ap.add_argument("--replace", action="store_true")
+    ap.add_argument("--keep-old", action="store_true", help="leave seed rows the package no longer has (default: remove them)")
     args = ap.parse_args()
     src = ROOT / "characters" / args.name / "seeds.jsonl"
     profile = ROOT / "home" / "profiles" / args.name
@@ -56,13 +56,19 @@ def main() -> int:
         ks._set_meta_default("subject", kok.get("subject", "你"))  # the store's fixed subject word, as kokoro would set it
     except Exception:
         pass
+    wanted = [json.loads(line) for line in src.read_text(encoding="utf-8").splitlines() if line.strip()]
+    want_texts = {w["text"] for w in wanted}
+    # Seeds the package no longer has leave the store (0.12.1): a re-run of the skill rewrites every seed's wording, and
+    # matching by exact text alone made an installed character collect near-duplicates. Only rows the seeding wrote
+    # (meta.seed) are touched; what she learned in conversation is never. --keep-old leaves them.
+    removed = 0
+    stale = [m.id for m in ks.all(include_archived=True) if m.meta.get("seed") and m.text not in want_texts]
+    if stale and not args.keep_old:
+        removed = ks.delete(ids=stale, reason="seed replaced by the package's current seeds.jsonl")
     existing = {r[0] for r in ks.conn.execute("SELECT text FROM memories").fetchall()}
     n = 0
-    for line in src.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        item = json.loads(line)
-        if item["text"] in existing and not args.replace:
+    for item in wanted:
+        if item["text"] in existing:
             continue
         ts = _ts(item.get("at"))  # a dated seed (YYYY, YYYY-MM or YYYY-MM-DD) is stored at that time, not at seeding time
         meta = {"seed": True, "source": "設定"}
@@ -71,7 +77,7 @@ def main() -> int:
         ks.add(item["text"], item.get("tags", []), meta, ts=ts)
         n += 1
     ks.close()
-    print(f"{args.name}: {n} seed memories added to {db}")
+    print(f"{args.name}: {n} seed memories added, {removed} old seed(s) removed ({db})")
     return 0
 
 
