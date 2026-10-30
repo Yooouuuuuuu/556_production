@@ -178,7 +178,10 @@ def phase_simple(d: Path, force: bool = False) -> List[str]:
     found = [x for x in checks(soul, "") if not x.startswith(("太短：", "太長："))]   # flatter and shorter is the stated cost
     write_text(d / "build" / "check.md", "# 檢查（簡單版）\n" + ("\n".join(f"- {x}" for x in found) if found else "- 通過"))
     write_text(d / "SOUL.md", soul)
-    if not (d / "seeds.jsonl").exists():
+    lines = [ln.strip(" -•\t") for ln in shared_past(d).splitlines() if ln.strip(" -•\t")]
+    if lines:   # no model here: each line of 關係 → 一起經歷過的事 is one memory as written (0.12.0)
+        (d / "seeds.jsonl").write_text("".join(json.dumps({"text": fix_simplified(ln), "tags": ["shared"]}, ensure_ascii=False) + "\n" for ln in lines), encoding="utf-8")
+    elif not (d / "seeds.jsonl").exists():
         (d / "seeds.jsonl").write_text("", encoding="utf-8")
     if not (d / "people" / "你.md").exists():
         write_text(d / "people" / "你.md", "# 你\n- 名字：（尚未設定）\n- 回覆語言：跟著對方（對方用什麼語言就用什麼語言回覆）\n")
@@ -213,7 +216,6 @@ P_STRUCTURE = """從描述整理出下面幾樣，輸出 JSON：
 - "refusals": {pr}不會答應、不會做的事。
 - "tensions": {pr}自己也沒想清楚的矛盾，兩到三條。
 - "cares_about": {pr}在乎什麼，五到七條短句（評估{pr}心情時會用到，例：「答應的事有沒有做到」）。
-- "closeness": {pr}跟「跟{pr}說話的人」現在有多熟，五選一："剛認識"、"還不算熟"、"朋友"、"很熟"、"很親近"；附 "closeness_why" 一句證據。描述沒提就 "朋友"。
 - "life": {pr}的日子，描述有寫到的才填，沒寫的欄位用 null：{{"wake": 起床時間（小時，例 7.5）, "bedtime": 睡覺時間（小時，例 23.5；凌晨一點寫 1）, "busy": [[開始, 結束], ...] 忙的時段（上班、上課；小時）, "busyness_mode": "work"（上班上課）|"hobby"（做自己的事）|"none"（不忙）, "project": {{"title": "{pr}手上在做的一件事", "stage": "到哪個階段"}}, "small_events": [{{"text": "會發生在{pr}日子裡的一件小事，一句", "v": -1 到 1 好壞}}] 三到六條}}；描述完全沒寫就 null。
 - "vague": 描述裡太空泛、猜不出行為的句子，每條 {{"line": "原句", "why": "為什麼"}}；沒有就空陣列。
 
@@ -276,6 +278,23 @@ P_VERIFY = """你會讀到一份角色設定。只依設定的內容判斷這個
 
 ## 設定
 {soul}"""
+
+
+P_SHARED = """下面是作者寫的、{name}（{pr}）跟「跟{pr}說話的人」一起經歷過的事。把它整理成要載入記憶庫的記憶條目，一件事一條。只輸出 JSON：
+{{"seeds": [{{"text": "一句話", "tags": ["shared", "另一個英文小寫標籤"], "at": "YYYY-MM-DD 或 YYYY-MM 或 YYYY——只在作者有寫日期時填，沒有就省略，不要猜"}}]}}
+規則：跟{pr}說話的人寫「你」；{pr}自己寫「{name}」（不要用別的稱呼）；只寫作者寫了的事，不補細節、不加感想、不推論；一條一件；作者寫幾件就幾條。
+
+## 一起經歷過的事
+{shared}"""
+
+P_SHARED_CHECK = """你會讀到一份角色設定（{name}，{pr}），和幾條「{name}跟對方一起經歷過的事」的記憶。只找兩者對不上的地方：年齡、時間、地點、人物、跟設定裡寫的經歷互相矛盾的。沒有就空陣列。只輸出 JSON：
+{{"conflicts": ["一句話說哪一條記憶跟設定的哪一句對不上"]}}
+
+## 設定
+{soul}
+
+## 記憶
+{seeds}"""
 
 
 # ----------------------------------------------------------------------------- files
@@ -405,8 +424,38 @@ def phase_intake(llm, d: Path) -> Dict[str, Any]:
 def phase_structure(llm, d: Path) -> Dict[str, Any]:
     pr = pronoun(d)
     data = ask(llm, d, "structure", SYSTEM.format(pr=pr), P_STRUCTURE.format(pr=pr, describe=describe_text(read_describe(d))))
+    data.pop("closeness", None)       # 0.12.0: how close you start is the author's bar (profile.json), never proposed
+    data.pop("closeness_why", None)
+    data["shared_seeds"] = shared_seeds(llm, d)
     write_json(d / "build" / "structure.json", data)
     return data
+
+
+def shared_past(d: Path) -> str:
+    """profile.json `shared_past`: what the author wrote under 關係 → 一起經歷過的事 (0.12.0). It becomes memory rows
+    like anything she will remember from real talk — never SOUL text, never the people file."""
+    prof = read_json(d / "profile.json", {}) or {}
+    return str(prof.get("shared_past") or "").strip()
+
+
+def shared_seeds(llm, d: Path) -> List[Dict[str, Any]]:
+    """The author's shared past as memory rows: the model only splits and phrases (subject rules, dates only when
+    written), it adds nothing; [] when the box is empty."""
+    text = shared_past(d)
+    if not text:
+        return []
+    pr = pronoun(d)
+    res = ask(llm, d, "shared", SYSTEM.format(pr=pr), P_SHARED.format(pr=pr, name=display(d), shared=text))
+    out: List[Dict[str, Any]] = []
+    for s in res.get("seeds") or []:
+        if not isinstance(s, dict) or not str(s.get("text") or "").strip():
+            continue
+        tags = [str(t).strip().lower() for t in (s.get("tags") or []) if str(t).strip() and str(t).strip().lower() != "shared"]
+        row: Dict[str, Any] = {"text": str(s["text"]).strip(), "tags": ["shared", *tags][:3]}
+        if str(s.get("at") or "").strip():
+            row["at"] = str(s["at"]).strip()
+        out.append(row)
+    return out
 
 
 def phase_thinking(llm, d: Path, accept: bool) -> Dict[str, Any]:
@@ -650,6 +699,9 @@ def build_seeds(d: Path) -> List[Dict[str, Any]]:
     for s in st.get("seeds") or []:
         if isinstance(s, dict):
             add(s.get("text"), s.get("tags"), s.get("at"))
+    for s in st.get("shared_seeds") or []:   # 關係 → 一起經歷過的事 (0.12.0): memory with its own tag, never SOUL text
+        if isinstance(s, dict):
+            add(s.get("text"), ["shared", *[t for t in (s.get("tags") or []) if str(t).strip().lower() != "shared"]], s.get("at"))
     return rows
 
 
@@ -760,7 +812,7 @@ def build_psyche(d: Path) -> Dict[str, Any]:
     life = prof.get("life") if isinstance(prof.get("life"), dict) else life_from_structure(st.get("life"))
     if life:
         base["life"] = _overlay(base.get("life") or {}, life)
-    band = str(prof.get("closeness") or st.get("closeness") or "").strip()
+    band = str(prof.get("closeness") or "").strip()   # 0.12.0: the author's bar; the skill no longer proposes one
     if band in CLOSENESS:
         base.setdefault("relationships", {})["你"] = dict(CLOSENESS[band])
     return base
@@ -891,6 +943,13 @@ def phase_verify(llm, d: Path) -> Dict[str, Any]:
         raise SystemExit("verify: SOUL.md missing — run assemble first")
     soul = soul_p.read_text(encoding="utf-8")
     data = ask(llm, d, "verify", "你是審稿人。只輸出 JSON。", P_VERIFY.format(soul=soul))
+    st = read_json(d / "build" / "structure.json", {}) or {}
+    shared = [s for s in st.get("shared_seeds") or [] if isinstance(s, dict) and str(s.get("text") or "").strip()]
+    conflicts: List[str] = []
+    if shared:   # 0.12.0: the author's shared past is memory, so it is checked against the SOUL instead of written into it
+        chk = ask(llm, d, "shared_check", "你是審稿人。只輸出 JSON。",
+                  P_SHARED_CHECK.format(pr=pronoun(d), name=display(d), soul=soul, seeds="\n".join(f"- {s['text']}" for s in shared)))
+        conflicts = [str(x).strip() for x in chk.get("conflicts") or [] if str(x).strip()]
     prof = read_json(d / "profile.json", {}) or {}
     th, ch = prof.get("thinking") or {}, prof.get("choices") or {}
     rows: List[str] = []
@@ -917,9 +976,11 @@ def phase_verify(llm, d: Path) -> Dict[str, Any]:
     report = ["# 盲讀回推（只給設定，不給描述）", f"模型：{data.get('_meta', {}).get('model')}", "",
               "| 項目 | 設定值 | 讀回 | |", "| --- | --- | --- | --- |", *rows, "",
               f"一致：{hits}/{total}", f"依據：{data.get('note', '')}", "", "## 機械檢查", *(f"- {x}" for x in (checks(soul, describe_text(read_describe(d))) or ["通過"]))]
+    if shared:
+        report += ["", f"## 共同經歷（{len(shared)} 條記憶）對設定"] + ([f"- {x}" for x in conflicts] or ["- 沒有對不上的地方"])
     write_text(d / "build" / "verify.md", "\n".join(report))
-    write_json(d / "build" / "verify.json", {**data, "matches": hits, "total": total})
-    print(f"verify: {hits}/{total} consistent; report in build/verify.md")
+    write_json(d / "build" / "verify.json", {**data, "matches": hits, "total": total, "shared_conflicts": conflicts})
+    print(f"verify: {hits}/{total} consistent; report in build/verify.md" + (f"; shared past: {len(conflicts)} conflict(s)" if shared else ""))
     return data
 
 

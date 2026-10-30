@@ -137,9 +137,20 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
   const [thenRest, setThenRest] = useState(false); // 「全部」: after a clean intake, continue from structure
   const logRef = useRef<HTMLPreElement>(null);
   const describeDirty = useRef(false); // typed but not saved: a reload (a job ending) must not wipe it
+  const relDirty = useRef(false); // the 關係 inputs (bar, shared past) typed but not saved — same rule
 
   const refreshList = () => chars.list().then((r) => { setList(r.characters); setTemplate(r.template); setModel(r.model || ''); setLifeSamples(r.life_samples || []); }).catch((e) => setNotice({ kind: 'err', text: String(e) }));
-  const load = (cid: string) => chars.detail(cid).then((d) => { setDetail(d); if (!describeDirty.current) setDescribe(d.describe); setProfile(d.profile); }).catch((e) => setNotice({ kind: 'err', text: String(e) }));
+  const load = (cid: string) => chars.detail(cid).then((d) => {
+    setDetail(d);
+    if (!describeDirty.current) setDescribe(d.describe);
+    setProfile((p) => (relDirty.current && p && d.profile ? { ...d.profile, closeness: p.closeness ?? null, shared_past: p.shared_past ?? '' } : d.profile));
+  }).catch((e) => setNotice({ kind: 'err', text: String(e) }));
+  // the 關係 inputs are inputs like the describe boxes: saved before a run, and with 儲存
+  const saveRelation = async (cid: string) => {
+    if (!relDirty.current || !profile) return;
+    await chars.saveProfile(cid, { closeness: profile.closeness ?? null, shared_past: profile.shared_past ?? '' });
+    relDirty.current = false;
+  };
 
   useEffect(() => { refreshList(); }, []);
   useEffect(() => { if (id) { setDetail(null); describeDirty.current = false; load(id); } }, [id]);
@@ -178,7 +189,7 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
   async function saveDescribe() {
     if (!id) return;
     setBusy(true); setNotice(null);
-    try { await chars.saveDescribe(id, describe); describeDirty.current = false; setNotice({ kind: 'ok', text: t('newchar.saved') }); await load(id); refreshList(); }
+    try { await chars.saveDescribe(id, describe); describeDirty.current = false; await saveRelation(id); setNotice({ kind: 'ok', text: t('newchar.saved') }); await load(id); refreshList(); }
     catch (e) { setNotice({ kind: 'err', text: String(e) }); } finally { setBusy(false); }
   }
   async function run(phase: string, yes: boolean, force = false, from?: string) {
@@ -186,6 +197,7 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
     setNotice(null);
     try {
       if (describeDirty.current || (detail && JSON.stringify(describe) !== JSON.stringify(detail.describe))) { await chars.saveDescribe(id, describe); describeDirty.current = false; } // what is typed is what runs: unsaved boxes are saved first
+      await saveRelation(id);
       const r = await chars.run(id, { phase, from, yes, force }); setDetail((d) => (d ? { ...d, job: r.job } : d));
     } catch (e) { setNotice({ kind: 'err', text: String(e) }); }
   }
@@ -194,7 +206,8 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
     if (!id || !profile) return;
     setBusy(true); setNotice(null);
     try {
-      await chars.saveProfile(id, { pronoun: profile.pronoun, closeness: profile.closeness ?? null, scratch: !!profile.scratch, simple: profile.simple ?? null, big5: profile.big5, constants: profile.constants, thinking: profile.thinking, choices: profile.choices, life: profile.life ?? null });
+      await chars.saveProfile(id, { pronoun: profile.pronoun, closeness: profile.closeness ?? null, scratch: !!profile.scratch, simple: profile.simple ?? null, big5: profile.big5, constants: profile.constants, thinking: profile.thinking, choices: profile.choices, life: profile.life ?? null, shared_past: profile.shared_past ?? '' });
+      relDirty.current = false;
       const force = !!detail?.soul && !detail.character.phases.includes('assemble') ? confirm(t('newchar.simple_force')) : false;
       const r = await chars.simple(id, force);
       setDetail((d) => (d ? { ...d, job: r.job } : d));
@@ -206,7 +219,8 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
     if (!id || !profile) return;
     setBusy(true); setNotice(null);
     try {
-      const r = await chars.saveProfile(id, { pronoun: profile.pronoun, closeness: profile.closeness ?? null, scratch: !!profile.scratch, simple: profile.simple ?? null, big5: profile.big5, constants: profile.constants, thinking: profile.thinking, choices: profile.choices, life: profile.life ?? null });
+      const r = await chars.saveProfile(id, { pronoun: profile.pronoun, closeness: profile.closeness ?? null, scratch: !!profile.scratch, simple: profile.simple ?? null, big5: profile.big5, constants: profile.constants, thinking: profile.thinking, choices: profile.choices, life: profile.life ?? null, shared_past: profile.shared_past ?? '' });
+      relDirty.current = false;
       setProfile(r.profile); setNotice({ kind: 'ok', text: t('newchar.saved') });
     } catch (e) { setNotice({ kind: 'err', text: String(e) }); } finally { setBusy(false); }
   }
@@ -280,6 +294,28 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
                 <textarea className={`${field} min-h-[72px]`} rows={3} value={describe[stem] ?? ''} placeholder={template[stem] || ''} onChange={(e) => { describeDirty.current = true; setDescribe({ ...describe, [stem]: e.target.value }); }} />
               </div>
             ))}
+            {/* 關係 (0.12.0): two inputs, both may stay empty. The bar is her stance toward you (the engine's bond prior, never
+                the model's); what you went through together becomes memory rows like any other — never SOUL or people text. */}
+            {profile && (
+              <div className="rounded-lg bg-white/5 p-2 space-y-2">
+                <label className={label}>{t('newchar.relation')}</label>
+                <p className="text-xs opacity-60">{t('newchar.relation_note')}</p>
+                <div>
+                  <div className="flex items-center gap-3 text-sm">
+                    <span className="w-28 text-xs opacity-70">{t('newchar.relation_bar')}</span>
+                    <input type="range" min={0} max={4} step={1} className="flex-1" value={Math.max(0, CLOSENESS.indexOf(profile.closeness || ''))} onChange={(e) => { relDirty.current = true; const i = Number(e.target.value); setProfile({ ...profile, closeness: i > 0 ? CLOSENESS[i] : null }); }} />
+                    <span className="w-20 text-right">{profile.closeness || CLOSENESS[0]}</span>
+                  </div>
+                  <div className="flex justify-between text-[10px] opacity-50 pl-32 pr-20">{CLOSENESS.map((c) => <span key={c}>{c}</span>)}</div>
+                  <div className="text-xs opacity-60 mt-1">{t('newchar.relation_bar_hint')}</div>
+                </div>
+                <div>
+                  <label className={label}>{t('newchar.relation_past')}</label>
+                  <textarea className={`${field} min-h-[72px]`} rows={3} value={profile.shared_past ?? ''} onChange={(e) => { relDirty.current = true; setProfile({ ...profile, shared_past: e.target.value }); }} />
+                  <div className="text-xs opacity-60 mt-1">{t('newchar.relation_past_hint')}</div>
+                </div>
+              </div>
+            )}
             <button className={primary} disabled={busy || running} onClick={saveDescribe}>{t('newchar.save')}</button>
           </section>
 
@@ -358,14 +394,6 @@ export function NewCharacter({ onBack }: { onBack(): void }) {
                   <input type="checkbox" checked={!!profile.scratch} onChange={(e) => setProfile({ ...profile, scratch: e.target.checked })} />
                   <span>{t('newchar.scratch')}</span><span className="text-xs opacity-60">{t('newchar.scratch_note')}</span>
                 </label>
-                <div className="rounded-lg bg-white/5 p-2">
-                  <label className={label}>{t('newchar.closeness')}</label>
-                  <select className={field} value={profile.closeness ?? detail?.build?.structure?.closeness ?? ''} onChange={(e) => setProfile({ ...profile, closeness: e.target.value || null })}>
-                    <option value="">—</option>
-                    {CLOSENESS.map((o) => <option key={o} value={o}>{o}</option>)}
-                  </select>
-                  <div className="text-xs opacity-60 mt-1">{detail?.build?.structure?.closeness_why || t('newchar.closeness_hint')}</div>
-                </div>
                 <div className="rounded-lg bg-white/5 p-2 space-y-2">
                   <label className={label}>{t('newchar.life')}</label>
                   <div className="flex flex-wrap items-center gap-2">

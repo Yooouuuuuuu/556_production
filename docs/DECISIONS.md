@@ -5,6 +5,17 @@ One record for the whole project. Each heading carries its date and its part in 
 replaces; the designs themselves are in the part folders. Entries are grouped as they were written, not
 strictly sorted.
 
+## Decided (2026-10-30) — 關係: how close you start is a stance bar; what you went through together is memory, never SOUL text [prompt] [inner-life] [app]
+- The problem had two bad answers. A closeness number without a past is hollow, and a past written by a model is
+  fabrication; but deriving closeness strictly from the shared events the author wrote would make every relationship
+  take months of real talk and kill the premise of a virtual family or an old friend. The answer is to split what the
+  two things are. How close she starts is a stance — how deep she goes, the trust prior — and that is the author's
+  premise: a bar on the new-character page, never proposed by the skill (the structure phase's guess is gone), default
+  剛認識, said on the page. What you went through together is memory: the author's text, split into rows by the model
+  under the seed rules (nothing added, dates only when written), seeded with the `shared` tag, checked against the SOUL
+  in verify, and never written into SOUL.md or people/你.md — so it ranks like any other memory and real conversation
+  outgrows it. The bar cannot fake memories; the memories cannot fake the bar. Both may stay empty.
+
 ## Decided (2026-10-28) — a resumed session re-reads her files: 556d drops the stored prompt, no new session [prompt] [app]
 - Hermes continues a session with the system prompt it stored when the session opened, byte for byte, so an edited
   SOUL, people file or plugin section never reached the model until a new session (seen twice: the 0.10.0 memory rule

@@ -443,7 +443,7 @@ companion form); a part can be regenerated alone (`--phase`, `--from`), so the w
    cares_about; a vagueness audit — every line that cannot predict behaviour is flagged (有主見 fails,
    被放鴿子會記住，雖然嘴上說沒關係 passes).
 3. **Thinking.** Proposed meters with one line of evidence each; proposed dial 1 and 6 choices; proposed Big Five
-   and constants if blank; the closeness band. Into `profile.json` after confirmation (`--yes` accepts the
+   and constants if blank. Into `profile.json` after confirmation (`--yes` accepts the
    proposals). The number never comes from the LLM alone.
 4. **Voice.** Expression DNA, 口頭禪 and particles, words she never uses; the sample lines (五句會說、五句不會說)
    generated last, from the finished voice section.
@@ -543,8 +543,8 @@ compile of §2.5 kept as a first-class route, so a character exists after five m
    these: not verified). The blind validation on the test character: not built (item 2).
 5. **The five conversation mechanisms** ✅ built 0.8.9 (`inner-life.md`, the five mechanisms section;
    `relation.depth_now` / `depth_words`, `trust_uncertainty`, `strategy(pleasure=, uncertainty=)`, the engine's
-   `withheld` register with the appraisal's `withheld` field and the `unsaid` occasion; the skill's closeness band
-   → `relationships.你`). Fixed after 0.9.0: the register holds six per counterpart, not six in all, and an unsaid
+   `withheld` register with the appraisal's `withheld` field and the `unsaid` occasion; the author's closeness bar
+   → `relationships.你` — since 0.12.0 the skill proposes no band, and what you went through together is memory only). Fixed after 0.9.0: the register holds six per counterpart, not six in all, and an unsaid
    thing leaves it when the message really went out (`sent`), not when the urge fired. As planned (checked
    2026-10-14 against the engine), by cost: rendering the disclosure depth per counterpart and letting the 表現
    line cap what she opens up about (the number existed and nothing read it); trust variance from the Beta pair

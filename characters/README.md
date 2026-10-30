@@ -10,7 +10,9 @@ Inputs:
   filled one (an example description, a disposable test character).
 - `profile.json` — the numbers and choices the engine reads: Big Five, the seven constants (self-esteem stability,
   expressiveness, humor coping, clinginess cap, tsundere tendency, assertiveness, chronotype), the five thinking meters,
-  the dial 1 and 6 choices, pronoun, schedule, `closeness` (0.8.9), `scratch` (0.8.10) and `life` (0.11.0: her day — wake and
+  the dial 1 and 6 choices, pronoun, schedule, `closeness` (the author's bar, 剛認識 … 很親近 — since 0.12.0 never proposed by
+  the skill; unset = 剛認識), `shared_past` (0.12.0: what you went through together, in your words — memory rows only, see
+  seeds below), `scratch` (0.8.10) and `life` (0.11.0: her day — wake and
   bedtime, busy and meal blocks, kind of busy, the thing in hand, small events — from the new-character page: a sample
   under `templates/life/`, the structure phase's draft, or your own). The skill's thinking phase
   proposes the meters and choices with one line of evidence each (`proposed`); you confirm by filling the null fields
@@ -24,7 +26,10 @@ Outputs (regenerate explicitly; `soul.lock.json` records which inputs produced t
   background, `## 時間線` (absolute dates, oldest first) and `## 影響過你的人與事` — the dated, always-on part of who she
   is; the only place digits are allowed, not counted in the 2,500–4,000 budget (0.10.0).
 - `seeds.jsonl` — memories to load with `tools/seed-memories.py`; a row with `at` (YYYY, YYYY-MM or YYYY-MM-DD) is
-  stored at that date. Memories about you keep the subject word 你; the others are named.
+  stored at that date. Memories about you keep the subject word 你; the others are named. Rows tagged `shared` are
+  `profile.json` `shared_past` turned into memory by the structure phase (0.12.0): the model only splits and phrases
+  under the same rules, adds nothing, and the verify phase checks them against the SOUL; they never enter SOUL.md or
+  people/你.md, so later real memories outrank them like any other row.
 - `people/*.md` — how she sees you (`你.md`, also carries your name and reply language from Settings) and each other
   character.
 - `psyche.json` — the engine's file, built from `profile.json` and the template: `thinking` and `thinking_choices` for

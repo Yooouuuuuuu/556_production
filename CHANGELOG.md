@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.12.0 — 2026-10-30
+
+- **關係: how close you start is a bar; what you went through together is memory.** The new-character page's 描述
+  step gains a 關係 block with two inputs, both optional, and says the default: 剛認識, no shared past. The bar
+  (剛認識 … 很親近) sets only her stance toward you — profile.json `closeness` → psyche.json `relationships.你`, the
+  disclosure depth and trust prior — and is never proposed by the model (the structure phase stops guessing a band from
+  the description). 一起經歷過的事 is your text in your words: the structure phase turns it into memory rows only
+  (`shared_seeds` — the model splits and phrases under the seed rules, 你 for you, her name for her, dates only when
+  written, nothing added), they land in seeds.jsonl with the `shared` tag and are seeded into KeepsakeDB like any other
+  memory, never written into SOUL.md or people/你.md — so she brings them up when recall finds them and real
+  conversation outgrows them naturally. The verify phase checks those rows against the SOUL (`shared_conflicts`, a
+  section in verify.md). The simple path takes each line as one memory as written. DECISIONS 2026-10-30.
+
 ## 0.11.0 — 2026-10-28
 
 - **A changed SOUL reaches her on the next turn, in the same conversation.** Hermes continues a session with the system

@@ -106,9 +106,10 @@ def test_full_pipeline_with_scripted_llm(tmp_path, monkeypatch):
     assert ps["character"]["big5"]["neuroticism"] == 0.6 and ps["character"]["chronotype"] == 0.9 and ps["character"]["pronoun"] == "她"
     assert ps["thinking"]["prevention"] == 0.7 and ps["thinking_choices"]["first_look"] == "people"
     assert ps["cares_about"][0] == "畫的東西有沒有被當真"
-    assert ps["relationships"]["你"] == {"bond": 0.2, "hours": 30.0}      # the structure's closeness band → the prior
+    assert "你" not in (ps.get("relationships") or {})                     # 0.12.0: the skill proposes no band; the bar is the author's
+    assert "closeness" not in sw.read_json(d / "build" / "structure.json")
     prof = sw.read_json(d / "profile.json")
-    prof["closeness"] = "很親近"                                            # profile.json overrides the band
+    prof["closeness"] = "很親近"                                            # the author's bar sets the prior
     sw.write_json(d / "profile.json", prof)
     assert sw.build_psyche(d)["relationships"]["你"]["bond"] == 0.8
     # lock + status
@@ -260,3 +261,48 @@ def test_her_day_comes_from_the_profile_then_the_draft_then_the_template(tmp_pat
     assert out["life"]["schedule"]["wake"] == 12.0 and out["life"]["busyness_mode"] == "hobby" and out["life"]["projects"] == []
     assert out["life"]["small_events"][0]["text"] == "半夜很安靜"
     assert sw.life_from_structure(None) is None and sw.life_from_structure({"wake": None, "small_events": []}) is None
+
+
+def test_shared_past_becomes_memory_never_soul(tmp_path, monkeypatch):
+    # 關係 → 一起經歷過的事: the model only splits it into memory rows (subject rules, dates only when written); the rows go to
+    # seeds.jsonl with the shared tag, never into SOUL.md or people/你.md; verify checks them against the SOUL
+    d = _make_char(tmp_path, monkeypatch)
+    prof = sw.read_json(d / "profile.json")
+    prof["shared_past"] = "2021 年一起去花蓮\n你教過角色甲騎車"
+    prof["closeness"] = "朋友"
+    sw.write_json(d / "profile.json", prof)
+    shared = {"seeds": [{"text": "2021 年你和角色甲一起去花蓮", "tags": ["trip"], "at": "2021"}, {"text": "你教過角色甲騎車", "tags": ["shared"]}]}
+    llm = ScriptedLLM([_j(STRUCTURE), _j(shared), _j(THINKING), _j(VOICE), _j(REACTIONS), _j(PARTS), _j(VERIFY),
+                       _j({"conflicts": ["設定說她不會騎車，記憶說你教過她騎車"]})])
+    llm.model = "scripted"
+    sw.phase_structure(llm, d)
+    st = sw.read_json(d / "build" / "structure.json")
+    assert "closeness" not in st
+    assert [s["tags"] for s in st["shared_seeds"]] == [["shared", "trip"], ["shared"]] and st["shared_seeds"][0]["at"] == "2021"
+    sw.phase_thinking(llm, d, accept=True)
+    sw.phase_voice(llm, d)
+    sw.phase_reactions(llm, d)
+    sw.phase_parts(llm, d)
+    sw.phase_assemble(d, force=True, model="scripted")
+    rows = [json.loads(ln) for ln in (d / "seeds.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert any(r["text"] == "你教過角色甲騎車" and r["tags"] == ["shared"] for r in rows)
+    assert any(r["text"].endswith("一起去花蓮") and r.get("at") == "2021" and r["tags"] == ["shared", "trip"] for r in rows)
+    soul = (d / "SOUL.md").read_text(encoding="utf-8")
+    you = (d / "people" / "你.md").read_text(encoding="utf-8")
+    assert "花蓮" not in soul and "騎車" not in soul and "花蓮" not in you and "騎車" not in you
+    assert sw.build_psyche(d)["relationships"]["你"]["bond"] == 0.4      # the bar, not the skill
+    sw.phase_verify(llm, d)
+    v = sw.read_json(d / "build" / "verify.json")
+    assert v["shared_conflicts"] == ["設定說她不會騎車，記憶說你教過她騎車"]
+    assert "共同經歷（2 條記憶）對設定" in (d / "build" / "verify.md").read_text(encoding="utf-8")
+
+
+def test_simple_path_writes_shared_past_lines_as_memories(tmp_path, monkeypatch):
+    d = _make_char(tmp_path, monkeypatch)
+    prof = sw.read_json(d / "profile.json")
+    prof["shared_past"] = "- 2020 年一起搬家\n\n你常常忘記帶鑰匙，角色甲幫你留一把"
+    sw.write_json(d / "profile.json", prof)
+    sw.phase_simple(d, force=True)
+    rows = [json.loads(ln) for ln in (d / "seeds.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert [r["text"] for r in rows] == ["2020 年一起搬家", "你常常忘記帶鑰匙，角色甲幫你留一把"] and all(r["tags"] == ["shared"] for r in rows)
+    assert "搬家" not in (d / "SOUL.md").read_text(encoding="utf-8")
