@@ -43,7 +43,7 @@ func TestWriteKokoroAndPsycheFromConnections(t *testing.T) {
 	dir := t.TempDir()
 	kp := filepath.Join(dir, "kokoro.json")
 	_ = os.WriteFile(kp, []byte(`{"subject":"你","llm":{"timeout":120},"embedder":{"base_url":"http://old/v1","model":"old"}}`), 0o644)
-	err := writeKokoroConnections(kp, models.Endpoint{BaseURL: "http://127.0.0.1:18765/v1", Model: "m", APIKey: "k"},
+	err := writeKokoroConnections(kp, models.Endpoint{BaseURL: "http://127.0.0.1:1234/v1", Model: "m", APIKey: "k"},
 		models.Embedder{Kind: models.EmbedLlama, Port: 55602, Model: "bge-m3", Dims: 1024})
 	if err != nil {
 		t.Fatal(err)
@@ -53,7 +53,7 @@ func TestWriteKokoroAndPsycheFromConnections(t *testing.T) {
 	_ = json.Unmarshal(b, &m)
 	llm := m["llm"].(map[string]any)
 	emb := m["embedder"].(map[string]any)
-	if llm["base_url"] != "http://127.0.0.1:18765/v1" || llm["model"] != "m" || llm["api_key"] != "k" || llm["timeout"] != 120.0 {
+	if llm["base_url"] != "http://127.0.0.1:1234/v1" || llm["model"] != "m" || llm["api_key"] != "k" || llm["timeout"] != 120.0 {
 		t.Fatalf("llm: %v", llm)
 	}
 	if emb["base_url"] != "http://127.0.0.1:55602/v1" || emb["model"] != "bge-m3" || emb["dims"] != 1024.0 || emb["api_key"] != nil {

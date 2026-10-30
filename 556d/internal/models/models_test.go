@@ -13,7 +13,7 @@ import (
 
 func full() Config {
 	return Config{
-		Master:   Endpoint{BaseURL: "http://127.0.0.1:18765/v1/", Model: "agy/gemini-3.8-flash", APIKey: "k1"},
+		Master:   Endpoint{BaseURL: "http://127.0.0.1:1234/v1/", Model: "vendor/model-a", APIKey: "k1"},
 		Chat:     Use{Use: UseMaster},
 		Memory:   Use{Use: UseMaster},
 		Soul:     Use{Use: UseCustom, Endpoint: Endpoint{BaseURL: "http://x/v1", Model: "m2", APIKey: "k2"}},
@@ -49,10 +49,10 @@ func TestNothingIsAssumed(t *testing.T) {
 
 func TestResolveMergeAndMask(t *testing.T) {
 	c := full()
-	if c.Resolve("chat").Model != "agy/gemini-3.8-flash" || c.Resolve("soul").Model != "m2" {
+	if c.Resolve("chat").Model != "vendor/model-a" || c.Resolve("soul").Model != "m2" {
 		t.Fatal("resolve")
 	}
-	if c.Resolve("chat").BaseURL != "http://127.0.0.1:18765/v1/" { // not normalized until Save/Merge
+	if c.Resolve("chat").BaseURL != "http://127.0.0.1:1234/v1/" { // not normalized until Save/Merge
 		t.Fatal("raw base url")
 	}
 	// the UI sends no keys back: Merge keeps the stored ones and trims
@@ -60,7 +60,7 @@ func TestResolveMergeAndMask(t *testing.T) {
 	next.Master.APIKey, next.Soul.APIKey = "", ""
 	next.Master.Model = " new-model "
 	got := Merge(c, next)
-	if got.Master.APIKey != "k1" || got.Soul.APIKey != "k2" || got.Master.Model != "new-model" || got.Master.BaseURL != "http://127.0.0.1:18765/v1" {
+	if got.Master.APIKey != "k1" || got.Soul.APIKey != "k2" || got.Master.Model != "new-model" || got.Master.BaseURL != "http://127.0.0.1:1234/v1" {
 		t.Fatalf("merge: %+v", got)
 	}
 	m := got.Masked()

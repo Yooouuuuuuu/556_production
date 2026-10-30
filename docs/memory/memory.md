@@ -319,7 +319,8 @@ it was settled that this content does not grow through conversation, "fixed and 
 `after_memory`, at most 4 000 chars, frozen into the session like every section, until the next restart: since 0.11.0 556d drops the session's stored
 prompt before every start and the first turn rebuilds it): the zh-TW memory rule (how to read
 the block: `[high]` is certain, plain is probably right, notes are dated, `[archived: …]` is never spoken — only asked
-about when the other side touches it, `By name` is why a person came up, what is not in memory is unknown — no
+about when the other side touches it, `By name` is why a person came up, a name in memory belongs to that person and never to whoever is talking now —
+who that is comes only from 關於你, and with no name there she uses none (0.12.2), what is not in memory is unknown — no
 guessing), then 關於<her term for you>：`people/你.md` (first 2 000 chars; `memories/USER.md` as the legacy
 fallback). The provider's own `system_prompt_block()` returns "" so nothing is injected twice. The SOUL (Hermes's
 identity slot) comes before it, with its 時間線.

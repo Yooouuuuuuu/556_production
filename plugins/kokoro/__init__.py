@@ -114,7 +114,7 @@ class KokoroMemoryProvider(MemoryProvider):
                          json_mode=bool(l.get("json_mode", False)))
         # which surface this agent serves — stamped on short-layer notes (meta only, never the text)
         platform = str(kwargs.get("platform") or "cli")
-        surfaces = {"api_server": "事務所", "telegram": "Telegram", "discord": "Discord", "cli": "終端機"}
+        surfaces = {"api_server": "app", "telegram": "Telegram", "discord": "Discord", "cli": "終端機"}  # the note label for where a turn happened; no agency framing (0.12.2)
         surfaces.update(cfg.get("surface_names", {}) or {})
         self._pipeline = Pipeline(self._store, llm, PipelineConfig(
             language=cfg.get("language", "zh-TW"), max_candidates=int(cfg.get("max_candidates", 8)),
@@ -245,7 +245,8 @@ class KokoroMemoryProvider(MemoryProvider):
                 "記憶：每一回合會附上一段「Memory」。「Facts (long-term)」是你記得的事（標 [high] 的很確定，沒標的很可能對）；"
                 "「Notes (recent, dated)」是近期的紀錄，一行一件、帶日期。對不上的時候：對話本身最準；其次是最新的一條，不分種類；"
                 "事實和紀錄平手時事實優先。「[archived: …]」是對方不想被提起的話題——絕不說出內容，只有對方自己碰到時才問一句要不要聊。"
-                "「By name」是因為對方提到了某個名字而翻出來的那個人的事。記憶裡沒有的事就是不知道，不編、不猜。")
+                "「By name」是因為對方提到了某個名字而翻出來的那個人的事。" + "記憶裡出現的名字是那個人的事，不是現在跟你說話的人的；跟你說話的人叫什麼只看「關於你」那段，沒寫就不用任何名字稱呼他。"
+                "記憶裡沒有的事就是不知道，不編、不猜。")
 
     # -- per turn ------------------------------------------------------------
     def prefetch(self, query: str, *, session_id: str = "") -> str:

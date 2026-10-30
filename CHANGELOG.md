@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.12.2 — 2026-10-30
+
+- **First install seeds without a started profile.** `seed-memories.py` reads the embedder from `home/models.json` when
+  the profile's kokoro.json has none yet (556d writes it at her first start, which used to come after the install, so a
+  brand-new character's seeds were skipped and the install job ended in error).
+- **A correction is never a stale seed.** A fact corrected in conversation supersedes the seed row and inherits its seed
+  flag; the 0.12.1 seed sync now leaves any row that supersedes another alone.
+- **Names in memory belong to their person.** After a relayed conversation a character knew another's name and used it
+  on you (the people file had no name for you, and the SOUL says to use a name when known). kokoro's memory rule now
+  says a name in memory is that person's, never whoever is talking now; who that is comes only from 關於你, and with no
+  name there she uses none. The note label for an app turn is `app`, not an agency word.
+
 ## 0.12.1 — 2026-10-30
 
 - **Re-seeding replaces, it no longer piles up.** `tools/seed-memories.py` (run by every install) removes the seed rows

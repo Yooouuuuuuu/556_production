@@ -31,6 +31,23 @@ def _ts(at) -> float | None:
         return None
 
 
+def embedder_from_models(path: Path) -> dict:
+    """The embedder block as 556d writes it into kokoro.json, resolved from home/models.json (models.go Embedder.URL)."""
+    try:
+        cfg = json.loads(path.read_text(encoding="utf-8-sig"))
+    except Exception:
+        return {}
+    emb = cfg.get("embedder") or {}
+    if emb.get("kind") == "llama":
+        base = f"http://127.0.0.1:{int(emb.get('port') or 0)}/v1" if emb.get("port") else ""
+    else:
+        base = str(emb.get("base_url") or "").rstrip("/")
+    out = {"base_url": base, "model": str(emb.get("model") or ""), "api_key": str(emb.get("api_key") or "")}
+    if emb.get("dims"):
+        out["dims"] = int(emb["dims"])
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("name")
@@ -46,7 +63,11 @@ def main() -> int:
     from keepsakedb.embedders import OpenAIEmbedder
     e = kok.get("embedder") or {}
     if not (e.get("base_url") and e.get("model")):
-        print("模型連線未設定：kokoro.json 沒有 embedder（在 app 的 設定 → 全域 → 模型連線 填好，啟動角色一次讓 556d 寫入，再來）")
+        # a profile 556d has not started yet (the first install) has no embedder in kokoro.json: take the connection
+        # from home/models.json, the same source 556d writes it from (設定 → 全域 → 模型連線); 556d keeps the embedder up
+        e = embedder_from_models(ROOT / "home" / "models.json")
+    if not (e.get("base_url") and e.get("model")):
+        print("模型連線未設定：kokoro.json 沒有 embedder，home/models.json 也沒有（在 app 的 設定 → 全域 → 模型連線 填好）")
         return 1
     emb = OpenAIEmbedder(e["base_url"], e["model"], api_key=e.get("api_key", ""), dims=e.get("dims"))
     db = profile / str(kok.get("db", "memory/{profile}.db")).format(profile=args.name)
@@ -62,7 +83,9 @@ def main() -> int:
     # matching by exact text alone made an installed character collect near-duplicates. Only rows the seeding wrote
     # (meta.seed) are touched; what she learned in conversation is never. --keep-old leaves them.
     removed = 0
-    stale = [m.id for m in ks.all(include_archived=True) if m.meta.get("seed") and m.text not in want_texts]
+    stale = [m.id for m in ks.all(include_archived=True)
+             if m.meta.get("seed") and not m.meta.get("supersedes") and m.text not in want_texts]   # a correction made in
+    # conversation inherits the seed flag through supersede (meta.supersedes): never a stale seed
     if stale and not args.keep_old:
         removed = ks.delete(ids=stale, reason="seed replaced by the package's current seeds.jsonl")
     existing = {r[0] for r in ks.conn.execute("SELECT text FROM memories").fetchall()}
