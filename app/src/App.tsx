@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Office } from './pages/Office';
 import { Avatar } from './pages/Avatar';
+import { Shell } from './pages/Shell';
 
-// Hash routing: the office window opens #/office, the avatar window #/avatar.
-function useRoute(): string {
-  const read = () => (window.location.hash.replace(/^#\/?/, '') || 'office');
+// Two windows share one bundle: the avatar window (#/avatar, transparent) and the office window (everything else).
+// #/settings opens the office with the gear screen up (the tray menu and the avatar's context menu link there).
+function useRoute() {
+  const read = () => location.hash.replace(/^#\/?/, '') || 'chat';
   const [route, setRoute] = useState(read);
   useEffect(() => {
     const on = () => setRoute(read());
@@ -18,6 +19,5 @@ export function App() {
   const route = useRoute();
   useEffect(() => { document.body.dataset.route = route === 'avatar' ? 'avatar' : 'office'; }, [route]);
   if (route === 'avatar') return <Avatar />;
-  const tab = route === 'settings' ? 'settings' : route === 'memory' ? 'memory' : route === 'roster' ? 'roster' : 'chat';
-  return <Office initialTab={tab} />;
+  return <Shell initialScreen={route === 'settings' ? 'settings' : 'main'} />;
 }

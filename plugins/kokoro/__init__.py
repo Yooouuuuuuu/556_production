@@ -92,8 +92,8 @@ class KokoroMemoryProvider(MemoryProvider):
         e = cfg.get("embedder") or {}
         l = cfg.get("llm") or {}
         missing = [k for k, blk in (("embedder", e), ("llm", l)) if not (blk.get("base_url") and blk.get("model"))]
-        if missing:  # no guessed endpoint: 556d writes these from 設定 → 全域 → 模型連線 before she starts
-            raise RuntimeError("kokoro: 模型連線未設定（kokoro.json 缺 " + " / ".join(missing) + "）— 設定 → 全域 → 模型連線")
+        if missing:  # no guessed endpoint: 556d writes these from 設定 → 模型連線 before she starts
+            raise RuntimeError("kokoro: 模型連線未設定（kokoro.json 缺 " + " / ".join(missing) + "）— 設定 → 模型連線")
         embedder = OpenAIEmbedder(e["base_url"], e["model"], api_key=e.get("api_key", ""), batch_size=int(e.get("batch_size", 32)),
                                   timeout=float(e.get("timeout", 60)), dims=e.get("dims"))
         owner = self._agent_context == "primary"

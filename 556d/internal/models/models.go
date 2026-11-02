@@ -1,5 +1,5 @@
 // Package models holds the model connections of one 556 install: home/models.json, edited in
-// 設定 → 全域 → 模型連線. One master endpoint and three jobs that either follow it or carry their own —
+// 設定 → 模型連線. One master endpoint and three jobs that either follow it or carry their own —
 // 對話 (what Hermes talks to, through the shim), 記憶 (kokoro's observe and psyche's appraisal) and 寫靈魂
 // (the soul skill and the fidelity probe) — plus the embedder and the timezone.
 //
@@ -195,7 +195,7 @@ func (c Config) Ready() bool { return len(c.Missing()) == 0 }
 
 // ErrNotConfigured is what a start answers while something is missing.
 func ErrNotConfigured(missing []string) error {
-	return errors.New("模型連線未設定（設定 → 全域 → 模型連線）：" + strings.Join(missing, "、"))
+	return errors.New("模型連線未設定（設定 → 模型連線）：" + strings.Join(missing, "、"))
 }
 
 // Masked is the config as the UI sees it: keys replaced by a flag.

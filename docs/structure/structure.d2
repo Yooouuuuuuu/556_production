@@ -29,7 +29,7 @@ legend: |md
   solid = runs today (0.10.0) · **dashed pink** = later · **yellow** = the character package (characters/ID/, authored + generated; copied into her profile before every start)
 | {near: top-left}
 
-you: "你 — the person (named in 設定 → 全域; else each character's own default term)" {shape: person}
+you: "你 — the person (named in 設定; else each character's own default term)" {shape: person}
 
 app: "556 Production app (Electron)" {
   office: "office window" {
@@ -46,14 +46,14 @@ app: "556 Production app (Electron)" {
 pkg: "characters/<id>/ — the character package = the character (ignored by git)" {
   class: package
   in: "describe/01…10.md · profile.json — what the author writes" {class: file}
-  skill: "tools/soul_writer.py — the soul skill (設定 → 角色 → 新角色 runs it as a 556d job; the simple path needs no model)" {shape: hexagon}
+  skill: "tools/soul_writer.py — the soul skill (名單 → ＋ 新角色 runs it as a 556d job; the simple path needs no model)" {shape: hexagon}
   out: "SOUL.md (時間線 · 影響過你的人與事 inside) · seeds.jsonl · people/*.md · psyche.json · soul.lock.json · build/" {class: file}
   in -> skill -> out
 }
 
 daemon: "556d (Go, :55600) — hub around her, never inside, never a chat participant" {
   hub: "hub API + /ws events"
-  conn: "model connections (0.9.0) — home/models.json, 設定 → 全域 → 模型連線:\n對話 / 記憶 / 寫靈魂 endpoints, the vectors, the timezone; nothing has a default, nothing starts while something is missing"
+  conn: "model connections (0.9.0) — home/models.json, 設定 → 模型連線:\n對話 / 記憶 / 寫靈魂 endpoints, the vectors, the timezone; nothing has a default, nothing starts while something is missing"
   prep: "before every start (prepareProfile) — package sync: SOUL.md · psyche.json · people/*.md copied from characters/<id>/ (你.md only when missing);\nconfig.yaml (model → shim, memory → kokoro, plugins [psyche], empty toolsets) · kokoro.json (llm, embedder) · psyche.json (zone) written from the connections;\nhygiene switches + zh-TW platform hints (0.8.4 / 0.9.0 / 0.10.0)"
   mgr: "companions manager — start (opens her ONE session) / stop (graceful)"
   transcript: "Transcript — her state.db, read-only; a failed turn's dangling user row is deactivated (active=0) (0.7.4)"

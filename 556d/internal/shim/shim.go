@@ -174,7 +174,7 @@ func (s *Shim) chat(w http.ResponseWriter, r *http.Request) {
 	wantStream, _ := original["stream"].(bool)
 	lane, chain := s.pickBackends(str(original["model"]))
 	if len(chain) == 0 {
-		writeJSON(w, 503, map[string]any{"error": map[string]any{"message": "模型連線未設定（設定 → 全域 → 模型連線）"}})
+		writeJSON(w, 503, map[string]any{"error": map[string]any{"message": "模型連線未設定（設定 → 模型連線）"}})
 		return
 	}
 	var lastCode int

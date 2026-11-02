@@ -24,7 +24,7 @@ At the docs root:
 
 `characters/` (repo root) holds your cast as packages, one folder per character: `describe/*.md` and `profile.json` are
 yours, `SOUL.md`, `seeds.jsonl`, `people/`, `psyche.json`, `soul.lock.json` and `build/` are what the soul skill makes
-from them. A package is installed from 設定 → 角色 → 新角色 or with `install-character.ps1`, and the package is the
+from them. A package is installed from 名單 → ＋ 新角色 or with `install-character.ps1`, and the package is the
 character: 556d copies it over her profile before every start, so backing her up = the package + `memory/<id>.db`,
 `psyche.db` and `state.db` from the profile. Ignored by git except `characters/README.md` (the layout).
 

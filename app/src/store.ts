@@ -20,9 +20,9 @@ type State = {
   speaking: { url: string; n: number; playing: boolean } | null; // speak_audio: the avatar lip-syncs / plays it
   handsFree: boolean;                        // conversation mode is on (the 'follow' speak override follows it)
   proactiveSpeak: 'follow' | 'always' | 'never'; // 主動 setting: speak her event-turn messages?
-  showCues: boolean;                         // 設定 → 全域: show the narrator cues behind proactive turns (source "cue")
+  showCues: boolean;                         // 設定 → 程式: show the narrator cues behind proactive turns (source "cue")
   setShowCues(on: boolean): void;
-  timeFormat: TimeFormat;                    // 設定 → 全域: how dates read (年/月/日 · ISO · 日/月/年 · 月/日/年)
+  timeFormat: TimeFormat;                    // 設定 → 程式: how dates read (年/月/日 · ISO · 日/月/年 · 月/日/年)
   clock24: boolean;
   setTimeFormat(f: TimeFormat): void;
   setClock24(on: boolean): void;

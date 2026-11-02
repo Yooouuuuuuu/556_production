@@ -40,6 +40,7 @@ type Info struct {
 	Channels        []string `json:"channels"` // detected from .env: telegram, discord
 	Gateway         bool     `json:"gateway"`  // true whenever active: her gateway IS her process
 	Dir             string   `json:"dir"`
+	PortraitURL     string   `json:"portrait_url"` // her picture for the circle (portrait.go), "" = show her initial
 }
 
 // stopGrace is how long a companion may take to finish up (drain her turn, land the memory
@@ -125,7 +126,7 @@ func (m *Manager) Info(name string) Info {
 	if avatar == "" {
 		avatar = "hiyori/Hiyori.model3.json"
 	}
-	info := Info{Name: name, DisplayName: display, AvatarModel: avatar, Channels: DetectChannels(dir), Dir: dir}
+	info := Info{Name: name, DisplayName: display, AvatarModel: avatar, Channels: DetectChannels(dir), Dir: dir, PortraitURL: m.PortraitURL(name)}
 	m.mu.Lock()
 	l := m.live[name]
 	m.mu.Unlock()
@@ -390,7 +391,7 @@ func (m *Manager) infoLocked(name string) Info {
 	if avatar == "" {
 		avatar = "hiyori/Hiyori.model3.json"
 	}
-	info := Info{Name: name, DisplayName: display, AvatarModel: avatar, Channels: DetectChannels(dir), Dir: dir}
+	info := Info{Name: name, DisplayName: display, AvatarModel: avatar, Channels: DetectChannels(dir), Dir: dir, PortraitURL: m.PortraitURL(name)}
 	if l := m.live[name]; l != nil {
 		info.Active, info.Gateway, info.APIPort, info.Stopping = true, true, l.port, l.stopping
 		info.HermesConnected = !l.stopping && l.health()

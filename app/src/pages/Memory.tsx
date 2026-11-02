@@ -54,7 +54,7 @@ export function Memory() {
   }
 
   const fmtDate = (ts: number) => new Date(ts * 1000).toLocaleDateString();
-  const chip = (active: boolean) => `px-2 py-0.5 rounded-full text-xs ${active ? 'bg-pink-500/40' : 'bg-white/10 hover:bg-white/20'}`;
+  const chip = (active: boolean) => `px-2 py-0.5 rounded-full text-xs ${active ? 'bg-accent/40' : 'bg-white/10 hover:bg-white/20'}`;
 
   if (!exists) return <p className="p-5 opacity-60">{t('memory.no_store')}</p>;
 
@@ -76,7 +76,7 @@ export function Memory() {
         </div>
         <div className="flex items-center gap-3">
           <input
-            className="flex-1 rounded-lg bg-white/5 px-3 py-2 outline-none focus:ring-1 focus:ring-pink-400/60"
+            className="flex-1 rounded-lg bg-white/5 px-3 py-2 outline-none focus:ring-1 focus:ring-accent/60"
             placeholder={t('memory.search_placeholder')}
             value={q}
             onChange={(e) => setQ(e.target.value)}

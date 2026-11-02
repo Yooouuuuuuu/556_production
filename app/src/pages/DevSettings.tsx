@@ -25,7 +25,7 @@ export function DevSettings({ groups, tone = 'dev', onRestart }: { groups?: stri
   useEffect(() => { load(); }, []);
 
   const dev = tone === 'dev';
-  const field = `w-full rounded-lg bg-white/5 px-3 py-1.5 text-sm outline-none focus:ring-1 ${dev ? 'focus:ring-amber-400/60' : 'focus:ring-pink-400/60'}`;
+  const field = `w-full rounded-lg bg-white/5 px-3 py-1.5 text-sm outline-none focus:ring-1 ${dev ? 'focus:ring-amber-400/60' : 'focus:ring-accent/60'}`;
 
   async function save() {
     if (Object.keys(edits).length === 0) return;
@@ -66,7 +66,7 @@ export function DevSettings({ groups, tone = 'dev', onRestart }: { groups?: stri
   };
   const effectLabel = (e: string) => t(`dev.effect.${e}`);
   const shown = GROUPS.filter((g) => !groups || groups.includes(g.id));
-  const ring = dev ? 'ring-amber-400/60' : 'ring-pink-400/60';
+  const ring = dev ? 'ring-amber-400/60' : 'ring-accent/60';
 
   return (
     <section className={dev ? 'space-y-4 rounded-2xl border border-amber-400/40 bg-amber-500/5 p-4' : 'space-y-4'}>
@@ -98,7 +98,7 @@ export function DevSettings({ groups, tone = 'dev', onRestart }: { groups?: stri
         );
       })}
       <div className="flex items-center gap-3 flex-wrap">
-        <button className={`px-4 py-2 rounded-xl text-white disabled:opacity-40 ${dev ? 'bg-amber-500/70 hover:bg-amber-500' : 'bg-pink-500/80 hover:bg-pink-500'}`} disabled={saving || Object.keys(edits).length === 0} onClick={save}>
+        <button className={`px-4 py-2 rounded-xl text-white disabled:opacity-40 ${dev ? 'bg-amber-500/70 hover:bg-amber-500' : 'bg-accent hover:bg-accent/90'}`} disabled={saving || Object.keys(edits).length === 0} onClick={save}>
           {dev ? t('dev.save') : t('settings.save')} {Object.keys(edits).length > 0 && `(${Object.keys(edits).length})`}
         </button>
         {effects.restart_companion && <button className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20" onClick={onRestart}>{t('settings.restart')}</button>}

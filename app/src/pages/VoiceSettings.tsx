@@ -29,7 +29,7 @@ export function VoiceSettings({ companion }: { companion?: string }) {
     api.voice(companion).then(take).catch(() => {});
   }, [companion]);
 
-  const field = 'w-full rounded-lg bg-white/5 px-3 py-2 outline-none focus:ring-1 focus:ring-pink-400/60';
+  const field = 'w-full rounded-lg bg-white/5 px-3 py-2 outline-none focus:ring-1 focus:ring-accent/60';
   const label = 'block text-xs opacity-70 mb-1';
   const upd = (side: 'tts' | 'stt', k: keyof VoiceProvider, v: string) => setCfg({ ...cfg, [side]: { ...cfg[side], [k]: v } });
   const hf = cfg.handsfree ?? defaultHF();

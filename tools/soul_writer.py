@@ -364,7 +364,7 @@ def make_llm(model: Optional[str], base_url: Optional[str], temperature: float, 
 
 # ----------------------------------------------------------------------------- connection
 def connection(base_url: Optional[str], model: Optional[str]) -> Tuple[str, str, str]:
-    """(base_url, model, api_key): what was passed, else the 寫靈魂 connection of home/models.json (設定 → 全域 →
+    """(base_url, model, api_key): what was passed, else the 寫靈魂 connection of home/models.json (設定 →
     模型連線). Nothing is guessed: with neither, this is an error."""
     key = os.environ.get("X556_API_KEY", "")
     if base_url and model:
@@ -377,7 +377,7 @@ def connection(base_url: Optional[str], model: Optional[str]) -> Tuple[str, str,
     model = model or ep.get("model")
     key = key or ep.get("api_key") or ""
     if not (base_url and model):
-        raise SystemExit("模型連線未設定：給 --base-url 和 --model，或在 app 的 設定 → 全域 → 模型連線 填好（home/models.json）")
+        raise SystemExit("模型連線未設定：給 --base-url 和 --model，或在 app 的 設定 → 模型連線 填好（home/models.json）")
     return base_url.rstrip("/"), model, key
 
 

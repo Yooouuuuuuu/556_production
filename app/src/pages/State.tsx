@@ -216,7 +216,7 @@ export function State() {
                   <td className="py-1">{nameOf(p)}{others[p]?.phase && PHASE_ZH[others[p].phase] ? <span className="opacity-50"> · {PHASE_ZH[others[p].phase]}</span> : null}</td>
                   <td className="py-1 opacity-80">{relWords[p] ?? r.words ?? ''}</td>
                   <td className="py-1"><div className="h-1 w-16 rounded bg-white/10"><div className="h-1 rounded bg-sky-400/70" style={{ width: `${Math.round((r.trust_value ?? 0.5) * 100)}%` }} /></div></td>
-                  <td className="py-1"><div className="h-1 w-16 rounded bg-white/10"><div className="h-1 rounded bg-pink-400/70" style={{ width: `${Math.round((r.attachment ?? 0) * 100)}%` }} /></div></td>
+                  <td className="py-1"><div className="h-1 w-16 rounded bg-white/10"><div className="h-1 rounded bg-accent/70" style={{ width: `${Math.round((r.attachment ?? 0) * 100)}%` }} /></div></td>
                   <td className="py-1 opacity-60">{Math.round(r.hours ?? 0)} h · 揭露 {r.disclosure}</td>
                 </tr>
               ))}
@@ -243,7 +243,7 @@ export function State() {
             return (
               <div key={k} className="flex items-center gap-2 text-xs">
                 <span className="w-20 opacity-70">{zh}</span>
-                <div className="flex-1 h-1 rounded bg-white/10"><div className="h-1 rounded bg-pink-400/70" style={{ width: `${Math.round(x * 100)}%` }} /></div>
+                <div className="flex-1 h-1 rounded bg-white/10"><div className="h-1 rounded bg-accent/70" style={{ width: `${Math.round(x * 100)}%` }} /></div>
               </div>
             );
           })}

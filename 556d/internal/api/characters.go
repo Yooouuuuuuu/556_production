@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-// The create-character page (設定 → 角色 → 新角色) drives the soul skill (tools/soul_writer.py,
+// The create-character page (名單 → ＋ 新角色) drives the soul skill (tools/soul_writer.py,
 // docs/prompt/prompt.md §2.9) through 556d. A character package lives under <root>/characters/<id>/:
 // describe/*.md in the person's words, profile.json (numbers and choices: proposed by the skill,
 // confirmed by the person), and the generated outputs (SOUL.md, seeds.jsonl, people/, psyche.json,
@@ -352,7 +352,7 @@ func (a *API) charactersHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		soul, ok := a.soulEndpoint()
 		if !ok {
-			writeJSON(w, 400, map[string]any{"error": "模型連線未設定（設定 → 全域 → 模型連線：寫靈魂）"})
+			writeJSON(w, 400, map[string]any{"error": "模型連線未設定（設定 → 模型連線：寫靈魂）"})
 			return
 		}
 		body.Model = soul.Model

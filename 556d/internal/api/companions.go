@@ -1,6 +1,7 @@
 package api
 
 import (
+	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -15,9 +16,10 @@ import (
 //   POST /api/companions/{name}/start    start her: one `hermes gateway run` (API server + her channels)
 //   POST /api/companions/{name}/stop     stop her
 //   GET  /api/selected | PUT {"name"}    which companion the windows are on (persisted)
+//   GET | PUT | DELETE /api/companions/{name}/portrait   her picture for the circle (PUT: the image is the body)
 
 func (a *API) companionsHandler(w http.ResponseWriter, r *http.Request) {
-	if cors(w, r, "GET, POST, OPTIONS") {
+	if cors(w, r, "GET, POST, PUT, DELETE, OPTIONS") {
 		return
 	}
 	rest := strings.Trim(strings.TrimPrefix(r.URL.Path, "/api/companions"), "/")
@@ -30,6 +32,39 @@ func (a *API) companionsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	name, action, _ := strings.Cut(rest, "/")
+	if action == "portrait" { // her picture: GET serves it, PUT replaces it (the body is the image), DELETE removes it
+		if !a.mgr.Exists(name) {
+			writeJSON(w, 404, map[string]any{"error": "unknown companion"})
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			p, _ := a.mgr.PortraitPath(name)
+			if p == "" {
+				writeJSON(w, 404, map[string]any{"error": "no portrait"})
+				return
+			}
+			w.Header().Set("Cache-Control", "public, max-age=31536000, immutable") // the URL carries the file's mtime
+			http.ServeFile(w, r, p)
+		case http.MethodPut:
+			data, err := io.ReadAll(io.LimitReader(r.Body, companions.PortraitMax+1))
+			if err != nil {
+				writeJSON(w, 400, map[string]any{"error": err.Error()})
+				return
+			}
+			if _, err := a.mgr.SavePortrait(name, data); err != nil {
+				writeJSON(w, 400, map[string]any{"error": err.Error()})
+				return
+			}
+			writeJSON(w, 200, map[string]any{"portrait_url": a.mgr.PortraitURL(name)})
+		case http.MethodDelete:
+			a.mgr.RemovePortrait(name)
+			writeJSON(w, 200, map[string]any{"portrait_url": ""})
+		default:
+			writeJSON(w, 405, map[string]any{"error": "GET, PUT or DELETE"})
+		}
+		return
+	}
 	if r.Method != http.MethodPost {
 		writeJSON(w, 405, map[string]any{"error": "POST only"})
 		return

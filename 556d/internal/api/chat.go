@@ -95,7 +95,7 @@ func (a *API) Register(mux *http.ServeMux) {
 	})
 	mux.HandleFunc("/api/history", a.history)
 	mux.HandleFunc("/api/settings", a.settingsHandler)
-	mux.HandleFunc("/api/connections", a.connectionsHandler)     // model connections (home/models.json): 設定 → 全域 → 模型連線
+	mux.HandleFunc("/api/connections", a.connectionsHandler)     // model connections (home/models.json): 設定 → 模型連線
 	mux.HandleFunc("/api/connections/probe", a.connectionsProbe) // what models an endpoint serves
 	mux.HandleFunc("/api/companion", a.companion)
 	mux.HandleFunc("/api/companions", a.companionsHandler)

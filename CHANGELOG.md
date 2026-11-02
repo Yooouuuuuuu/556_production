@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.13.0 — 2026-11-03
+
+- **The UI remade: three doors, not five tabs** (DECISIONS 2026-11-02; design canvas first, then the app). 名單 is the left
+  column and is always there — every character with her portrait or initial, her state and channels, a 啟動 button when
+  offline; picking one puts her on stage, and on stage, viewed and talked to are one thing. The right pane is that
+  character: 聊天 · 狀態 · 記憶 · 角色. 角色 is her own settings in seven pages down the left (基本, 記憶, 能力, 主動, 聲音,
+  頻道, 細節), each saying when a change takes effect, with a save bar that names the unsaved fields. The gear at the
+  bottom of the column is 設定 — you and this program — as its own screen with five pages (你, 程式, 模型連線, 語音連線,
+  開發者) and 新角色 beside it. The old 名單 page, the 設定 → 全域 / 角色 split and the office header are gone
+  (`Shell.tsx` replaces `Office.tsx` and `Roster.tsx`); 狀態, 記憶 and the chat itself are unchanged inside.
+- **New-character page: one box at a time.** The package list first, then five steps across the top (描述 · 關係 · 產生 ·
+  確認 · 結果). 描述 shows one box with its hint as text above the input (never a placeholder that vanishes as you type)
+  and the ten titles on the right, each filled or empty; the package card beside every step says what is filled, the
+  SOUL size, seeds, people, which phases ran and what is stale; the save bar covers 描述 and 關係. The 角色 tab links to
+  her package.
+- **Portrait.** 角色 → 基本 takes a picture for her circle: one png / jpg / webp / gif, at most 4 MB, kept in her package
+  (`characters/<id>/portrait.<ext>`; the profile when she has no package) and served by 556d
+  (`GET | PUT | DELETE /api/companions/<id>/portrait`, the file's mtime in the URL); the roster carries `portrait_url`.
+  Without one the circle shows the first character of her name.
+- **Palette 暖夜.** Charcoal-brown ground, apricot accent with dark text, warm off-white ink — Tailwind theme tokens in
+  `src/index.css`; the pink is gone from every page. Paths in messages and docs follow the new shape (設定 → 模型連線,
+  名單 → ＋ 新角色, 角色 → 主動).
+
 ## 0.12.2 — 2026-10-30
 
 - **First install seeds without a started profile.** `seed-memories.py` reads the embedder from `home/models.json` when

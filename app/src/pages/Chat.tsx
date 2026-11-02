@@ -12,7 +12,7 @@ const OWN_SOURCES = new Set(['app', 'office', 'http', 'voice', 'smoke', 'eval'])
 export function Chat() {
   const { messages, talking, connected, error, setHistory, connect, selected, setHandsFree, setProactiveSpeak, showCues } = useStore();
   // system notes — narrator cues, undelivered messages, backend errors — are not real messages: gray, centered,
-  // and shown only when 設定 → 全域 → 程式 says so
+  // and shown only when 設定 → 程式 says so
   const NOTE = new Set(['cue', 'system', 'failed']);
   const shown = showCues ? messages : messages.filter((m) => !NOTE.has(m.source ?? ''));
   const noteLabel = (s?: string) => (s === 'cue' ? t('chat.cue') : s === 'failed' ? t('chat.failed_tag') : t('chat.system'));
@@ -99,7 +99,7 @@ export function Chat() {
         ) : (
           <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[78%] px-3 py-2 rounded-2xl whitespace-pre-wrap leading-relaxed text-[15px] ${
-              m.role === 'user' ? 'bg-pink-500/80 text-white rounded-br-sm' : 'bg-white/10 rounded-bl-sm'
+              m.role === 'user' ? 'bg-accent text-white rounded-br-sm' : 'bg-white/10 rounded-bl-sm'
             } ${m.streaming ? 'animate-pulse' : ''}`}>
               {m.source && !OWN_SOURCES.has(m.source) && <span className="block text-[10px] uppercase tracking-wider opacity-60 mb-0.5">{m.source === 'event' ? t('chat.badge_event') : m.source}</span>}
               {m.text}
@@ -113,7 +113,7 @@ export function Chat() {
       {error && <div className="mx-4 mb-2 px-3 py-1.5 rounded bg-red-500/20 text-red-200 text-xs">{error}</div>}
       {!connected && <div className="mx-4 mb-2 px-3 py-1.5 rounded bg-amber-500/20 text-amber-200 text-xs">{t('chat.offline')}</div>}
       {voice.handsfree && (
-        <div className="mx-4 mb-2 px-3 py-1.5 rounded bg-pink-500/15 text-pink-100 text-xs flex gap-2 items-center">
+        <div className="mx-4 mb-2 px-3 py-1.5 rounded bg-accent/15 text-link text-xs flex gap-2 items-center">
           <span className={voice.phase === 'listening' ? 'animate-pulse' : ''}>{t('chat.phase.' + voice.phase)}</span>
           {voice.queue > 0 && <span className="opacity-70">· {t('chat.queued').replace('{n}', String(voice.queue))}</span>}
           {voice.last && <span className="opacity-70 truncate">· {voice.last}</span>}
@@ -122,7 +122,7 @@ export function Chat() {
       )}
       <div className="border-t border-white/10 p-3 flex gap-2 items-end">
         <textarea
-          className="flex-1 resize-none rounded-xl bg-white/5 px-3 py-2 outline-none focus:ring-1 focus:ring-pink-400/60 text-[15px] disabled:opacity-50"
+          className="flex-1 resize-none rounded-xl bg-white/5 px-3 py-2 outline-none focus:ring-1 focus:ring-accent/60 text-[15px] disabled:opacity-50"
           rows={2}
           disabled={voice.handsfree}
           placeholder={voice.handsfree ? t('chat.handsfree_placeholder') : t('chat.placeholder')}
@@ -141,14 +141,14 @@ export function Chat() {
           {transcribing ? '…' : recording ? '■' : '🎙'}
         </button>
         <button
-          className={`px-3 py-2 rounded-xl text-sm disabled:opacity-40 ${voice.handsfree ? 'bg-pink-500/80 text-white' : 'bg-white/10 hover:bg-white/20'}`}
+          className={`px-3 py-2 rounded-xl text-sm disabled:opacity-40 ${voice.handsfree ? 'bg-accent text-white' : 'bg-white/10 hover:bg-white/20'}`}
           disabled={!voiceOk.stt || !voiceOk.tts}
           title={voiceOk.stt && voiceOk.tts ? '' : t('chat.voice_off')}
           onClick={toggleHandsFree}
         >
           {voice.handsfree ? t('chat.handsfree_stop') : t('chat.handsfree')}
         </button>
-        <button className="px-4 py-2 rounded-xl bg-pink-500/80 hover:bg-pink-500 text-white disabled:opacity-40" disabled={!draft.trim() || sending || voice.handsfree} onClick={send}>
+        <button className="px-4 py-2 rounded-xl bg-accent hover:bg-accent/90 text-accent-ink font-medium disabled:opacity-40" disabled={!draft.trim() || sending || voice.handsfree} onClick={send}>
           {t('chat.send')}
         </button>
       </div>

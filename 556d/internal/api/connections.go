@@ -18,7 +18,7 @@ import (
 	"github.com/Yooouuuuuuu/556_production/556d/internal/shim"
 )
 
-// Model connections (home/models.json; 設定 → 全域 → 模型連線):
+// Model connections (home/models.json; 設定 → 模型連線):
 //   GET  /api/connections         the config with keys masked, what is still missing, the embedder's state
 //   PUT  /api/connections         replace (an empty api_key keeps the stored one); applied at once to the shim,
 //                                 the embedder and the clock; running characters need a restart
@@ -39,7 +39,7 @@ func (a *API) LoadConnections() {
 	case err != nil:
 		log.Printf("[connections] %v", err)
 	case !exists:
-		log.Printf("[connections] home/models.json missing: set 設定 → 全域 → 模型連線 before starting a character")
+		log.Printf("[connections] home/models.json missing: set 設定 → 模型連線 before starting a character")
 	case !c.Ready():
 		log.Printf("[connections] incomplete: %v", c.Missing())
 		a.applyConnections(c)

@@ -26,7 +26,7 @@ pkg: "characters/<id>/ — the character package (the character): authored descr
   pj: "psyche.json" {class: file}
 }
 
-models: "home/models.json — the model connections (設定 → 全域 → 模型連線, 0.9.0):\n對話 · 記憶 · 寫靈魂 endpoints · the vectors (local llama-server or an embeddings endpoint) · the timezone" {class: [ours; file]}
+models: "home/models.json — the model connections (設定 → 模型連線, 0.9.0):\n對話 · 記憶 · 寫靈魂 endpoints · the vectors (local llama-server or an embeddings endpoint) · the timezone" {class: [ours; file]}
 
 home: "HERMES_HOME = home/profiles/<id> — her folder (runtime, ignored by VCS; rebuilt from the package and the connections before every start)" {
   class: ours
@@ -69,7 +69,7 @@ d: "556d (Go) — around her, never inside" {
   class: ours
   prep: "prepareProfile, before every start: the connections complete? else the start is refused;\ncopies SOUL.md / psyche.json / people/*.md from the package (api/package.go);\nwrites config.yaml, kokoro.json (llm, embedder), psyche.json (zone) from models.json (api/connections.go);\nhygiene switches + zh-TW hints (api/hygiene.go)"
   spawn: "spawn with env (API key/host/port, HERMES_TIMEZONE, X556_HUB); graceful stop via the marker"
-  cfgw: "設定 → 角色 writes 能力 (platform_toolsets), 主動 (psyche.json — the package's copy too), 聲音, 頻道, dev registry;\n設定 → 全域 → 你 writes people/你.md"
+  cfgw: "角色分頁 writes 能力 (platform_toolsets), 主動 (psyche.json — the package's copy too), 聲音, 頻道, dev registry;\n設定 → 你 writes people/你.md"
   reads: "reads state.db and psyche.db read-only (history, live tail, 狀態 page);\nopens + stamps her one session at start"
   chat: "POST /v1/chat/completions per app turn (X-Hermes-Session-Id)"
   send: "Telegram send: app turns and her event turns -> her DM (plain text)"

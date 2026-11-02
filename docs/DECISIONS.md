@@ -5,6 +5,19 @@ One record for the whole project. Each heading carries its date and its part in 
 replaces; the designs themselves are in the part folders. Entries are grouped as they were written, not
 strictly sorted.
 
+## Decided (2026-11-02) — the app has three doors: 名單, the current character, 設定; palette 暖夜 [app]
+- The five tabs of 0.3.0 (聊天, 名單, 記憶, 狀態, 設定) hid the app's real tree — 名單 → one character → 聊天 / 狀態 / 記憶 /
+  her settings, and a second tree, the program's settings — and made 設定 → 角色 → a character put her on stage as a side
+  effect. Decided on a design canvas (first proposal, then colour choices, then "how do the layers show", then "five
+  into three"): the roster is the always-present left column, the right pane is the one character with four tabs
+  (聊天 · 狀態 · 記憶 · 角色 — her own settings; 角色 chosen over 人設 / 角色卡 / 配置 because the word was free and plain),
+  the gear at the bottom of the column is 設定 as its own screen (你, 程式, 模型連線, 語音連線, 開發者 + 新角色). On stage,
+  viewed and talked to are one thing: the name lit in the column; one character at a time, the others keep running.
+  Every form that the app saves itself gets a save bar that names the unsaved fields and when they take effect; hints
+  are text above an input, never a placeholder. Colour: five sets were drawn on one layout; 暖夜 (charcoal-brown,
+  apricot) was chosen as "more like a mature chat app" over the pink dark of 0.3.0. 狀態 and 記憶 keep their content for
+  a later round.
+
 ## Decided (2026-10-30) — 關係: how close you start is a stance bar; what you went through together is memory, never SOUL text [prompt] [inner-life] [app]
 - The problem had two bad answers. A closeness number without a past is hollow, and a past written by a model is
   fabrication; but deriving closeness strictly from the shared events the author wrote would make every relationship

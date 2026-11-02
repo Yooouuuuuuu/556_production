@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react';
 import { api, Connections, Endpoint, Use } from '../api';
 import { t } from '../i18n';
 
-// 設定 → 全域 → 模型連線 (home/models.json): one master endpoint; 對話, 記憶 and 寫靈魂 follow it or carry
+// 設定 → 模型連線 (home/models.json): one master endpoint; 對話, 記憶 and 寫靈魂 follow it or carry
 // their own; the embedder (local llama-server or an endpoint); the timezone. Nothing has a default — the
 // page shows what is still missing, and a character does not start until the list is empty. 「檢查」 asks an
 // endpoint what models it serves and fills the picker; keys never come back from 556d (only a flag).
 
-const field = 'w-full rounded-lg bg-white/5 px-3 py-2 outline-none focus:ring-1 focus:ring-pink-400/60';
+const field = 'w-full rounded-lg bg-white/5 px-3 py-2 outline-none focus:ring-1 focus:ring-accent/60';
 const label = 'block text-xs opacity-70 mb-1';
 const btn = 'px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-sm disabled:opacity-40';
 
@@ -193,7 +193,7 @@ export function ConnectionsSettings() {
       </div>
 
       <div className="flex items-center gap-3">
-        <button className="px-4 py-2 rounded-xl bg-pink-500/80 hover:bg-pink-500 text-white disabled:opacity-40" disabled={saving} onClick={save}>{t('settings.save')}</button>
+        <button className="px-4 py-2 rounded-xl bg-accent hover:bg-accent/90 text-accent-ink font-medium disabled:opacity-40" disabled={saving} onClick={save}>{t('settings.save')}</button>
         {notice && <span className={`text-sm ${notice.kind === 'err' ? 'text-red-300' : notice.kind === 'warn' ? 'text-amber-300' : 'text-green-300'}`}>{notice.text}</span>}
       </div>
     </section>

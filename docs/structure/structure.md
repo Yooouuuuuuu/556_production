@@ -11,7 +11,7 @@ today (0.10.0), dashed pink = later work (Discord, MCP). Discord and MCP stay da
   opens her one session at start).
 - Shared across characters: the model shim (one lane, `auto/556`, pointed at the 對話 connection), the embedder
   (started by 556d when the vectors are local), 556d. Nothing has a default: the connections — `home/models.json`,
-  設定 → 全域 → 模型連線 (0.9.0) — must be complete before any character starts, and 556d writes her `config.yaml` /
+  設定 → 模型連線 (0.9.0) — must be complete before any character starts, and 556d writes her `config.yaml` /
   `kokoro.json` / `psyche.json` from them before every start. Per character: process, API port and key,
   `state.db` (history), `memory/<name>.db` (memory), `psyche.db` (state, 0.5.0), SOUL / config / `.env`.
 - Inside her process, two plugins of ours: **kokoro** (memory) and **psyche** (the engine: 1-minute tick,
@@ -19,7 +19,7 @@ today (0.10.0), dashed pink = later work (Discord, MCP). Discord and MCP stay da
   `psyche.db` (狀態 page) and writes `psyche.json` from Settings, applied by a restart like tool extensions.
 - Tools: none at baseline (0.8.6; memory is injected every turn, not a tool — 556d strips the old `memory` toolset
   from every `platform_toolsets` list before a start, so her prompt carries no tools preamble); extensions per
-  character in 設定 → 角色 → 能力, written to `platform_toolsets`, applied by a restart. No hot toggling.
+  character in 角色 → 能力, written to `platform_toolsets`, applied by a restart. No hot toggling.
 
 ## 2. One turn — `turn-flow.d2`
 

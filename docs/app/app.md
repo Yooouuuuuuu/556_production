@@ -1,6 +1,22 @@
 # The app — 556 Production (Electron + React)
 
-Living doc; last verified 2026-10-30 (0.12.0). The shape decided on 2026-09-30 (notes below) still holds.
+Living doc; last verified 2026-11-03 (0.13.0). The shape decided on 2026-09-30 (notes below) still holds.
+## The shape since 0.13.0 (2026-11-03)
+
+Three doors, not five tabs (DECISIONS 2026-11-02; `app/src/pages/Shell.tsx`). **名單** is the left column and is always
+there: every character with her portrait (or the first character of her name), her state and channels, a 啟動 button
+when she is offline; picking one puts her on stage — on stage, viewed and talked to are one thing. The right pane is
+**that character**: 聊天 · 狀態 · 記憶 · 角色. 角色 is her own settings in seven pages down the left (基本 with the portrait
+upload, 記憶, 能力, 主動, 聲音, 頻道, 細節); every page says when a change takes effect (存了就生效 / 重新啟動後生效), and the
+pages the app saves itself carry a save bar that names what is typed but not saved. The gear at the bottom of the
+column is **設定** — you and this program — as its own screen with five pages (你, 程式, 模型連線, 語音連線, 開發者) and
+新角色 beside it (also the column's ＋). The new-character page is the package list, then five steps across the top
+(描述 · 關係 · 產生 · 確認 · 結果): 描述 shows one box at a time with its hint as text above the input and the ten titles
+listed on the right, filled or empty; the package card (what is filled, SOUL size, seeds, which phases ran, what is
+stale) stays beside every step; a save bar covers 描述 and 關係. Palette 暖夜 — charcoal-brown ground, apricot accent
+with dark text, warm off-white ink — as Tailwind theme tokens in `src/index.css` (`bg-panel`, `bg-accent`,
+`text-muted`…), never a hex in a page. 狀態, 記憶 and the chat itself are unchanged inside.
+
 What landed since:
 
 - **0.3.0** (2026-10-01): one app owns 556d's lifecycle; office window with 聊天, 名單, 記憶, 設定 (two tiers
@@ -32,10 +48,10 @@ What landed since:
   never a bubble, and its dangling user row is dropped. 狀態 shows the promise flow (要問誰, 第幾次, 答案).
 - **0.7.5** (2026-10-14): your name and reply language reach every character on save; the developer-knob labels
   without 她; 狀態 names other characters by their display name; loop states 忘了 / 重試中; online / offline wording;
-  設定 → 角色 → 主動 → 記性 (the forgetting toggle). Backend: the mailbox between characters, forgetting, undelivered
+  角色 → 主動 → 記性 (the forgetting toggle). Backend: the mailbox between characters, forgetting, undelivered
   due items backing off (`../inner-life/inner-life.md`).
 - **0.7.6** (2026-10-14): 狀態 — 熟悉度 back, feedback buttons gone, one 時間線 by day (date format and clock in
-  設定 → 全域 → 程式), 掛念 in 進行中 / 已結束 with five words and a seven-day fade; online / offline / starting… /
+  設定 → 程式), 掛念 in 進行中 / 已結束 with five words and a seven-day fade; online / offline / starting… /
   stopping… wording, no extra light for the model lane; 記性 on the character's 主動 page.
 - **0.7.7** (2026-10-14): 時間線 shows the hurt ledger's life (記了一筆 / 又提起了 / 和解了 / 放下了); 記憶 does not list
   held rows (a turn whose hurt is on the ledger). Backend: the ledger ↔ memory rules (`../inner-life/inner-life.md` §9).
@@ -45,7 +61,7 @@ What landed since:
 - **0.7.9** (2026-10-15): no UI change. `docs/prompt/` — the request she answers, verified, and the 0.8.0 design
   (six-part SOUL, thinking dials, clock line, vendor-text filter; the pinned groups proposed there were built in 0.8.7 and
   retired in 0.10.0).
-- **0.8.1** (2026-10-16): 設定 → 角色 → **新角色** — the soul skill behind 556d (`../prompt/prompt.md` §2.9). One page per
+- **0.8.1** (2026-10-16): 角色 → **新角色** — the soul skill behind 556d (`../prompt/prompt.md` §2.9). One page per
   character package: 描述 (ten boxes in your own words, the template prompts as grey text), 產生 (the model — the choice
   offered then was gemini or claude on the proxy; since 0.9.0 the page shows the configured 寫靈魂 model instead — 「全部」
   or one phase at a time, the job's log live, the intake's questions), 確認 (the proposed thinking meters and choices
@@ -64,10 +80,10 @@ What landed since:
 - **0.8.4–0.8.5** (2026-10-16): no UI change. Prompt hygiene — the guidance switches written into her `config.yaml`
   before every start, the shim dropping Hermes's vendor paragraphs — and the clock line in the state block
   (`../prompt/prompt.md` §2.7–2.8).
-- **0.8.6** (2026-10-19): the avatar window is hidden by default (設定 → 全域 → 程式 → 啟動時顯示角色視窗 off); the avatar
+- **0.8.6** (2026-10-19): the avatar window is hidden by default (設定 → 程式 → 啟動時顯示角色視窗 off); the avatar
   is parked until the core is done. 能力: the baseline is no tool at all — memory is injected every turn, not called;
   查網路 and later extensions still switch on per character.
-- **0.8.8** (2026-10-19): 設定 → 角色 → 主動 gains a **怎麼想** fold with the five thinking sliders and **想不開的程度**;
+- **0.8.8** (2026-10-19): 角色 → 主動 gains a **怎麼想** fold with the five thinking sliders and **想不開的程度**;
   restart applies. Backend: the thinking module (`plugins/psyche/thinking.py`) and its one optional 想法 line in the
   state block.
 - **0.8.9** (2026-10-19): 狀態 lists **沒說出口** (what she visibly held back, until it is said or fades); the new-character
@@ -76,9 +92,12 @@ What landed since:
 - **0.8.10** (2026-10-19): 產生 gains the **簡單版** fold (three boxes plus the sliders and choices become the files with
   template sentences, no model; `POST /api/characters/<id>/simple`); 確認 gains **回覆前先想** (the hidden scratch,
   `profile.json` `scratch`; the shim strips it from every reply). Backend: keyword triggers in kokoro, the fidelity probe.
-- **0.9.0** (2026-10-19): 設定 → 全域 → **模型連線** — master endpoint with 檢查 (lists the endpoint's models), 對話／記憶／寫靈魂
+- **0.9.0** (2026-10-19): 設定 → **模型連線** — master endpoint with 檢查 (lists the endpoint's models), 對話／記憶／寫靈魂
   follow it or carry their own, the vectors (local llama-server or an embeddings endpoint), the timezone; what is missing is
   listed and a character does not start until it is complete; the new-character page shows the configured model.
+- **0.13.0** (2026-11-03): the UI remake — the shape above. Portrait upload under 角色 → 基本: one png / jpg / webp / gif
+  in her package (`characters/<id>/portrait.<ext>`, the profile when she has no package), served by 556d at
+  `/api/companions/<id>/portrait` with the file's mtime in the URL; the roster carries `portrait_url`.
 - **0.12.0** (2026-10-30): 新角色 → 描述 gains **關係** — a bar for how close you start (剛認識 … 很親近; her stance
   only, never proposed by the model) and a box for what you went through together (memory rows only, never SOUL or
   people text); both optional, default 剛認識 and no shared past. The 確認 step's closeness dropdown is gone.

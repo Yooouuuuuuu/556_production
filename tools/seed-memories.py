@@ -64,10 +64,10 @@ def main() -> int:
     e = kok.get("embedder") or {}
     if not (e.get("base_url") and e.get("model")):
         # a profile 556d has not started yet (the first install) has no embedder in kokoro.json: take the connection
-        # from home/models.json, the same source 556d writes it from (設定 → 全域 → 模型連線); 556d keeps the embedder up
+        # from home/models.json, the same source 556d writes it from (設定 → 模型連線); 556d keeps the embedder up
         e = embedder_from_models(ROOT / "home" / "models.json")
     if not (e.get("base_url") and e.get("model")):
-        print("模型連線未設定：kokoro.json 沒有 embedder，home/models.json 也沒有（在 app 的 設定 → 全域 → 模型連線 填好）")
+        print("模型連線未設定：kokoro.json 沒有 embedder，home/models.json 也沒有（在 app 的 設定 → 模型連線 填好）")
         return 1
     emb = OpenAIEmbedder(e["base_url"], e["model"], api_key=e.get("api_key", ""), dims=e.get("dims"))
     db = profile / str(kok.get("db", "memory/{profile}.db")).format(profile=args.name)

@@ -1,5 +1,21 @@
 @import "tailwindcss";
 
+/* 暖夜 — the app's palette since 0.13.0 (docs/app/app.md): charcoal-brown ground, apricot accent with dark text
+   on it, warm off-white ink. Named tokens so pages say bg-panel / bg-accent / text-muted, never a hex. */
+@theme {
+  --color-ground: #1a1614;
+  --color-panel: #231e1b;
+  --color-panel2: #2c2521;
+  --color-ink: #f1ece6;
+  --color-soft: #d8cfc6;
+  --color-muted: #b3a89f;
+  --color-accent: #e07b45;
+  --color-accent-ink: #1a1614;
+  --color-link: #f5b58c;
+  --color-ok: #9fe6b4;
+  --color-warn: #fcd34d;
+}
+
 :root {
   font-family: "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
   color-scheme: dark;
@@ -7,4 +23,5 @@
 
 /* The avatar window is transparent: only the office route paints a background. */
 html, body, #root { margin: 0; height: 100%; background: transparent; }
-body[data-route="office"] { background: #14141c; color: #e8e8f0; }
+body[data-route="office"] { background: #1a1614; color: #f1ece6; }
+a { color: #f5b58c; }

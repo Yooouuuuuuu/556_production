@@ -79,7 +79,7 @@ def connection(base_url: Optional[str], model: Optional[str]):
     ep = soul if soul.get("use") == "custom" else (cfg.get("master") or {})
     base_url, model, key = base_url or ep.get("base_url"), model or ep.get("model"), key or ep.get("api_key") or ""
     if not (base_url and model):
-        raise SystemExit("模型連線未設定：給 --base-url 和 --model，或在 app 的 設定 → 全域 → 模型連線 填好（home/models.json）")
+        raise SystemExit("模型連線未設定：給 --base-url 和 --model，或在 app 的 設定 → 模型連線 填好（home/models.json）")
     return base_url.rstrip("/"), model, key
 
 

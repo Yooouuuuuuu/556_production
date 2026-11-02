@@ -1,4 +1,4 @@
-// Dates and times the way the person reads them (設定 → 全域 → 程式): four date orders and a 24 h / 12 h clock.
+// Dates and times the way the person reads them (設定 → 程式): four date orders and a 24 h / 12 h clock.
 export type TimeFormat = 'ymd' | 'iso' | 'dmy' | 'mdy';
 export const TIME_FORMATS: TimeFormat[] = ['ymd', 'iso', 'dmy', 'mdy'];
 

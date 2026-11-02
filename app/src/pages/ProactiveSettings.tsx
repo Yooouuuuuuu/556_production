@@ -32,7 +32,7 @@ export function ProactiveSettings({ onChanged }: { onChanged(): void }) {
   const ch = s.character ?? {};
   const b5 = ch.big5 ?? {};
   const nd = (p.no_disturb && p.no_disturb[0]) || [23, 8];
-  const field = 'w-full rounded-lg bg-white/5 px-3 py-2 outline-none focus:ring-1 focus:ring-pink-400/60';
+  const field = 'w-full rounded-lg bg-white/5 px-3 py-2 outline-none focus:ring-1 focus:ring-accent/60';
   const label = 'block text-xs opacity-70 mb-1';
   const setP = (k: string, v: any) => setS({ ...s, proactive: { ...p, [k]: v } });
   const setCh = (k: string, v: number) => setS({ ...s, character: { ...ch, [k]: v } });

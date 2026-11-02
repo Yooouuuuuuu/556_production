@@ -18,7 +18,7 @@ export type Settings = {
   context_turns: number;
 };
 
-// 設定 → 全域 → 模型連線 (home/models.json). Keys never come back: api_key is write-only, api_key_set says one is stored.
+// 設定 → 模型連線 (home/models.json). Keys never come back: api_key is write-only, api_key_set says one is stored.
 export type Endpoint = { method: string; base_url: string; api_key?: string; model: string };
 export type Use = Endpoint & { use: 'master' | 'custom' };
 export type EmbedderConn = { kind: string; exe: string; file: string; port: number; base_url: string; api_key?: string; model: string; dims: number };
@@ -42,6 +42,7 @@ export type Knob = { key: string; group: string; label: string; help: string; ty
 export type CompanionInfo = {
   name: string; display_name: string; avatar_model: string; active: boolean; hermes_connected: boolean;
   stopping: boolean; api_port: number; channels: string[]; gateway: boolean; dir: string;
+  portrait_url?: string; // her picture for the circle, with the file's mtime in the query; "" = show her initial
 };
 
 // Error text of a failed response: the hub's {"error"} JSON, else the raw body (an old daemon
@@ -105,6 +106,17 @@ export const api = {
     const r = await fetch(`${BASE}/api/companions/${encodeURIComponent(name)}/${action}`, { method: 'POST' });
     if (!r.ok) throw new Error(await errorOf(r));
     return r.json() as Promise<{ companion: CompanionInfo }>;
+  },
+  // her portrait: the image is the request body; 556d keeps it in her package (or her profile when she has none)
+  uploadPortrait: async (name: string, file: File) => {
+    const r = await fetch(BASE + '/api/companions/' + encodeURIComponent(name) + '/portrait', { method: 'PUT', headers: { 'content-type': file.type || 'application/octet-stream' }, body: file });
+    if (!r.ok) throw new Error(await errorOf(r));
+    return r.json() as Promise<{ portrait_url: string }>;
+  },
+  removePortrait: async (name: string) => {
+    const r = await fetch(BASE + '/api/companions/' + encodeURIComponent(name) + '/portrait', { method: 'DELETE' });
+    if (!r.ok) throw new Error(await errorOf(r));
+    return r.json() as Promise<{ portrait_url: string }>;
   },
   select: async (name: string) => {
     const r = await fetch(BASE + '/api/selected', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name }) });

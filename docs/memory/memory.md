@@ -39,7 +39,7 @@ section). Decision trail: `../DECISIONS.md`.
   (`../inner-life/inner-life.md`). Since 0.5.0 every memory a turn writes carries `meta.turn_id` and
   `meta.source`, and the engine annotates `valence`, `arousal`, `instance_ids` afterwards (`Keepsake.annotate_turn`).
 - Since 0.9.0 nothing in memory has a hidden default: kokoro.json's `llm` (the 記憶 connection) and `embedder` (the
-  vectors) blocks are written by 556d from `home/models.json` (設定 → 全域 → 模型連線) before every start
+  vectors) blocks are written by 556d from `home/models.json` (設定 → 模型連線) before every start
   (`writeKokoroConnections`); kokoro raises 模型連線未設定 instead of guessing an endpoint, and `tools/seed-memories.py`
   reads the embedder from kokoro.json or stops.
 - Since 0.8.6 **no tools at baseline**: 556d empties the `memory` toolset from every `platform_toolsets` list before a
@@ -283,7 +283,7 @@ Realistic final packaging = one installer/launcher with bundled sidecars (roadma
 
 - `language` per companion (kokoro.json, template **zh-TW**; en selectable): the extraction prompt writes
   facts in this language. Never "mirror the input" — mixed-language stores defeat dedup.
-- The embedder is the **vectors** connection of 設定 → 全域 → 模型連線 (0.9.0): 556d's own llama-server with a model
+- The embedder is the **vectors** connection of 設定 → 模型連線 (0.9.0): 556d's own llama-server with a model
   file, or any OpenAI-compatible embeddings endpoint, with its name and dimensions; no default — 556d writes it into
   every profile's kokoro.json `embedder` before a start, and nothing starts until it is set (this machine: local
   bge-m3, 100+ languages incl. zh/ja/fr/en). **Anyone running a companion in another language must pair it with an

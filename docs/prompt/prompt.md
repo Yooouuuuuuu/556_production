@@ -82,7 +82,7 @@ files (no AGENTS.md or `.hermes.md` in her cwd or home); the Bot Mode protocol.
 
 **Time.** She has a clock (0.8.4): the first line under the state block's title, 現在：2026/10/19（一）22:40, from
 the engine's own zone — `psyche.json` `time.timezone_offset_h`, which 556d writes from the connections' timezone
-(`home/models.json`, 設定 → 全域 → 模型連線) before every start; the same zone goes to every gateway as
+(`home/models.json`, 設定 → 模型連線) before every start; the same zone goes to every gateway as
 `HERMES_TIMEZONE`. Nothing has a default: a character does not start until the zone is set. Hermes's own date
 paragraph is dropped whole (block 12). Her session is still endless (one session per character, never rotated),
 and she now knows the date, the weekday and the hour on every turn; a proactive cue's 現在是…, the MM/DD stamp on
@@ -366,7 +366,7 @@ output tokens every turn, and the first measurement of what it buys is the probe
 One line at the top of the state block, from the engine's own clock: 現在：2026/10/19（一）22:40, the first line
 under the title. The block is per turn and already in the user message, so it costs nothing in prefix cache and
 reaches every path (app, Telegram, voice, cue, relay — all run the same hook). The zone: `home/models.json`
-`timezone` (設定 → 全域 → 模型連線, no default) → `psyche.json` `time.timezone_offset_h`, written before every
+`timezone` (設定 → 模型連線, no default) → `psyche.json` `time.timezone_offset_h`, written before every
 start, and `HERMES_TIMEZONE` on every gateway, so the engine and Hermes agree; Hermes's own date paragraph is
 dropped by the shim regardless (0.8.5, its weekday was wrong). Dates in a skill-written SOUL are absolute and
 live only in 時間線 (§2.4); seeds carry `at` and `tools/seed-memories.py` stores them at that date (0.8.0). The
@@ -482,7 +482,7 @@ the package before every start (§2.4), so an edit in the package wins and the p
 
 **Runtime.** Unchanged by authoring: the SOUL enters the system prompt (tier 1), the meters enter the engine,
 the 想法 line is rendered by the engine. The skill never runs while she is live; the engine never writes a word
-of the SOUL. The app page (設定 → 角色 → 新角色, 0.8.1) runs the same skill behind 556d as a job
+of the SOUL. The app page (名單 → ＋ 新角色, 0.8.1) runs the same skill behind 556d as a job
 (`POST /api/characters/<id>/run`, one job per package, its output in `build/run.log`, hub event `character.job`),
 on the 寫靈魂 connection (`--model` and `--base-url` from `home/models.json`; the page shows the configured model
 instead of a menu, 0.9.0), phase by phase or 「全部」, shows the proposals with their evidence for confirmation

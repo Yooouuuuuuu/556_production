@@ -19,6 +19,8 @@ Inputs:
   or run with `--yes`.
 - `companion.json` (display name, avatar) and `kokoro.json` (keys merged into the profile's kokoro.json, e.g.
   `address_default`: how she addresses you until Settings → 你 has your name).
+- `portrait.<ext>` — her picture for the circle in the app (角色 → 基本, 0.13.0; one png / jpg / webp / gif). Without one
+  the app shows the first character of her name.
 
 Outputs (regenerate explicitly; `soul.lock.json` records which inputs produced them):
 - `SOUL.md` — the six-part persona: background, likes and dislikes, 怎麼聽、怎麼想、怎麼回, 怎麼判斷、怎麼決定, 說話的方式
@@ -40,7 +42,7 @@ Outputs (regenerate explicitly; `soul.lock.json` records which inputs produced t
 - `build/` — one JSON per phase (intake, structure, thinking, voice, reactions, parts, verify), `check.md`, `verify.md`,
   the raw model replies under `build/raw/`, and `run.log` (the output of the last job 556d ran for this package).
 
-The skill, from the app: 設定 → 角色 → 新角色 (0.8.1) — the same phases as a 556d job, proposals confirmed on the page,
+The skill, from the app: 名單 → ＋ 新角色 (0.8.1) — the same phases as a 556d job, proposals confirmed on the page,
 install from the page. From the terminal:
 ```
 python tools/soul_writer.py init <id> --display 名字 [--from-example] [--avatar hiyori/Hiyori.model3.json] [--pronoun 她|他]
@@ -51,7 +53,7 @@ python tools/soul_writer.py check <id> ; python tools/soul_writer.py status <id>
 ```
 Every phase stops for review unless `--yes`; a part can be regenerated alone; `assemble` refuses to write a SOUL that
 fails the checks (theory or machine words, digits outside 時間線, simplified characters, size 2,500–4,000, missing
-sections) unless `--force`. The model is the 寫靈魂 connection of `home/models.json` (設定 → 全域 → 模型連線), or
+sections) unless `--force`. The model is the 寫靈魂 connection of `home/models.json` (設定 → 模型連線), or
 `--base-url <…/v1> --model <name>` with the key in `X556_API_KEY`; `--timeout` is the per-call limit (900 s — the parts
 phase can take minutes); 556d need not be running.
 
