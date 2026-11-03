@@ -37,7 +37,7 @@ func defaultSettings() Settings {
 		AvatarModel:       "hiyori/Hiyori.model3.json",
 		ShowAvatarOnStart: false, // 0.8.6: hidden until the core is done; the avatar is toggled from the office window
 		MemoryLanguage:    "zh-TW",
-		ContextTurns:      20,
+		ContextTurns:      100,
 	}
 }
 

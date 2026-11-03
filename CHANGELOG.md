@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.13.1 — 2026-11-03
+
+- **License.** The repository is public: 556 Production's own code is MIT (`LICENSE`, `app/package.json`), matching Hermes
+  Agent and KeepsakeDB (both MIT). `THIRD-PARTY.md` lists what is not ours — the Live2D Cubism Core and the Hiyori
+  sample stay under Live2D's own (non-open) agreements.
+- **對話視窗保留的輪數 defaults to 100** (was 20) on a new install; an existing `home/settings.json` keeps its value.
+
 ## 0.13.0 — 2026-11-03
 
 - **The UI remade: three doors, not five tabs** (DECISIONS 2026-11-02; design canvas first, then the app). 名單 is the left

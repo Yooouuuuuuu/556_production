@@ -30,3 +30,7 @@ language your embedder doesn't cover, change the embedder as well**; the two set
 living concept doc with its graphs; `docs/DECISIONS.md` and `docs/STACK.md` at the docs root; working documents
 (roadmap, test list) are `docs/*.local.md`, ignored. `CHANGELOG.md` is per version.
 Version control is git; `vendor/` holds the two submodules and is never edited.
+
+## License
+MIT (`LICENSE`) for 556 Production's own code. Third-party pieces keep their terms — the Live2D Cubism Core and the
+Hiyori sample are Live2D's, not open source; see `THIRD-PARTY.md`.
