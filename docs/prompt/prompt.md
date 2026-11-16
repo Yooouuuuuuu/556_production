@@ -174,7 +174,7 @@ SOUL, so no fix was ever routed. This doc is that design pass; the 2026-10-02 en
 
 | Home | Copies | What goes there | Today (0.10.0) |
 | --- | --- | --- | --- |
-| tier 1 — system prompt | 1, cached; rebuilt at her restart or a compression | the SOUL — with its 時間線 and 影響過你的人與事, the dated, always-on part of who she is (§2.4); kokoro's section: the memory rule in zh-TW and 關於你 | built. No date line any more: the start date went with Hermes's date paragraph (0.8.5), the clock is tier 2. Budget: SOUL 2,500–4,000 chars of prose, the two dated sections not counted |
+| tier 1 — system prompt | 1, cached; rebuilt at her restart or a compression | the SOUL — with its 時間線 and 影響過你的人與事, the dated, always-on part of who she is (§2.4); kokoro's section: the memory rule in zh-TW and 關於你 | built. No date line any more: the start date went with Hermes's date paragraph (0.8.5), the clock is tier 2. Budget: SOUL 2,500–10,000 chars of prose, the two dated sections not counted |
 | tier 2 — per turn, tiny | 1 per turn, ×20+ in history | the state block with the **clock line** (§2.7) and the optional 想法 line (§2.5) | built; eight lines of state, the title and the clock extra (§1.4) |
 | tier 3 — per turn, only when it hits | 0 or 1 per turn | similarity recall top 5 + 5 as before, plus **keyword triggers** | built 0.8.10 for names only — the roster, the person files, your name (`By name`, §1.4); places are not triggers until a store has enough named places to need them (DECISIONS 2026-10-19). The lorebook row in `memory.md` is this and nothing more |
 
@@ -216,7 +216,7 @@ that shaped her, her stances and refusals, who the people around her are — is 
 line per event, oldest first) and `## 影響過你的人與事` written by the skill from the description (code, not a
 model; absent when the description gives none), stances and refusals in `## 怎麼判斷、怎麼決定`, the people in
 `## 誰在跟你說話` and the person files. The same events and influences also go to the store as dated seeds, for
-retrieval when a topic touches them. Dates may appear only in 時間線 (the digit check and the 2,500–4,000 prose
+retrieval when a topic touches them. Dates may appear only in 時間線 (the digit check and the 2,500–10,000 prose
 budget leave it out). Where she stands with each person *now* is the engine's 對他 line, not text.
 
 The 0.8.7 mechanism — five reserved tags (`timeline`, `influences`, `stances`, `refusals`, `standing`) whose store
@@ -454,7 +454,7 @@ companion form); a part can be regenerated alone (`--phase`, `--from`), so the w
 7. **Assemble.** Code, not a model: the six-part SOUL in zh-TW with 時間線 and 影響過你的人與事 after part 1 and the
    scratch line when `scratch` is set; then the mechanical checks — no theory or machine words, no Arabic digits
    outside 時間線 and list numbering, no simplified characters (common slips repaired), the six sections present,
-   size 2,500–4,000 characters not counting the dated sections; third-person drift is a warning; a failed check
+   size 2,500–10,000 characters not counting the dated sections; third-person drift is a warning; a failed check
    refuses to write.
 8. **Verify.** The blind read-back: the model reads only the finished SOUL and names the dials, compared to the
    confirmed meters and choices — its own prompt, never the writer's (the writer must not grade itself). The

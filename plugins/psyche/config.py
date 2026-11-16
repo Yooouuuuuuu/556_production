@@ -80,8 +80,9 @@ DEFAULTS: Dict[str, Any] = {
         # the soul skill from profile.json (the new-character page: a sample, the description's draft, or your own words).
         # Before 0.11.0 this block carried one character's life and every package without its own inherited it.
         "schedule": {"bedtime": 23.5, "wake": 7.5, "bedtime_delay_max_h": 1.5,
-                     "work": [[9.5, 12.5], [14.0, 18.0]], "hobby": [[10.0, 12.0], [15.0, 17.0]], "meals": [[12.5, 13.5], [18.5, 19.5]]},
+                     "work": [[9.5, 12.5], [14.0, 18.0]], "hobby": [], "meals": [[12.5, 13.5], [18.5, 19.5]]},
         "busyness_mode": "work",          # work | hobby | none
+        "busy_kinds": ["work"],           # which activities count as busy: she replies short and says wait (work | hobby | meal)
         "wake_on_message": True,
         "projects": [],                   # [{"title", "stage", "difficulty" 0-1, "progress" 0-1}] — the first one advances in work time
         "small_events": [],               # [{"text", "v" -1..1, "R", "p" daily chance, "kind" life|work|unwell|project, "share"}]

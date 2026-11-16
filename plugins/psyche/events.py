@@ -15,6 +15,8 @@ import urllib.request
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
+from . import replying as RP
+
 EVENT_MARK = "【事件】"
 SILENCE = "（沉默）"
 
@@ -58,7 +60,7 @@ def is_event_turn(user_text: str) -> bool:
 def is_silence(reply: str) -> bool:
     """Her event-turn answer that is not a message: silence, or a system error the platform returned."""
     r = (reply or "").strip().strip("「」\"'")
-    if not r or r == SILENCE.strip("（）") or r == SILENCE or r.startswith(SILENCE) or r in ("沉默", "(沉默)"):
+    if not r or r == SILENCE.strip("（）") or r == SILENCE or r.startswith(SILENCE) or r in ("沉默", "(沉默)") or RP.is_silent(r):
         return True
     return any(r.startswith(e) or e in r for e in ERRORISH)
 

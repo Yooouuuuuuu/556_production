@@ -141,6 +141,9 @@ type Message struct {
 	Text   string  `json:"text"`
 	TS     float64 `json:"ts"`
 	Source string  `json:"source"` // "app", or the channel it came through (telegram); her reply inherits the question's source
+	// Reaction: her emoji on your message when she answered with a reaction instead of words (when-to-reply.md);
+	// Hermes keeps it in the row's display_metadata reactions, author "agent".
+	Reaction string `json:"reaction,omitempty"`
 }
 
 type rawMessage struct {
@@ -150,7 +153,7 @@ type rawMessage struct {
 
 // Messages returns the latest `limit` user/assistant messages, oldest first.
 func (t *Transcript) Messages(sessionID string, limit int, channel string) ([]Message, error) {
-	rows, err := t.query(`SELECT id, role, content, timestamp, platform_message_id IS NOT NULL FROM messages
+	rows, err := t.query(`SELECT id, role, content, timestamp, platform_message_id IS NOT NULL, display_metadata FROM messages
 		WHERE session_id = ? AND active = 1 AND _compressed_summary = 0 AND role IN ('user','assistant')
 		ORDER BY id DESC LIMIT ?`, sessionID, limit*3)
 	if err != nil {
@@ -162,13 +165,64 @@ func (t *Transcript) Messages(sessionID string, limit int, channel string) ([]Me
 	if len(rows) > limit {
 		rows = rows[len(rows)-limit:]
 	}
-	return attribute(rows, channel, "app"), nil
+	out := []Message{}
+	for _, m := range attribute(rows, channel, "app") {
+		if m.Role == "assistant" && m.Source != "cue" && IsNoReply(m.Text) {
+			continue // she let it go: no bubble (the reaction, if any, is on your message)
+		}
+		out = append(out, m)
+	}
+	return out, nil
+}
+
+// agentReaction: her (author "agent") emoji in a row's display_metadata, or "".
+func agentReaction(meta sql.NullString) string {
+	if !meta.Valid || meta.String == "" {
+		return ""
+	}
+	var d struct {
+		Reactions []struct {
+			Emoji  string `json:"emoji"`
+			Author string `json:"author"`
+		} `json:"reactions"`
+	}
+	if json.Unmarshal([]byte(meta.String), &d) != nil {
+		return ""
+	}
+	for _, r := range d.Reactions {
+		if r.Author == "agent" {
+			return r.Emoji
+		}
+	}
+	return ""
+}
+
+// LastUserReaction: her reaction on the newest user row of a session (the row id too, 0 when none yet).
+func (t *Transcript) LastUserReaction(sessionID string) (int64, string, error) {
+	db, err := t.open(true)
+	if err != nil {
+		return 0, "", err
+	}
+	defer db.Close()
+	var (
+		id   int64
+		meta sql.NullString
+	)
+	err = db.QueryRow(`SELECT id, display_metadata FROM messages WHERE session_id = ? AND role = 'user' AND active = 1
+		ORDER BY id DESC LIMIT 1`, sessionID).Scan(&id, &meta)
+	if err == sql.ErrNoRows {
+		return 0, "", nil
+	}
+	if err != nil {
+		return 0, "", err
+	}
+	return id, agentReaction(meta), nil
 }
 
 // After returns user/assistant messages with id > after, oldest first (the live follower).
 // lastUserSource carries the attribution state across calls.
 func (t *Transcript) After(sessionID string, after int64, channel, lastUserSource string) ([]Message, error) {
-	rows, err := t.query(`SELECT id, role, content, timestamp, platform_message_id IS NOT NULL FROM messages
+	rows, err := t.query(`SELECT id, role, content, timestamp, platform_message_id IS NOT NULL, display_metadata FROM messages
 		WHERE session_id = ? AND id > ? AND active = 1 AND _compressed_summary = 0 AND role IN ('user','assistant')
 		ORDER BY id ASC LIMIT 200`, sessionID, after)
 	if err != nil {
@@ -208,8 +262,9 @@ func (t *Transcript) query(q string, args ...any) ([]rawMessage, error) {
 			m       rawMessage
 			content sql.NullString
 			ts      sql.NullFloat64
+			meta    sql.NullString
 		)
-		if err := rs.Scan(&m.ID, &m.Role, &content, &ts, &m.channel); err != nil {
+		if err := rs.Scan(&m.ID, &m.Role, &content, &ts, &m.channel, &meta); err != nil {
 			return nil, err
 		}
 		m.Text = strings.TrimSpace(contentText(content))
@@ -217,6 +272,9 @@ func (t *Transcript) query(q string, args ...any) ([]rawMessage, error) {
 			continue // tool-call-only assistant rows
 		}
 		m.TS = ts.Float64
+		if m.Role == "user" {
+			m.Reaction = agentReaction(meta)
+		}
 		out = append(out, m)
 	}
 	return out, rs.Err()
@@ -242,8 +300,25 @@ func IsPlatformError(s string) bool {
 // IsSilence: her answer to a cue that means "not now" (events.py SILENCE), or a platform error
 // returned in place of her words.
 func IsSilence(s string) bool {
+	if IsNoReply(s) {
+		return true
+	}
 	s = strings.Trim(strings.TrimSpace(s), "「」\"'()（）")
 	return s == "" || s == "沉默" || IsPlatformError(s)
+}
+
+// IsNoReply: her whole answer is a silence marker (Hermes gateway's set: NO_REPLY, [SILENT], SILENT, NO REPLY) —
+// she chose not to answer in words (when-to-reply.md). Telegram never gets it; the windows show no bubble.
+func IsNoReply(s string) bool {
+	s = strings.Trim(strings.TrimSpace(s), "「」\"'`*.。!！")
+	if len(s) == 0 || len(s) > 64 {
+		return false
+	}
+	switch strings.Join(strings.Fields(strings.ToUpper(s)), " ") {
+	case "NO_REPLY", "NO REPLY", "[SILENT]", "SILENT":
+		return true
+	}
+	return false
 }
 
 // DiscardOrphans deactivates the trailing user rows of a session that never got an answer: a turn

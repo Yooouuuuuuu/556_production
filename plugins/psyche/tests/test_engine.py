@@ -210,3 +210,25 @@ def test_projects_follow_the_package_and_keep_progress_by_title(tmp_path):
     e4.owner = True
     e4.load()
     assert e4.projects == []
+
+
+def test_a_worker_has_her_own_time_after_work():
+    from psyche import life as L
+    life = {"busyness_mode": "work", "schedule": {"work": [[9.0, 18.0]], "hobby": [[21.0, 24.0]], "meals": []}}
+    act = lambda h: L.activity_for(h, {"asleep": False, "lying": False}, False, life)
+    assert act(10.0) == "work" and act(22.0) == "hobby" and act(19.5) == "rest"
+
+
+def test_busy_kinds_decide_when_she_says_wait(tmp_path):
+    import datetime as _dt
+    clock = Clock(T0)
+    c = cfg()
+    c["life"]["schedule"]["meals"] = [[0.0, 24.0]]   # always eating
+    c["life"]["busy_kinds"] = ["work"]
+    e = Engine(tmp_path, "test", c, db_path=tmp_path / "b.db", now_fn=clock, llm=None); e.owner = True; e.load()
+    e.activity = "meal"
+    assert "手上在忙" not in e.state_block()
+    e.cfg["life"]["busy_kinds"] = ["work", "meal"]
+    e.activity = "meal"
+    blk = e.state_block()
+    assert e.activity == "meal" and "手上在忙" in blk

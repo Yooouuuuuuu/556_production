@@ -272,6 +272,10 @@ func (a *API) chat(w http.ResponseWriter, r *http.Request) {
 	// is kept — the dangling user row is deactivated so it cannot re-enter her context later — and the windows
 	// get a system note instead of a bubble; no mirror, no avatar bubble.
 	failed := err != nil || res.Err != "" || res.Status == "error" || companions.IsPlatformError(res.Reply)
+	silent := !failed && companions.IsNoReply(res.Reply) // she let it go, or reacted (when-to-reply.md): no bubble, no mirror
+	if silent {
+		res.Reply = ""
+	}
 	if res.Reply != "" && !failed { // her reply arrives whole (see hermesapi.Chat); the windows render it as one delta
 		a.emit(map[string]any{"type": "chat.delta", "companion": name, "text": res.Reply})
 		if sse != nil {
@@ -331,9 +335,17 @@ func (a *API) chat(w http.ResponseWriter, r *http.Request) {
 		status = "timeout"
 	}
 
-	a.emit(map[string]any{"type": "chat.complete", "companion": name, "text": reply, "status": status, "usage": res.Usage})
+	a.emit(map[string]any{"type": "chat.complete", "companion": name, "text": reply, "status": status, "usage": res.Usage, "silent": silent})
 	a.emit(map[string]any{"type": "companion.state", "companion": name, "talking": false})
-	a.bubble(name, reply)
+	if silent {
+		wsid := sid
+		if wsid == "" {
+			wsid = slot.id
+		}
+		go a.watchReaction(name, wsid)
+	} else {
+		a.bubble(name, reply)
+	}
 	if status == "stop" && reply != "" && a.settings.Get().MirrorToTelegram {
 		go a.mirrorToTelegram(name, text, reply)
 	}
@@ -351,6 +363,26 @@ func (a *API) chat(w http.ResponseWriter, r *http.Request) {
 			"message": map[string]any{"role": "assistant", "content": reply}}},
 		"usage": res.Usage,
 	})
+}
+
+// watchReaction: after a turn she answered without words, her reaction (if any) lands on your message a moment
+// later — psyche writes it once Hermes has stored the row — so the windows are told when it shows up (~25 s at most).
+func (a *API) watchReaction(name, sessionID string) {
+	if sessionID == "" {
+		return
+	}
+	tr := a.mgr.Transcript(name)
+	for i := 0; i < 50; i++ {
+		time.Sleep(500 * time.Millisecond)
+		id, emoji, err := tr.LastUserReaction(sessionID)
+		if err != nil {
+			return
+		}
+		if emoji != "" {
+			a.emit(map[string]any{"type": "chat.reaction", "companion": name, "emoji": emoji, "id": id})
+			return
+		}
+	}
 }
 
 // mirrorToTelegram (c): echo an app exchange into your Telegram DM as plain text,
@@ -766,6 +798,12 @@ func (a *API) follow(name, channel string) {
 			a.emit(map[string]any{"type": "chat.user", "companion": name, "text": m.Text, "source": m.Source})
 			a.emit(map[string]any{"type": "companion.state", "companion": name, "talking": true})
 		case "assistant":
+			if companions.IsNoReply(m.Text) { // she let your Telegram message go, or reacted to it
+				a.emit(map[string]any{"type": "chat.complete", "companion": name, "text": "", "status": "stop", "source": m.Source, "silent": true})
+				a.emit(map[string]any{"type": "companion.state", "companion": name, "talking": false})
+				go a.watchReaction(name, f.sessionID)
+				continue
+			}
 			a.emit(map[string]any{"type": "chat.complete", "companion": name, "text": m.Text, "status": "stop", "source": m.Source})
 			a.emit(map[string]any{"type": "companion.state", "companion": name, "talking": false})
 			a.bubble(name, m.Text)

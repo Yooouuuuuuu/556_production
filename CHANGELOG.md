@@ -1,5 +1,45 @@
 # Changelog
 
+## 0.14.0 — 2026-11-17
+
+- **New-character page, redrawn and reordered.** Six steps: 描述 · 關係 · 日子 · 產生 · 確認 · 結果 — what you set comes
+  before what the model writes, 確認 after 產生 holds only the numbers and think-first. Everything saves itself (no save
+  buttons; a saved / saving line in the header), one action per step, the step bar marks done / out of date / optional.
+  日子 has source cards (the description's draft, a sample — it asks before it overwrites — or your own), a day bar, and
+  an editor in clock times with one row per kind of time (sleep, work, her own time, meals; add / remove per row),
+  which times count as busy (multi-choice incl. meals), the thing in hand and small events with a tone picker. 確認's
+  questions have worded slider ends with the proposal marked, segments instead of dropdowns and a real switch. 產生 is
+  eight rows with plain-text state and one button each.
+- **Rerun marking per section.** A change marks only the phases that read that part of `profile.json` as out of date
+  (`soul.lock.json` `profile_sections`; 556d and the skill agree), not every phase. Tested in Go and Python.
+- **Her own time and what counts as busy** (psyche): `schedule.hobby` blocks count after work for a worker; the skill
+  drafts them from the description; no default blocks. `life.busy_kinds` (work / hobby / meal) decides when the 手上在忙
+  line shows; default work only.
+- **Soul skill.** No ages or durations in the text (dates instead), relationships as lasting attitudes, never their
+  current state (the describe hints say so too). Prose budget 2,500–10,000 characters. 影響過你的人與事 is third person
+  by name and marks every name with who it is — 小明（人名，你的弟弟） — her own name marked as her; the structure phase
+  keeps who said what apart. An endpoint error returned as text stops the phase instead of being saved as its answer.
+- 556d also writes its log to `home/logs/556d.log` (the previous run kept as `556d.prev.log`).
+
+- **App icon.** A gold-framed heart, green with an ivory quarter, on a transparent ground (`app/assets`): `icon.ico` is
+  the window and taskbar icon on Windows (16–256 px inside), `icon.png` (256 px) elsewhere, `tray.png` and `tray@2x.png`
+  for the tray (Electron picks the @2x on high-DPI screens). Kept for packaging, which the repo does not do yet:
+  `icon.icns` (macOS), `icon-1024.png` (Linux or any size) and `icon.svg`, the master to edit and re-export from.
+
+- **Not every message gets a reply** (DECISIONS 2026-11-16, `docs/inner-life/when-to-reply.md`). psyche's state block has a
+  回不回 line for every turn with you: a closer (好啦, 晚安, a lone emoji) may get no reply (`NO_REPLY`, which Hermes's
+  gateway already drops) or one reaction (`[REACT 🤣]`); a question, a feeling, news or anything she owes always gets
+  words. How easily she lets one go is derived each turn from her big5 and the moment (busy and having said 等一下, tired,
+  worn out, wanting to talk, mood, closeness) — one hint at the two ends, nothing to set; two unanswered in a row and the
+  next one with content gets words. The plugin turns a reaction into `NO_REPLY` and puts the emoji on your message: in
+  Telegram (Bot API `setMessageReaction`, mapped to Telegram's fixed set — 😂 → 🤣, none close → silence) and on the
+  stored row (Hermes's `display_metadata` reactions, author `agent`). A marker mixed with words is dropped and the words
+  go out. Her own event turns keep their own silence and also accept `NO_REPLY`. The turn event records
+  `answer: silent | react` and the emoji; appraisal, the recent-turns ring and kokoro see 「（沒回）」 /
+  「（沒回字，按了 🤣）」. 556d hides silent turns (history and live), sends no Telegram mirror and no avatar bubble for them,
+  returns `reaction` on your messages and emits `chat.reaction` when it lands; the app shows it on your bubble. Tests:
+  `plugins/psyche/tests/test_replying.py`, `TestNoReplyRowsHideAndHerReactionRidesOnYourMessage`.
+
 ## 0.13.1 — 2026-11-03
 
 - **License.** The repository is public: 556 Production's own code is MIT (`LICENSE`, `app/package.json`), matching Hermes

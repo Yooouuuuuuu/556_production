@@ -4,7 +4,7 @@ import { create } from 'zustand';
 import { api, BASE } from './api';
 import type { TimeFormat } from './fmt';
 
-export type Msg = { id: string; role: 'user' | 'assistant'; text: string; ts?: number; streaming?: boolean; source?: string; failed?: boolean };
+export type Msg = { id: string; role: 'user' | 'assistant'; text: string; ts?: number; streaming?: boolean; source?: string; failed?: boolean; reaction?: string }; // reaction: her emoji on your message (when-to-reply.md)
 
 type State = {
   messages: Msg[];
@@ -113,6 +113,14 @@ export const useStore = create<State>((set, get) => ({
               set({ messages: [...messages.slice(0, -1), { ...last, text: ev.text || last.text, streaming: false, ts: Date.now() / 1000, source: ev.source ?? last.source }] });
             } else if (ev.text) {
               set({ messages: [...messages, { id: nextId(), role: 'assistant', text: ev.text, ts: Date.now() / 1000, source: ev.source }] });
+            }
+            break;
+          }
+          case 'chat.reaction': { // she answered your latest message with an emoji instead of words
+            const i = [...messages].reverse().findIndex((m) => m.role === 'user' && m.source !== 'failed' && m.source !== 'cue');
+            if (i >= 0) {
+              const idx = messages.length - 1 - i;
+              set({ messages: messages.map((m, j) => (j === idx ? { ...m, reaction: String(ev.emoji || '') } : m)) });
             }
             break;
           }

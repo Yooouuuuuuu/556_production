@@ -1,6 +1,6 @@
 # The app — 556 Production (Electron + React)
 
-Living doc; last verified 2026-11-03 (0.13.0). The shape decided on 2026-09-30 (notes below) still holds.
+Living doc; last verified 2026-11-17 (0.14.0). The shape decided on 2026-09-30 (notes below) still holds.
 ## The shape since 0.13.0 (2026-11-03)
 
 Three doors, not five tabs (DECISIONS 2026-11-02; `app/src/pages/Shell.tsx`). **名單** is the left column and is always
@@ -10,14 +10,24 @@ when she is offline; picking one puts her on stage — on stage, viewed and talk
 upload, 記憶, 能力, 主動, 聲音, 頻道, 細節); every page says when a change takes effect (存了就生效 / 重新啟動後生效), and the
 pages the app saves itself carry a save bar that names what is typed but not saved. The gear at the bottom of the
 column is **設定** — you and this program — as its own screen with five pages (你, 程式, 模型連線, 語音連線, 開發者) and
-新角色 beside it (also the column's ＋). The new-character page is the package list, then five steps across the top
-(描述 · 關係 · 產生 · 確認 · 結果): 描述 shows one box at a time with its hint as text above the input and the ten titles
-listed on the right, filled or empty; the package card (what is filled, SOUL size, seeds, which phases ran, what is
-stale) stays beside every step; a save bar covers 描述 and 關係. Palette 暖夜 — charcoal-brown ground, apricot accent
+新角色 beside it (also the column's ＋). The new-character page is the package list, then six steps across the top
+(描述 · 關係 · 日子 · 產生 · 確認 · 結果; since 0.14.0): 描述 shows one box at a time with its hint as text above the input
+and the ten titles listed on the right, filled or empty; the package card (what is filled, SOUL size, seeds, which
+phases ran, what is stale) stays beside every step. Everything you type saves itself (no save buttons; a line in the
+header says saved / saving), each step has one action, and a rerun hint shows only when generated output is out of date
+for the section you changed. Palette 暖夜 — charcoal-brown ground, apricot accent
 with dark text, warm off-white ink — as Tailwind theme tokens in `src/index.css` (`bg-panel`, `bg-accent`,
 `text-muted`…), never a hex in a page. 狀態, 記憶 and the chat itself are unchanged inside.
 
 What landed since:
+- **0.14.0** (2026-11-17): the new-character steps reordered and redrawn from the design canvas — 日子 is its own step
+  before 產生 (source cards: the description's draft, a sample, or your own; a day bar; the editor in clock times with
+  one row per kind of time — sleep, work, her own time, meals — add / remove per row, which times count as busy as a
+  multi-choice incl. meals, the thing in hand, small events with a good / bad / unwell picker); 確認 after 產生 with
+  questions whose slider ends are worded and the proposal marked; 產生 as eight rows, one button each. Autosave
+  everywhere. The chat hides turns she let go and shows her emoji reaction on your bubble (`chat.reaction`). The app
+  icon is a heart (`app/assets`: `.ico` on Windows, png elsewhere, tray + @2x; `.icns`, 1024 png and the svg master kept
+  for packaging).
 
 - **0.3.0** (2026-10-01): one app owns 556d's lifecycle; office window with 聊天, 名單, 記憶, 設定 (two tiers
   over the config registry); avatar window (Live2D, official sample) toggled from the office window and

@@ -4,7 +4,8 @@ Hooks (Hermes plugin API, vendor untouched):
     pre_llm_call          -> {"context": <her-state>…【她現在】…</her-state>}   lands after the memory block
     post_llm_call         -> a turn with you or another character: record it, queue appraisal A;
                              her own event turn: record sent / silent (and relay to the other character)
-    transform_llm_output  -> output checks, record only (never changes the text)
+    transform_llm_output  -> output checks, record only; a reply that is only [REACT x] becomes NO_REPLY and the
+                             reaction is put on your message (Telegram + state.db), when-to-reply.md
     on_unload / atexit    -> drain the queues (bounded), snapshot
 
 Who she is talking to comes from the session: her conversation with you (Telegram DM key or the
@@ -96,6 +97,67 @@ def _s(x: Any) -> str:
     return x if isinstance(x, str) else ("" if x is None else str(x))
 
 
+def _session_env(name: str) -> str:
+    try:
+        from gateway.session_context import get_session_env
+        return get_session_env(name, "") or ""
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _telegram_react(token: str, chat: str, msg: str, emoji: str) -> bool:
+    """setMessageReaction straight on the Bot API: no gateway event loop needed from the agent thread."""
+    import json
+    import urllib.request
+    body = json.dumps({"chat_id": int(chat) if chat.lstrip("-").isdigit() else chat, "message_id": int(msg),
+                       "reaction": [{"type": "emoji", "emoji": emoji}]}).encode("utf-8")
+    req = urllib.request.Request(f"https://api.telegram.org/bot{token}/setMessageReaction", data=body,
+                                 headers={"Content-Type": "application/json"}, method="POST")
+    with urllib.request.urlopen(req, timeout=15) as r:
+        return bool(json.loads(r.read().decode("utf-8")).get("ok"))
+
+
+def _react(state_db: Path, sid: str, user_text: str, emoji: str, chat: str, msg: str) -> None:
+    """Her reaction lands on your message: in Telegram when the message came from there, and on the stored user row
+    (display_metadata reactions, author agent) so the app shows it. The row is written by Hermes after the turn, so
+    this waits for it (up to ~20 s)."""
+    import time
+    token = os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    if chat and msg and token:
+        try:
+            if not _telegram_react(token, chat, msg, emoji):
+                logger.warning("psyche: telegram reaction %s not accepted", emoji)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("psyche: telegram reaction failed: %s", exc)
+    probe = (user_text or "").strip()[:40]
+    for _ in range(40):
+        row_id = None
+        try:
+            c = sqlite3.connect(f"file:{state_db.as_posix()}?mode=ro", uri=True, timeout=5)
+            try:
+                r = c.execute("SELECT id, content, platform_message_id FROM messages WHERE session_id = ? AND role = 'user' "
+                              "AND active = 1 ORDER BY id DESC LIMIT 1", (sid,)).fetchone()
+            finally:
+                c.close()
+            if r and ((msg and str(r[2] or "") == msg) or (probe and probe in str(r[1] or ""))):
+                row_id = int(r[0])
+        except Exception:  # noqa: BLE001
+            pass
+        if row_id is not None:
+            try:
+                from hermes_state_registry import acquire, release_or_close
+                db = acquire()
+                try:
+                    db.set_message_reaction(sid, row_id, emoji, author="agent")
+                finally:
+                    release_or_close(db)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("psyche: storing the reaction failed: %s", exc)
+            return
+        time.sleep(0.5)
+    logger.info("psyche: reaction %s not stored (your message row did not show up)", emoji)
+
+
 def register(ctx) -> None:
     global _engine
     from hermes_constants import get_hermes_home
@@ -114,6 +176,9 @@ def register(ctx) -> None:
     eng = Engine(home, home.name, cfg, llm=_llm(home, cfg), term_fn=lambda: _address_term(home), memory_db=mem_db,
                  names_fn=lambda p: _display_name(home, p), hub_url=hub)
     sessions = SessionCounterparts(home / "state.db")
+    from . import replying as RP
+    event_turn: Dict[str, bool] = {}       # session id -> this turn is her own event turn (no 回不回, no reaction)
+    answered: Dict[str, Dict[str, Any]] = {}  # session id -> how transform saw her reply (kind, emoji)
     owner = eng.start(os.getpid())
     _engine = eng
     logger.info("psyche: %s (%s, tick %ss, proactive %s, hub %s)", eng.db_path, "owner" if owner else "read-only", eng.tick_s,
@@ -123,8 +188,11 @@ def register(ctx) -> None:
         try:
             if kw.get("parent_session_id"):  # a sub-agent's turn is not a conversation
                 return None
-            cp = sessions.resolve(_s(kw.get("session_id")))
-            return {"context": wrap_block(eng.state_block(counterpart=cp), eng.pr)}
+            sid = _s(kw.get("session_id"))
+            cp = sessions.resolve(sid)
+            ev = EV.is_event_turn(_s(kw.get("user_message")))
+            event_turn[sid] = ev
+            return {"context": wrap_block(eng.state_block(counterpart=cp, reply_rule=not ev), eng.pr)}
         except Exception:  # noqa: BLE001
             logger.exception("psyche state block failed")
             return None
@@ -145,20 +213,43 @@ def register(ctx) -> None:
                     import threading
                     threading.Thread(target=lambda: EV.relay(hub, home.name, cp, assistant), name="psyche-relay", daemon=True).start()
             else:
-                eng.on_turn(user, assistant, turn_id=turn_key(sid, user, assistant), platform=platform, session_id=sid, counterpart=cp)
+                seen = answered.pop(sid, None) or {}
+                kind = seen.get("kind") or ("silent" if RP.is_silent(assistant) else "text")
+                said = RP.recent_answer(assistant, kind, seen.get("emoji"))
+                eng.on_turn(user, said, turn_id=turn_key(sid, user, assistant), platform=platform, session_id=sid, counterpart=cp,
+                            answer=kind, reaction=seen.get("emoji"))
+                if kind == "react" and seen.get("emoji"):
+                    import threading
+                    threading.Thread(target=_react, args=(home / "state.db", sid, user, seen["emoji"], seen.get("chat", ""), seen.get("msg", "")),
+                                     name="psyche-react", daemon=True).start()
         except Exception:  # noqa: BLE001
             logger.exception("psyche post_llm_call failed")
         return None
 
     def transform_llm_output(**kw):
+        out = None
         try:
             if not kw.get("parent_session_id"):
-                hits = eng.record_check(_s(kw.get("response_text")), _s(kw.get("platform")))
+                text = _s(kw.get("response_text"))
+                sid = _s(kw.get("session_id"))
+                hits = eng.record_check(text, _s(kw.get("platform")))
                 if hits:
                     logger.info("psyche check (record only): %s", {k: v[0] for k, v in hits.items()})
+                if not event_turn.get(sid):
+                    kind, emoji, words = RP.parse(text)
+                    if kind == "react":
+                        tg = _s(kw.get("platform")) == "telegram"
+                        answered[sid] = {"kind": "react", "emoji": emoji, "chat": _session_env("HERMES_SESSION_CHAT_ID") if tg else "",
+                                         "msg": _session_env("HERMES_SESSION_MESSAGE_ID") if tg else ""}
+                        out = RP.NO_REPLY
+                    elif kind == "silent":
+                        answered[sid] = {"kind": "silent"}
+                        out = RP.NO_REPLY if text.strip() != RP.NO_REPLY else None
+                    elif words != text.strip():   # a marker mixed with words: the words go out
+                        out = words
         except Exception:  # noqa: BLE001
             logger.exception("psyche output check failed")
-        return None  # never changes the text
+        return out  # None leaves her text as it is
 
     ctx.register_hook("pre_llm_call", pre_llm_call)
     ctx.register_hook("post_llm_call", post_llm_call)

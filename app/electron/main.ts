@@ -43,7 +43,9 @@ async function boot() {
   }
 }
 
-const appIcon = () => nativeImage.createFromPath(path.join(__dirname, '..', 'assets', 'icon.png'));
+// Windows takes the multi-size .ico (crisp in the taskbar at every scale); elsewhere the 256 px png.
+// assets/ also keeps icon.icns (macOS), icon-1024.png (Linux / any size) and icon.svg (the master) for packaging.
+const appIcon = () => nativeImage.createFromPath(path.join(__dirname, '..', 'assets', process.platform === 'win32' ? 'icon.ico' : 'icon.png'));
 
 function createOffice() {
   office = new BrowserWindow({

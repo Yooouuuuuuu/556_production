@@ -1,6 +1,7 @@
 package api
 
 import (
+	"reflect"
 	"bufio"
 	"crypto/sha256"
 	"encoding/hex"
@@ -165,6 +166,20 @@ func staleInputs(dir string) []string {
 			out = append(out, rel)
 		}
 	}
+	// profile.json is recorded per section (soul_writer.PROFILE_SECTIONS): "profile.json:<phase>" names the first phase
+	// that reads the part that changed, so a change to her day reruns 7–8, not the whole skill
+	if secs, ok := lock["profile_sections"].(map[string]any); ok {
+		prof, _ := readJSONFile(filepath.Join(dir, "profile.json")).(map[string]any)
+		for ph, sv := range secs {
+			sec, _ := sv.(map[string]any)
+			for k, want := range sec {
+				if !reflect.DeepEqual(want, prof[k]) {
+					out = append(out, "profile.json:"+ph)
+					break
+				}
+			}
+		}
+	}
 	sort.Strings(out)
 	if out == nil {
 		out = []string{}
@@ -184,15 +199,15 @@ func (a *API) packageSummary(id string) map[string]any {
 		}
 	}
 	var phases []string
+	phaseTimes := map[string]int64{} // when each phase last wrote its output: the page tells done from stale by order
 	for _, ph := range skillPhases {
+		out := filepath.Join(dir, "build", ph+".json")
 		if ph == "assemble" {
-			if fileExists(filepath.Join(dir, "SOUL.md")) {
-				phases = append(phases, ph)
-			}
-			continue
+			out = filepath.Join(dir, "SOUL.md")
 		}
-		if fileExists(filepath.Join(dir, "build", ph+".json")) {
+		if st, err := os.Stat(out); err == nil {
 			phases = append(phases, ph)
+			phaseTimes[ph] = st.ModTime().Unix()
 		}
 	}
 	if phases == nil {
@@ -208,7 +223,7 @@ func (a *API) packageSummary(id string) map[string]any {
 		"id": id, "display_name": display, "avatar_model": avatar, "describe_filled": filled, "describe_total": len(describeStems),
 		"phases": phases, "has_soul": fileExists(filepath.Join(dir, "SOUL.md")), "installed": a.mgr.Exists(id),
 		"running": running, "job_kind": kind, "lock": readJSONFile(filepath.Join(dir, "soul.lock.json")),
-		"stale": staleInputs(dir),
+		"stale": staleInputs(dir), "phase_times": phaseTimes,
 	}
 }
 

@@ -332,6 +332,8 @@ class KokoroMemoryProvider(MemoryProvider):
             return
         if (user_content or "").lstrip().startswith("【事件】"):
             return  # her own event turn (psyche speaks first): nothing you said, nothing to remember about you
+        if " ".join((assistant_content or "").strip().upper().split()) in ("NO_REPLY", "NO REPLY", "[SILENT]", "SILENT"):
+            assistant_content = "（沒回）"  # she let it go (when-to-reply.md); what you said can still be worth keeping
         cp = self._counterpart_of(session_id)
         pl = self._pipeline_for(cp)
         with self._turn_lock:

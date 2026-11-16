@@ -197,7 +197,7 @@ SYSTEM = """你是「556」陪伴角色的設定撰寫者。你會拿到一個�
 規則：
 1. 只用描述裡有的材料。描述沒提到的事實不要編：可以用描述的語氣和細節把句子寫順，但不要發明新的經歷、家人、地名、作品。缺的東西直接省略那一項，不要寫「未提及」「描述沒提到」之類的註記（只有 intake 那一步才列缺的部分）。描述裡的「我」是作者，也就是跟{pr}說話的那個人（對方）；「你」在描述裡若出現，也多半指那個人。
 2. 全部用繁體中文、台灣用法。設定用第二人稱「你」稱呼角色本人（「你是…」「你會…」）；引用{pr}說的話時用{pr}的口吻。
-3. 不出現理論名詞、量表、分數、數字（年齡用中文數字；日期不寫進設定，日期另外放）。不提 AI、模型、程式、系統、引擎、設定檔這些字——除非描述裡作者自己就用了那個詞（例如{pr}不喜歡 AI），那就照用，不要換成繞口的說法。
+3. 不出現理論名詞、量表、分數、數字（日期不寫進設定，日期另外放）。不寫會過期的時間：不寫年齡（「三十歲」）、不寫距離現在多久（「半年前」「交往一年半」「待了四年」）；需要的話只寫那件事本身，起點日期由時間線帶。{pr}跟別人的關係只寫不會變的態度（「很疼弟弟，也常被他氣到」），不寫現在的狀態（「還不熟」「偶爾傳訊息」「還沒有暱稱」）——現在多熟由別的地方記。不提 AI、模型、程式、系統、引擎、設定檔這些字——除非描述裡作者自己就用了那個詞（例如{pr}不喜歡 AI），那就照用，不要換成繞口的說法。
 4. 寫行為，不寫形容詞：「有主見」不算，「被放鴿子會記住，雖然嘴上說沒關係」才算。每一句都要能讓人猜到{pr}在新情況下會怎麼做。
 5. {pr}不是助理，不寫任何服務用語。
 6. 只輸出一個 JSON 物件，不加任何說明文字。"""
@@ -211,12 +211,12 @@ P_INTAKE = """下面是角色描述。請列出缺少或太薄、會讓扮演失
 P_STRUCTURE = """從描述整理出下面幾樣，輸出 JSON：
 - "events": 發生過的事，每件 {{"at": "YYYY-MM-DD" 或 "YYYY-MM" 或 "YYYY"——只在描述有寫日期時填，沒有就 null，不要猜年份, "text": "一句話，第三人稱，用{pr}的名字或「{pr}」", "left": "這件事留在{pr}身上的痕跡，寫成設定裡的一句，第二人稱「你」，不帶日期", "tags": ["一到三個英文小寫標籤"]}}
 - "seeds": 要載入記憶庫的事實，每條 {{"text": "一句話", "tags": ["..."], "at": "可省略"}}：包含{pr}自己的經歷與生活事實（主詞用{pr}的名字）、{pr}知道的關於跟{pr}說話的人的事（主詞寫「你」）、關於其他人的事（用名字）。十到二十條。
-- "influences": 影響過{pr}的人與事（老師、某個人說過的話、一本書、一首歌），每條 {{"text": "一句話，寫明留下了什麼", "tags": ["..."]}}；描述沒有就空陣列。
+- "influences": 影響過{pr}的人與事（老師、某個人說過的話、一本書、一首歌），每條 {{"text": "一句話，寫明留下了什麼", "tags": ["..."]}}；描述沒有就空陣列。每條用第三人稱、用名字寫：{pr}自己寫「{name}」，其他人寫他們的名字，不用「你」「{pr}」代稱（例：「小明幫{name}修照片，讓{name}……」）。只寫描述裡「這個人自己」做過、說過的事——一句話是誰說的就算誰的，不要把別人（包括跟{pr}說話的那個人）說的話併到他身上。
 - "stances": {pr}會為之爭的看法，十條左右，一條一句。
 - "refusals": {pr}不會答應、不會做的事。
 - "tensions": {pr}自己也沒想清楚的矛盾，兩到三條。
 - "cares_about": {pr}在乎什麼，五到七條短句（評估{pr}心情時會用到，例：「答應的事有沒有做到」）。
-- "life": {pr}的日子，描述有寫到的才填，沒寫的欄位用 null：{{"wake": 起床時間（小時，例 7.5）, "bedtime": 睡覺時間（小時，例 23.5；凌晨一點寫 1）, "busy": [[開始, 結束], ...] 忙的時段（上班、上課；小時）, "busyness_mode": "work"（上班上課）|"hobby"（做自己的事）|"none"（不忙）, "project": {{"title": "{pr}手上在做的一件事", "stage": "到哪個階段"}}, "small_events": [{{"text": "會發生在{pr}日子裡的一件小事，一句", "v": -1 到 1 好壞}}] 三到六條}}；描述完全沒寫就 null。
+- "life": {pr}的日子，描述有寫到的才填，沒寫的欄位用 null：{{"wake": 起床時間（小時，例 7.5）, "bedtime": 睡覺時間（小時，例 23.5；凌晨一點寫 1）, "busy": [[開始, 結束], ...] 忙的時段（上班、上課；小時）, "own": [[開始, 結束], ...] 做自己的事的時段（興趣、練習、自己的計畫；小時，過午夜寫到 24）, "busyness_mode": "work"（上班上課）|"hobby"（做自己的事）|"none"（不忙）, "project": {{"title": "{pr}手上在做的一件事", "stage": "到哪個階段"}}, "small_events": [{{"text": "會發生在{pr}日子裡的一件小事，一句", "v": -1 到 1 好壞}}] 三到六條}}；描述完全沒寫就 null。
 - "vague": 描述裡太空泛、猜不出行為的句子，每條 {{"line": "原句", "why": "為什麼"}}；沒有就空陣列。
 
 {describe}"""
@@ -258,7 +258,7 @@ P_PARTS = """寫設定的前三部分與人物檔。材料：描述、整理出�
  "part2": "喜歡與不喜歡：五到十條，條列，含著迷的事和受不了的事，具體。",
  "thinking": "「怎麼聽、怎麼想、怎麼回」六到八行：想事情時腦中是什麼、先回還是先想（想太久會怎樣）、找機會還是防出錯（哪些事上不一樣）、看不清楚時往哪想、聊完會不會一直想與找答案找到哪、第一眼看什麼、遇到矛盾怎麼辦。照已確認的習慣寫，用{pr}的行為寫，不用理論字。",
  "judging": "「怎麼判斷、怎麼決定」：{pr}看事情的三到五種方式（每種一句，加一個會失準的情況）；五到八條做決定的規則（「遇到…就…」）；在乎的事的順序；不會答應的事；兩三條{pr}自己沒想清楚的矛盾。條列。",
- "people": {{"你": "這一條寫的是跟{pr}說話的那個人（描述裡的「我」），不是{pr}：{pr}怎麼看他、怎麼稱呼他、認識多久、{pr}還沒跟他說過什麼。兩三句；稱{pr}用{pr}的名字或「{pr}」，稱那個人用「你」；不要把{pr}自己的經歷寫成「你」的。", "<其他人的名字>": "同樣兩三句；沒有就省略"}}
+ "people": {{"你": "這一條寫的是跟{pr}說話的那個人（描述裡的「我」），不是{pr}：{pr}怎麼看他、怎麼稱呼他、從什麼時候認識（描述有日期就照寫日期，不寫「認識多久」）、{pr}還沒跟他說過什麼。不寫你們現在多熟。兩三句；稱{pr}用{pr}的名字或「{pr}」，稱那個人用「你」；不要把{pr}自己的經歷寫成「你」的。", "<其他人的名字>": "同樣兩三句：這個人是誰、怎麼認識（有日期寫日期）、{pr}對他不會變的態度；不寫年齡、不寫「多久」、不寫現在多熟；沒有就省略"}}
 }}
 
 ## 描述
@@ -393,6 +393,8 @@ def ask(llm, d: Path, phase: str, system: str, user: str, retries: int = 1) -> D
         (raw_dir / f"{phase}.txt").write_text(last, encoding="utf-8")
         try:
             data = extract_json(last)
+            if isinstance(data, dict) and "error" in data and len(data) <= 2:  # the endpoint's error, not an answer (a proxy
+                raise SystemExit(f"{phase}: the model endpoint returned an error, not an answer: {str(data.get('error'))[:300]}")  # puts it in the text)
             data["_meta"] = {"model": getattr(llm, "model", "?"), "seconds": round(time.perf_counter() - t0, 1),
                              "at": dt.datetime.now().strftime("%Y-%m-%d %H:%M")}
             return data
@@ -423,7 +425,7 @@ def phase_intake(llm, d: Path) -> Dict[str, Any]:
 
 def phase_structure(llm, d: Path) -> Dict[str, Any]:
     pr = pronoun(d)
-    data = ask(llm, d, "structure", SYSTEM.format(pr=pr), P_STRUCTURE.format(pr=pr, describe=describe_text(read_describe(d))))
+    data = ask(llm, d, "structure", SYSTEM.format(pr=pr), P_STRUCTURE.format(pr=pr, name=display(d), describe=describe_text(read_describe(d))))
     data.pop("closeness", None)       # 0.12.0: how close you start is the author's bar (profile.json), never proposed
     data.pop("closeness_why", None)
     data["shared_seeds"] = shared_seeds(llm, d)
@@ -629,7 +631,7 @@ def build_soul(d: Path) -> str:
     prof = read_json(d / "profile.json", {}) or {}
     st = read_json(d / "build" / "structure.json", {}) or {}
     sc = scratch_line(prof)
-    out = [f"# {name}", "", _para(parts.get("part1")), "", *timeline_sections(st), "## 喜歡與不喜歡", _para(parts.get("part2")), "",
+    out = [f"# {name}", "", _para(parts.get("part1")), "", *timeline_sections(st, parts.get("people"), name, pronoun(d)), "## 喜歡與不喜歡", _para(parts.get("part2")), "",
            "## 怎麼聽、怎麼想、怎麼回", _para(parts.get("thinking")) + (("\n- " + sc) if sc else ""), "",
            "## 怎麼判斷、怎麼決定", _para(parts.get("judging")), "",
            "## 說話的方式", _para(voice.get("expression"))]
@@ -761,6 +763,12 @@ def life_from_structure(st_life: Any) -> Optional[Dict[str, Any]]:
                   and all(isinstance(x, (int, float)) for x in b)]
         if blocks:
             sched["work"] = blocks
+    own = st_life.get("own")
+    if isinstance(own, list):
+        oblocks = [[float(b[0]), float(b[1])] for b in own if isinstance(b, (list, tuple)) and len(b) == 2
+                   and all(isinstance(x, (int, float)) for x in b)]
+        if oblocks:
+            sched["hobby"] = oblocks
     if sched:
         out["schedule"] = sched
     if st_life.get("busyness_mode") in ("work", "hobby", "none"):
@@ -818,7 +826,35 @@ def build_psyche(d: Path) -> Dict[str, Any]:
     return base
 
 
-def timeline_sections(st: Dict[str, Any]) -> List[str]:
+def _label(text: str) -> str:
+    """Who a person is, in a few words: the first clause of her people file's text ("小華的弟弟，也是…" → "小華的弟弟")."""
+    t = str(text or "").strip().lstrip("-").strip()
+    for sep in ("，", "。", "；", ","):
+        if sep in t:
+            t = t.split(sep, 1)[0]
+    return t[:16]
+
+
+def mark_names(line: str, people: Optional[Dict[str, Any]], self_name: str = "", pronoun: str = "她") -> str:
+    """In 影響過你的人與事 each person's name is followed by who they are, the first time it appears in the line —
+    小華（人名，妳）、小明（人名，小華的弟弟）— so a line about one person cannot be read as about another, and the reader
+    knows which name is her. Her own name first (the other labels contain it). 你 is never marked."""
+    me = str(self_name or "").strip()
+    if me and me in line and f"{me}（人名" not in line:
+        line = line.replace(me, f"{me}（人名，{'妳' if pronoun == '她' else '你'}）", 1)
+    for name, text in (people or {}).items():
+        name = str(name).strip()
+        if not name or name == "你" or name not in line or f"{name}（人名" in line:
+            continue
+        label = _label(text)
+        i = line.find(name)
+        if label and len(label) >= 2 and line[:i].endswith(label[-2:]):
+            label = ""   # the line already says who it is right before the name (「弟弟小明」)
+        line = line[:i] + (f"{name}（人名，{label}）" if label else f"{name}（人名）") + line[i + len(name):]
+    return line
+
+
+def timeline_sections(st: Dict[str, Any], people: Optional[Dict[str, Any]] = None, self_name: str = "", pronoun: str = "她") -> List[str]:
     """## 時間線 and ## 影響過你的人與事 from the structure phase: the dated, always-on part of who you are, inside the
     SOUL (DECISIONS 2026-10-19 — the pinned tags of 0.8.7 are retired). Code, not a model; absent when the description
     gives nothing. Dated events first, oldest first; undated after."""
@@ -833,7 +869,7 @@ def timeline_sections(st: Dict[str, Any]) -> List[str]:
         out += ["## 時間線", _bullets(lines), ""]
     infl = [str(i.get("text") or "").strip() for i in (st.get("influences") or []) if isinstance(i, dict) and str(i.get("text") or "").strip()]
     if infl:
-        out += ["## 影響過你的人與事", _bullets(infl), ""]
+        out += ["## 影響過你的人與事", _bullets([mark_names(x, people, self_name, pronoun) for x in infl]), ""]
     return out
 
 
@@ -877,9 +913,9 @@ def checks(soul: str, allowed: str = "") -> List[str]:
         found.append(f"注意：第三人稱「她／他」當主詞 {drift} 處——設定應以「你」稱呼角色本人（模型的筆誤，可重跑該段）")
     n = len(_without_sections(soul, DATED_SECTIONS))   # prose budget; the dated sections are data and not counted
     if n < 2500:
-        found.append(f"太短：{n} 字（目標 2,500–4,000，不計時間線）")
-    elif n > 4000:
-        found.append(f"太長：{n} 字（目標 2,500–4,000，不計時間線）")
+        found.append(f"太短：{n} 字（目標 2,500–10,000，不計時間線）")
+    elif n > 10000:
+        found.append(f"太長：{n} 字（目標 2,500–10,000，不計時間線）")
     simp = [c for c in "觉这说没么时间关对认为发现实还会让给们个经过应该种问题" if c in body]
     if simp:
         found.append(f"含簡體字：{''.join(simp)}")
@@ -889,11 +925,25 @@ def checks(soul: str, allowed: str = "") -> List[str]:
     return found
 
 
+# which phase first reads each part of profile.json — a change reruns from there (proposals are an output, not an input)
+PROFILE_SECTIONS = {
+    "intake": ("pronoun",),
+    "structure": ("shared_past",),
+    "parts": ("thinking", "choices", "big5", "constants"),
+    "assemble": ("life", "schedule", "closeness", "scratch", "simple"),
+}
+
+
+def profile_sections(d: Path) -> Dict[str, Dict[str, Any]]:
+    prof = read_json(d / "profile.json", {}) or {}
+    return {ph: {k: prof.get(k) for k in keys} for ph, keys in PROFILE_SECTIONS.items()}
+
+
 def lock_data(d: Path, model: Optional[str]) -> Dict[str, Any]:
     inputs = {f"describe/{s}.md": sha(d / "describe" / f"{s}.md") for s in DESCRIBE}
     inputs["companion.json"] = sha(d / "companion.json")
-    inputs["profile.json"] = sha(d / "profile.json")
     return {"version": VERSION, "model": model, "at": dt.datetime.now().strftime("%Y-%m-%d %H:%M"), "inputs": inputs,
+            "profile_sections": profile_sections(d),
             "outputs": {f: sha(d / f) for f in ("SOUL.md", "seeds.jsonl", "psyche.json")}}
 
 
@@ -902,8 +952,13 @@ def stale_inputs(d: Path) -> List[str]:
     lock = read_json(d / "soul.lock.json")
     if not lock:
         return []
-    cur = lock_data(d, lock.get("model"))["inputs"]
-    return [k for k, v in (lock.get("inputs") or {}).items() if cur.get(k) != v]
+    now = lock_data(d, lock.get("model"))
+    cur = dict(now["inputs"], **{"profile.json": sha(d / "profile.json")})
+    out = [k for k, v in (lock.get("inputs") or {}).items() if cur.get(k) != v]
+    for ph, sec in (lock.get("profile_sections") or {}).items():
+        if now["profile_sections"].get(ph) != sec:
+            out.append(f"profile.json:{ph}")
+    return out
 
 
 def phase_assemble(d: Path, force: bool, model: Optional[str] = None) -> List[str]:

@@ -114,7 +114,7 @@ def test_full_pipeline_with_scripted_llm(tmp_path, monkeypatch):
     assert sw.build_psyche(d)["relationships"]["你"]["bond"] == 0.8
     # lock + status
     lock = sw.read_json(d / "soul.lock.json")
-    assert lock["version"] == sw.VERSION and lock["inputs"]["profile.json"] and lock["outputs"]["SOUL.md"]
+    assert lock["version"] == sw.VERSION and lock["profile_sections"]["parts"] and lock["outputs"]["SOUL.md"]
     # verify compares bands and choices
     sw.phase_verify(llm, d)
     v = sw.read_json(d / "build" / "verify.json")
@@ -306,3 +306,33 @@ def test_simple_path_writes_shared_past_lines_as_memories(tmp_path, monkeypatch)
     rows = [json.loads(ln) for ln in (d / "seeds.jsonl").read_text(encoding="utf-8").splitlines()]
     assert [r["text"] for r in rows] == ["2020 年一起搬家", "你常常忘記帶鑰匙，角色甲幫你留一把"] and all(r["tags"] == ["shared"] for r in rows)
     assert "搬家" not in (d / "SOUL.md").read_text(encoding="utf-8")
+
+
+def test_influence_lines_mark_each_name_with_who_they_are():
+    people = {"你": "她在畫畫課認識你。", "小文": "店長，裝沒看到她在畫圖。", "小明": "小華的弟弟，也是她畫展的第一個客人。"}
+    st = {"influences": [{"text": "小明幫你修照片，小明的留言最毒"}, {"text": "小文說過一句話"}, {"text": "你說過一句話"}]}
+    sec = "\n".join(sw.timeline_sections(st, people))
+    assert "小明（人名，小華的弟弟）幫你修照片，小明的留言最毒" in sec      # the first time only
+    assert "小文（人名，店長）說過一句話" in sec
+    assert "你（人名" not in sec
+    assert sw.mark_names("小明（人名，小華的弟弟）早就說過", people) == "小明（人名，小華的弟弟）早就說過"   # never twice
+
+
+def test_her_own_name_is_marked_as_her():
+    people = {"小明": "小華的弟弟，也是她畫展的第一個客人。", "小美": "小明的女朋友，在餐廳上班。"}
+    line = sw.mark_names("小美一直覺得小華應該把歌認真做", people, "小華", "她")
+    assert line == "小美（人名，小明的女朋友）一直覺得小華（人名，妳）應該把歌認真做"
+    assert sw.mark_names("小明幫小華修照片", people, "小華", "她") == "小明（人名，小華的弟弟）幫小華（人名，妳）修照片"
+    assert sw.mark_names("弟弟小明幫小華修照片", people, "小華", "她").startswith("弟弟小明（人名）")   # no 「弟弟小明（人名，小華的弟弟）」
+    assert "（人名，你）" in sw.mark_names("小強幫小明", people, "小強", "他")
+
+
+def test_stale_names_the_profile_section(tmp_path, monkeypatch):
+    d = _make_char(tmp_path, monkeypatch)
+    sw.write_json(d / "soul.lock.json", sw.lock_data(d, "m"))
+    assert sw.stale_inputs(d) == []
+    prof = sw.read_json(d / "profile.json"); prof["life"] = {"schedule": {"wake": 5.5}}; prof["proposed"] = {"x": 1}
+    sw.write_json(d / "profile.json", prof)
+    assert sw.stale_inputs(d) == ["profile.json:assemble"]          # proposals are output, her day reruns from 7
+    prof["thinking"] = {"rationality": 0.9}; sw.write_json(d / "profile.json", prof)
+    assert set(sw.stale_inputs(d)) == {"profile.json:parts", "profile.json:assemble"}

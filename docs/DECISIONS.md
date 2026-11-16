@@ -5,6 +5,17 @@ One record for the whole project. Each heading carries its date and its part in 
 replaces; the designs themselves are in the part folders. Entries are grouped as they were written, not
 strictly sorted.
 
+## Decided (2026-11-16) — not every message gets a reply: one shared rule, silence or a reaction [inner-life] [app]
+- Telegram testing showed every message answered, including closers (「好啦」, a lone 😆) and a 👍 right after she said
+  「等我一下」, which broke her own word. Hermes can already drop a reply that is exactly `NO_REPLY` / `[SILENT]`, but no
+  chat turn ever tells her so; psyche lets her stay silent only on her own event turns. Decided: both silence and a
+  reaction. One rule for every character, carried by psyche's state block (not the SOUL — it is mechanics and the moment,
+  not who she is): closers may get `NO_REPLY` or `[REACT x]` (turned into a Telegram reaction / a reaction on the app
+  bubble by our code, no tool given to her); questions, feelings, news and anything she owes always get text. How easily
+  she lets one go is derived, not set: big5 plus busy / tired / mood / closeness, one hint line. No per-character value
+  yet. Deferred: following up after 「晚點回你」 (return_promise), and making this and her other behaviours truly her own
+  per character, which needs a post-creation tuning step that does not exist yet. Design in `inner-life/when-to-reply.md`.
+
 ## Decided (2026-11-02) — the app has three doors: 名單, the current character, 設定; palette 暖夜 [app]
 - The five tabs of 0.3.0 (聊天, 名單, 記憶, 狀態, 設定) hid the app's real tree — 名單 → one character → 聊天 / 狀態 / 記憶 /
   her settings, and a second tree, the program's settings — and made 設定 → 角色 → a character put her on stage as a side

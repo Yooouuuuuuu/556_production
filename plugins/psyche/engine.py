@@ -40,6 +40,7 @@ from . import thinking as TH
 from . import model
 from . import needs as N
 from . import relation as RL
+from . import replying as RP
 from . import tom as T
 from . import urge as U
 
@@ -1271,7 +1272,8 @@ class Engine:
             if self.live:
                 self.snapshot()  # the 狀態 page reads the latest snapshot
 
-    def on_turn(self, user_text: str, assistant_text: str, *, turn_id: str, platform: str, session_id: str, counterpart: str = MAIN) -> None:
+    def on_turn(self, user_text: str, assistant_text: str, *, turn_id: str, platform: str, session_id: str, counterpart: str = MAIN,
+                answer: str = "text", reaction: Optional[str] = None) -> None:
         """A finished turn (yours, or another character's): a replayable turn event (contact, presence,
         waking), the recent-turns ring, and appraisal A queued."""
         term = self._name(counterpart)
@@ -1281,7 +1283,8 @@ class Engine:
         if counterpart != MAIN:
             self._other(counterpart)
         self._record_and_apply("turn", {"turn_id": turn_id, "platform": platform, "session": session_id[:24], "counterpart": counterpart,
-                                        "user": user_text[:500], "assistant": assistant_text[:500]}, counterpart=counterpart)
+                                        "user": user_text[:500], "assistant": assistant_text[:500],
+                                        **({"answer": answer, "reaction": reaction} if answer != "text" else {})}, counterpart=counterpart)
         if self.owner and self.llm is not None:
             self._q.put({"user": user_text, "assistant": assistant_text, "turn_id": turn_id, "platform": platform,
                          "recent": list(self.recent), "term": term, "counterpart": counterpart, "at": self.now_fn()})
@@ -1342,6 +1345,7 @@ class Engine:
             fresh = C.load(self.home, write_defaults=False)
             self.cfg["proactive"] = fresh.get("proactive", self.cfg.get("proactive", {}))
             self.cfg.setdefault("life", {})["busyness_mode"] = fresh.get("life", {}).get("busyness_mode", "work")
+            self.cfg["life"]["busy_kinds"] = fresh.get("life", {}).get("busy_kinds", ["work"])
             self.cfg["cares_about"] = fresh.get("cares_about", self.cfg.get("cares_about", []))
         except Exception:  # noqa: BLE001
             pass
@@ -1508,7 +1512,7 @@ class Engine:
             self.owner = False   # stop runs twice (on_unload, then atexit): the second pass has nothing to write
 
     # ------------------------------------------------------------------ expression layer: the state block
-    def state_block(self, *, t: Optional[float] = None, term: Optional[str] = None, counterpart: str = MAIN) -> str:
+    def state_block(self, *, t: Optional[float] = None, term: Optional[str] = None, counterpart: str = MAIN, reply_rule: bool = True) -> str:
         """【她現在】 for a turn with `counterpart` — at most max_lines lines, words not numbers; feelings
         about this person first; the 表現 line carries the strategy (§15); a transition is named when
         the dominant feeling changed since the last block, so the history's tone inertia does not win."""
@@ -1573,8 +1577,9 @@ class Engine:
                 how.append("可以多說一點")
             elif pleasure < -0.4:
                 how.append("話少一點")
-            if self.activity == "work":
-                how.append(f"手上在忙，可以回短一點或說等{self.pr}一下，忙完會回來找他")
+            busy = self.activity in (self.cfg.get("life", {}).get("busy_kinds") or ["work"])
+            if busy:
+                how.append(f"手上在忙，可以回短一點或說等{self.pr}一下，忙完會回來找他；說過等一下之後，收尾的訊息就先不回")
             if len(act) >= 2 and ((act[0]["type"] in model.POSITIVE) != (act[1]["type"] in model.POSITIVE)):
                 how.append("兩種情緒並存時先回應對方說的，再帶到自己的")
             fw = self.contact.get("farewell_until")
@@ -1615,12 +1620,21 @@ class Engine:
             if prev and prev != dom_type and self.last_block.get("counterpart", MAIN) == counterpart:
                 now_word = (model.intensity_word(shown(dominant)) + model.EMOTION_ZH[dom_type]) if dominant else "已經平復了"
                 lines.append(f"轉變：剛才{prev_word}，現在{now_word}")
+            if reply_rule and counterpart == MAIN:   # when-to-reply.md: one rule for everyone, the lean from her numbers
+                b5 = ch.get("big5") or {}
+                last_a = self.recent[-1][1] if self.recent else ""
+                lean = RP.tendency(extraversion=float(b5.get("extraversion", 0.55)), agreeableness=float(b5.get("agreeableness", 0.65)),
+                                   busy=busy, said_wait=busy and isinstance(last_a, str) and "等" in last_a and "一下" in last_a,
+                                   low_energy=self.activity == "woken" or self.energy < 0.35 or self.fatigue > 0.6,
+                                   pleasure=pleasure, want_talk=float(self._need_of(counterpart)), bond=float(rel["bond"]),
+                                   worn_out=float(self.needs.get("affiliation_general", 0.0)) <= -0.2)
+                lines.append(RP.line(pr=self.pr, term=term, lean=lean, silent_streak=RP.silent_streak(self.recent)))
             lines.append("原則：情緒是底色，內容以對方的話題為主；不提沒做過的事；有自己的看法，不用附和")
             # max_lines counts state lines only (the title and the clock are extra). When the block overflows, the least
             # load-bearing line goes first and 原則 always stays. (Before 0.8.11 the slice counted the title, so a full
             # block lost 轉變 and 原則.)
             cap = int(ex.get("max_lines", 8))
-            for drop in ("轉變：", "心裡：", "想法：", "掛念："):
+            for drop in ("轉變：", "心裡：", "回不回：", "想法：", "掛念："):
                 if len(lines) - 2 <= cap:
                     break
                 lines = [x for x in lines if not x.startswith(drop)]

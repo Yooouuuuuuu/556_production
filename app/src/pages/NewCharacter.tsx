@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { chars, CharDetail, CharPackage, CharProfile, LifeSample, LifeSpec } from '../api';
 import { t } from '../i18n';
+import { ConfirmStep, LifeStep } from './NewCharacterSteps';
 
 // 名單 → ＋ 新角色: the soul skill behind 556d (docs/prompt/prompt.md §2.9). One page, four sections for the
 // selected package: 描述 (ten boxes in your own words), 產生 (the skill, phase by phase or all at once, its log live),
@@ -51,13 +52,14 @@ const parseEvents = (s: string): NonNullable<LifeSpec['small_events']> => {
   return out;
 };
 // the structure phase's draft of her day (build/structure.json `life`: wake, bedtime, busy, busyness_mode, project, small_events) → the engine shape
-function lifeFromStructure(st: any): LifeSpec | null {
+export function lifeFromStructure(st: any): LifeSpec | null {
   if (!st || typeof st !== 'object') return null;
   const out: LifeSpec = {};
   const sched: NonNullable<LifeSpec['schedule']> = {};
   if (typeof st.wake === 'number') sched.wake = st.wake;
   if (typeof st.bedtime === 'number') sched.bedtime = st.bedtime;
   if (Array.isArray(st.busy)) sched.work = st.busy.filter((p: any) => Array.isArray(p) && p.length === 2).map((p: any) => [Number(p[0]), Number(p[1])]);
+  if (Array.isArray(st.own)) sched.hobby = st.own.filter((p: any) => Array.isArray(p) && p.length === 2).map((p: any) => [Number(p[0]), Number(p[1])]);
   if (Object.keys(sched).length) out.schedule = sched;
   if (['work', 'hobby', 'none'].includes(st.busyness_mode)) out.busyness_mode = st.busyness_mode;
   if (st.project && typeof st.project.title === 'string' && st.project.title.trim()) out.projects = [{ title: st.project.title.trim(), stage: (st.project.stage || '進行中').trim(), difficulty: 0.5, progress: 0 }];
@@ -68,54 +70,115 @@ function lifeFromStructure(st: any): LifeSpec | null {
   }
   return Object.keys(out).length ? out : null;
 }
-function sampleSpec(s: LifeSample): LifeSpec {
+export function sampleSpec(s: LifeSample): LifeSpec {
   const { id, name, note, ...spec } = s;
   void id; void name; void note;
   return spec;
 }
 
-function LifeEditor({ life, onChange }: { life: LifeSpec; onChange(next: LifeSpec): void }) {
+export function LifeEditor({ life, onChange }: { life: LifeSpec; onChange(next: LifeSpec): void }) {
+  // the design canvas's 日子 › 自己寫: times on a clock (never decimals), one row per kind of time with × and ＋ 加一段,
+  // "which times count as busy" as boxes you can turn on together, small events with a 好事／壞事／不舒服 picker
   const s = life.schedule || {};
-  const pj = (life.projects || [])[0] || { title: '', stage: '', difficulty: 0.5 };
-  const [busy, setBusy] = useState(blocksText(s.work));
-  const [meals, setMeals] = useState(blocksText(s.meals));
-  const [events, setEvents] = useState(eventsText(life.small_events));
+  const toClock = (h?: number) => { if (h == null || !Number.isFinite(h)) return ''; const x = ((h % 24) + 24) % 24; return `${String(Math.floor(x)).padStart(2, '0')}:${String(Math.round((x % 1) * 60)).padStart(2, '0')}`; };
+  const fromClock = (v: string) => { const [hh, mm] = v.split(':').map(Number); return Number.isFinite(hh) ? hh + (Number.isFinite(mm) ? mm / 60 : 0) : 0; };
   const setS = (patch: Partial<NonNullable<LifeSpec['schedule']>>) => onChange({ ...life, schedule: { ...s, ...patch } });
-  const setP = (patch: Partial<typeof pj>) => {
-    const next = { ...pj, ...patch };
-    onChange({ ...life, projects: (next.title || '').trim() ? [{ difficulty: 0.5, progress: 0, ...next }] : [] });
+  const timeBox = 'rounded-lg border border-ink/25 bg-[#110e0c] px-2.5 py-2 text-ink text-[15px]';
+  const square = 'w-9 h-9 rounded-lg border border-ink/30 hover:bg-white/10';
+  const outline = 'self-start px-3.5 py-1.5 rounded-lg border border-ink/35 text-sm hover:bg-white/10';
+  const hours = (a: number, b: number) => { const d = ((b - a) % 24 + 24) % 24 || 24; return `${Math.floor(d)} ${t('newchar.de_hours')}${d % 1 ? ' ' + t('newchar.de_half') : ''}`; };
+  type Key = 'work' | 'hobby' | 'meals';
+  const rows: { key: Key; name: string; note: string; swatch: string; add: [number, number] }[] = [
+    { key: 'work', name: t('newchar.de_work'), note: t('newchar.de_work_note'), swatch: 'bg-accent', add: [14, 18] },
+    { key: 'hobby', name: t('newchar.day_own'), note: t('newchar.de_own_note'), swatch: 'bg-ok', add: [20, 22] },
+    { key: 'meals', name: t('newchar.life_meals'), note: '', swatch: 'bg-soft', add: [12, 13] },
+  ];
+  const spans = (k: Key) => (s[k] || []) as number[][];
+  const setSpan = (k: Key, i: number, j: 0 | 1, v: string) => {
+    const next = spans(k).map((x) => [...x]);
+    let h = fromClock(v);
+    if (j === 1 && h <= next[i][0]) h += 24; // an end at or before the start runs past midnight (00:00 → 24:00)
+    next[i][j] = h; setS({ [k]: next } as any);
   };
+  const busy = life.busy_kinds ?? ['work'];
+  const busyOpts: { v: 'work' | 'hobby' | 'meal'; label: string }[] = [{ v: 'work', label: t('newchar.de_work') }, { v: 'hobby', label: t('newchar.day_own') }, { v: 'meal', label: t('newchar.life_meals') }];
+  const toggleBusy = (v: 'work' | 'hobby' | 'meal') => onChange({ ...life, busy_kinds: busy.includes(v) ? busy.filter((x) => x !== v) : [...busy, v] });
+  const pj = (life.projects || [])[0] || { title: '', stage: '', difficulty: 0.5 };
+  const setP = (patch: Partial<typeof pj>) => { const next = { ...pj, ...patch }; onChange({ ...life, projects: (next.title || '').trim() ? [{ difficulty: 0.5, progress: 0, ...next }] : [] }); };
+  const events = life.small_events || [];
+  const toneOf = (e: NonNullable<LifeSpec['small_events']>[number]) => (e.kind === 'unwell' ? 2 : (e.v ?? 0) < 0 ? 1 : 0);
+  const setTone = (i: number, tone: number) => onChange({ ...life, small_events: events.map((e, j) => j !== i ? e : tone === 2 ? { ...e, v: -0.4, kind: 'unwell' } : tone === 1 ? { ...e, v: -0.3, kind: 'life' } : { ...e, v: 0.3, kind: 'life' }) });
+  const setText = (i: number, text: string) => onChange({ ...life, small_events: events.map((e, j) => (j === i ? { ...e, text } : e)) });
+
   return (
-    <div className="space-y-2">
-      <div className="grid grid-cols-2 gap-2">
-        <div><label className={label}>{t('newchar.life_wake')}</label><input className={field} type="number" step={0.5} min={0} max={24} value={s.wake ?? ''} onChange={(e) => setS({ wake: Number(e.target.value) })} /></div>
-        <div><label className={label}>{t('newchar.life_bedtime')}</label><input className={field} type="number" step={0.5} min={0} max={24} value={s.bedtime ?? ''} onChange={(e) => setS({ bedtime: Number(e.target.value) })} /></div>
-        <div><label className={label}>{t('newchar.life_busy')}</label><input className={field} value={busy} placeholder={t('newchar.life_blocks_hint')} onChange={(e) => setBusy(e.target.value)} onBlur={() => setS({ work: parseBlocks(busy) })} /></div>
-        <div><label className={label}>{t('newchar.life_meals')}</label><input className={field} value={meals} placeholder={t('newchar.life_blocks_hint')} onChange={(e) => setMeals(e.target.value)} onBlur={() => setS({ meals: parseBlocks(meals) })} /></div>
-        <div>
-          <label className={label}>{t('newchar.life_mode')}</label>
-          <select className={field} value={life.busyness_mode || 'work'} onChange={(e) => onChange({ ...life, busyness_mode: e.target.value as LifeSpec['busyness_mode'] })}>
-            <option value="work">{t('newchar.life_mode_work')}</option>
-            <option value="hobby">{t('newchar.life_mode_hobby')}</option>
-            <option value="none">{t('newchar.life_mode_none')}</option>
-          </select>
+    <div className="space-y-5">
+      <div className="divide-y divide-white/8">
+        <div className="flex gap-5 py-4">
+          <div className="w-36 shrink-0"><div className="flex items-center gap-2 font-bold"><span className="w-3 h-3 rounded-sm bg-[rgba(120,140,200,0.7)]" />{t('newchar.de_sleep')}</div><div className="text-xs text-muted mt-1">{t('newchar.de_sleep_note')}</div></div>
+          <div className="flex items-center gap-2.5">
+            <input type="time" aria-label={t('newchar.life_bedtime')} className={timeBox} value={toClock(s.bedtime)} onChange={(e) => setS({ bedtime: fromClock(e.target.value) })} />
+            <span className="text-muted">{t('newchar.de_to')}</span>
+            <input type="time" aria-label={t('newchar.life_wake')} className={timeBox} value={toClock(s.wake)} onChange={(e) => setS({ wake: fromClock(e.target.value) })} />
+            {s.bedtime != null && s.wake != null && <span className="text-xs text-muted">{hours(s.bedtime, s.wake)}</span>}
+          </div>
+        </div>
+        {rows.map((r) => (
+          <div key={r.key} className="flex gap-5 py-4">
+            <div className="w-36 shrink-0"><div className="flex items-center gap-2 font-bold"><span className={`w-3 h-3 rounded-sm ${r.swatch}`} />{r.name}</div>{r.note && <div className="text-xs text-muted mt-1">{r.note}</div>}</div>
+            <div className="flex-1 flex flex-col gap-2.5">
+              {spans(r.key).length === 0 && <span className="text-sm text-muted">{t('newchar.day_none')}</span>}
+              {spans(r.key).map((x, i) => (
+                <div key={i} className="flex items-center gap-2.5">
+                  <input type="time" aria-label={t('newchar.de_from')} className={timeBox} value={toClock(x[0])} onChange={(e) => setSpan(r.key, i, 0, e.target.value)} />
+                  <span className="text-muted">{t('newchar.de_to')}</span>
+                  <input type="time" aria-label={t('newchar.de_until')} className={timeBox} value={toClock(x[1])} onChange={(e) => setSpan(r.key, i, 1, e.target.value)} />
+                  <span className="text-xs text-muted w-20">{hours(x[0], x[1])}</span>
+                  <button type="button" aria-label={t('newchar.de_remove')} className={square} onClick={() => setS({ [r.key]: spans(r.key).filter((_, j) => j !== i) } as any)}>×</button>
+                </div>
+              ))}
+              <button type="button" className={outline} onClick={() => setS({ [r.key]: [...spans(r.key), r.add] } as any)}>＋ {t('newchar.de_add_span')}</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="space-y-2">
+        <div className="font-bold">{t('newchar.de_busy_q')}</div>
+        <div role="group" aria-label={t('newchar.de_busy_q')} className="inline-flex flex-wrap gap-2">
+          {busyOpts.map((o) => {
+            const on = busy.includes(o.v);
+            return (
+              <button key={o.v} type="button" role="checkbox" aria-checked={on} onClick={() => toggleBusy(o.v)}
+                className={`px-4 py-2 rounded-xl text-sm border ${on ? 'bg-accent text-accent-ink border-accent font-bold' : 'border-ink/35 hover:bg-white/10'}`}>{on ? '✓ ' : ''}{o.label}</button>
+            );
+          })}
+        </div>
+        <div className="text-[13px] text-muted">{t('newchar.de_busy_note')}</div>
+      </div>
+
+      <div className="space-y-2">
+        <div className="font-bold">{t('newchar.life_project')}</div>
+        <div className="flex gap-3">
+          <label className="flex-1 flex flex-col gap-1.5 text-[13px] text-soft">{t('newchar.de_what')}<input className={timeBox} value={pj.title || ''} onChange={(e) => setP({ title: e.target.value })} /></label>
+          <label className="w-80 flex flex-col gap-1.5 text-[13px] text-soft">{t('newchar.life_stage')}<input className={timeBox} value={pj.stage || ''} onChange={(e) => setP({ stage: e.target.value })} /></label>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div><label className={label}>{t('newchar.life_project')}</label><input className={field} value={pj.title || ''} onChange={(e) => setP({ title: e.target.value })} /></div>
-        <div><label className={label}>{t('newchar.life_stage')}</label><input className={field} value={pj.stage || ''} onChange={(e) => setP({ stage: e.target.value })} /></div>
-      </div>
-      {(pj.title || '').trim() && (
-        <div className="flex items-center gap-3 text-sm">
-          <span className="w-24 text-xs opacity-70">{t('newchar.life_difficulty')}</span>
-          <input type="range" min={0} max={1} step={0.05} className="flex-1" value={pj.difficulty ?? 0.5} onChange={(e) => setP({ difficulty: Number(e.target.value) })} />
-          <span className="w-10 text-right tabular-nums">{(pj.difficulty ?? 0.5).toFixed(2)}</span>
-        </div>
-      )}
-      <div>
-        <label className={label}>{t('newchar.life_events')}</label>
-        <textarea className={`${field} min-h-[96px]`} value={events} onChange={(e) => setEvents(e.target.value)} onBlur={() => onChange({ ...life, small_events: parseEvents(events) })} />
-        <div className="text-xs opacity-60 mt-1">{t('newchar.life_events_hint')}</div>
+
+      <div className="space-y-2.5">
+        <div className="flex items-baseline gap-3"><span className="font-bold">{t('newchar.life_events')}</span><span className="text-[13px] text-muted">{t('newchar.de_events_note')}</span></div>
+        {events.map((e, i) => (
+          <div key={i} className="flex items-center gap-2.5">
+            <div role="radiogroup" aria-label={t('newchar.de_tone')} className="inline-flex border border-ink/30 rounded-lg overflow-hidden text-[13px]">
+              {[t('newchar.day_good'), t('newchar.day_bad'), t('newchar.day_unwell')].map((label, k) => (
+                <button key={k} type="button" role="radio" aria-checked={toneOf(e) === k} onClick={() => setTone(i, k)}
+                  className={`px-2.5 py-1.5 ${k ? 'border-l border-ink/20' : ''} ${toneOf(e) === k ? 'bg-accent text-accent-ink font-bold' : 'hover:bg-white/10'}`}>{label}</button>
+              ))}
+            </div>
+            <input aria-label={t('newchar.life_events')} className={`${timeBox} flex-1`} value={e.text} onChange={(ev) => setText(i, ev.target.value)} />
+            <button type="button" aria-label={t('newchar.de_remove')} className={square} onClick={() => onChange({ ...life, small_events: events.filter((_, j) => j !== i) })}>×</button>
+          </div>
+        ))}
+        <button type="button" className={outline} onClick={() => onChange({ ...life, small_events: [...events, { text: '', v: 0.3, R: 0.3, p: 0.1, kind: 'life', share: true }] })}>＋ {t('newchar.de_add_event')}</button>
       </div>
     </div>
   );
@@ -125,10 +188,10 @@ function LifeEditor({ life, onChange }: { life: LifeSpec; onChange(next: LifeSpe
 // one step on the left, the package card on the right. 描述 shows ONE box at a time (its title, what to write, the
 // input) with the ten titles listed on the right, each marked filled or empty; the hint is text above the box, never
 // a placeholder that vanishes as you type. A save bar at the bottom names what is typed but not saved.
-type Step = 'describe' | 'relation' | 'generate' | 'confirm' | 'result';
+type Step = 'describe' | 'relation' | 'life' | 'generate' | 'confirm' | 'result';
 const STEPS: { key: Step; label: string }[] = [
-  { key: 'describe', label: 'newchar.describe' }, { key: 'relation', label: 'newchar.relation' }, { key: 'generate', label: 'newchar.generate' },
-  { key: 'confirm', label: 'newchar.confirm' }, { key: 'result', label: 'newchar.result' },
+  { key: 'describe', label: 'newchar.describe' }, { key: 'relation', label: 'newchar.relation' }, { key: 'life', label: 'newchar.life' },
+  { key: 'generate', label: 'newchar.generate' }, { key: 'confirm', label: 'newchar.confirm' }, { key: 'result', label: 'newchar.result' },
 ];
 const clock = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
@@ -147,6 +210,7 @@ export function NewCharacter({ onBack, initialId }: { onBack(): void; initialId?
   const [notice, setNotice] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [savedAt, setSavedAt] = useState('');
+  const [rowMenu, setRowMenu] = useState<string | null>(null); // the 產生 row whose 只跑這步 is open
   const [form, setForm] = useState({ id: '', display_name: '', pronoun: '她' });
   const [thenRest, setThenRest] = useState(false); // 「全部」: after a clean intake, continue from structure
   const logRef = useRef<HTMLPreElement>(null);
@@ -165,6 +229,38 @@ export function NewCharacter({ onBack, initialId }: { onBack(): void; initialId?
     await chars.saveProfile(cid, { closeness: profile.closeness ?? null, shared_past: profile.shared_past ?? '' });
     relDirty.current = false;
   };
+
+  // ---- autosave (0.13.x): no save buttons; whatever is typed is written a second after you stop, and always before a
+  // step change or a run. Comparison is on a key-sorted copy (the server may return the same profile in another order).
+  const stable = (v: any): string => JSON.stringify(v, (_k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map((k) => [k, x[k]])) : x));
+  const PROFILE_KEYS = ['pronoun', 'closeness', 'scratch', 'simple', 'big5', 'constants', 'thinking', 'choices', 'life', 'shared_past'] as const;
+  const pick = (p: CharProfile | null | undefined) => Object.fromEntries(PROFILE_KEYS.map((k) => [k, (p as any)?.[k] ?? null]));
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'err'>('idle');
+  const saving = useRef<Promise<void> | null>(null);
+  const autosave = async (): Promise<void> => {
+    if (saving.current) { await saving.current; }
+    if (!id || !detail || !profile) return;
+    const descDirty = STEMS.some((st) => (describe[st] ?? '') !== (detail.describe[st] ?? ''));
+    const profDirty = stable(pick(profile)) !== stable(pick(detail.profile));
+    if (!descDirty && !profDirty) return;
+    const job = (async () => {
+      setSaveState('saving');
+      try {
+        const snapDescribe = { ...describe };
+        if (descDirty) await chars.saveDescribe(id, snapDescribe);
+        let saved = detail.profile;
+        if (profDirty) saved = (await chars.saveProfile(id, pick(profile) as any)).profile;
+        const fresh = await chars.detail(id);
+        describeDirty.current = false; relDirty.current = false;
+        setDetail((d) => (d ? { ...d, character: fresh.character, build: fresh.build, describe: descDirty ? snapDescribe : d.describe, profile: saved } : d));
+        setSavedAt(clock()); setSaveState('saved');
+      } catch (e) { setSaveState('err'); setNotice({ kind: 'err', text: String(e) }); }
+    })();
+    saving.current = job;
+    try { await job; } finally { saving.current = null; }
+  };
+  useEffect(() => { const h = setTimeout(() => { autosave(); }, 1000); return () => clearTimeout(h); }, [describe, profile]);
+  const go = async (next: Step) => { await autosave(); setStep(next); };
 
   useEffect(() => { refreshList(); }, []);
   useEffect(() => { if (id) { setDetail(null); describeDirty.current = false; relDirty.current = false; setStep('describe'); setBox(0); load(id); } }, [id]);
@@ -219,8 +315,7 @@ export function NewCharacter({ onBack, initialId }: { onBack(): void; initialId?
     if (!id) return;
     setNotice(null);
     try {
-      if (describeDirty.current || (detail && JSON.stringify(describe) !== JSON.stringify(detail.describe))) { await chars.saveDescribe(id, describe); describeDirty.current = false; } // what is typed is what runs: unsaved boxes are saved first
-      await saveRelation(id);
+      await autosave(); // what is typed is what runs
       const r = await chars.run(id, { phase, from, yes, force }); setDetail((d) => (d ? { ...d, job: r.job } : d));
     } catch (e) { setNotice({ kind: 'err', text: String(e) }); }
   }
@@ -281,6 +376,29 @@ export function NewCharacter({ onBack, initialId }: { onBack(): void; initialId?
   const filled = STEMS.filter((s) => (describe[s] ?? '').trim().length > 0).length;
   const stale = detail?.character.stale ?? [];
   const stem = STEMS[box];
+  // a phase is done when its output exists and is not older than the phase before it; stale when the description
+  // changed since, or an earlier phase ran after it; failed when the last job died in it
+  const lastFailed = (() => {
+    const j = detail?.job;
+    if (!j || j.running || !j.exit_code) return '';
+    const m = [...(j.log || '').matchAll(/== (\w+) ==/g)];
+    return m.length ? m[m.length - 1][1] : '';
+  })();
+  // each changed input names the first phase that reads it (556d: describe/* → intake, profile.json:<phase> → that phase)
+  const staleFrom = (k: string) => k.startsWith('describe/') ? 'intake' : k.startsWith('profile.json:') ? k.slice('profile.json:'.length) : 'assemble';
+  const firstStale = stale.length ? Math.min(...stale.map((k) => PHASES.indexOf(staleFrom(k))).filter((n) => n >= 0)) : -1;
+  const phaseState = (ph: string): 'done' | 'stale' | 'failed' | 'running' | 'todo' => {
+    if (running && detail?.job?.log && [...detail.job.log.matchAll(/== (\w+) ==/g)].pop()?.[1] === ph) return 'running';
+    if (ph === lastFailed) return 'failed';
+    const times = detail?.character.phase_times || {};
+    if (!times[ph]) return 'todo';
+    const i = PHASES.indexOf(ph);
+    for (let k = 0; k < i; k++) { const tk = times[PHASES[k]]; if (tk && tk > times[ph] + 2) return 'stale'; }
+    return firstStale >= 0 && i >= firstStale ? 'stale' : 'done';
+  };
+  const nextPhase = PHASES.find((ph) => phaseState(ph) !== 'done') ?? null;
+  const generated = !!detail?.character.phase_times && Object.keys(detail.character.phase_times).length > 0;
+  const needRerun = generated && firstStale >= 0;
   const pill = (tone: 'ok' | 'warn' | 'plain', text: string) => <span className={`text-[11px] px-2 py-0.5 rounded-full ${tone === 'ok' ? 'bg-ok/15 text-ok' : tone === 'warn' ? 'bg-warn/15 text-warn' : 'bg-white/8 text-soft'}`}>{text}</span>;
 
   // ---- no package chosen: the list and the create form
@@ -327,25 +445,36 @@ export function NewCharacter({ onBack, initialId }: { onBack(): void; initialId?
         <button className="text-sm opacity-70 hover:opacity-100" onClick={() => setId(null)}>{t('newchar.back_list')}</button>
         <span className="font-semibold text-lg">{cur?.display_name || id}</span>
         <span className="text-xs opacity-50 font-mono">{id}</span>
-        <span className="ml-auto flex flex-wrap gap-1.5">
-          {dirtyNames.length ? pill('warn', t('newchar.unsaved_tag')) : savedAt ? pill('ok', `${t('character.saved_at')} ${savedAt}`) : null}
-          {stale.length > 0 && pill('warn', t('newchar.stale_tag'))}
-          {detail.character.installed && pill('plain', t('newchar.installed_tag'))}
-          {running && pill('warn', t('newchar.running_tag'))}
+        <span className="ml-auto text-xs text-muted">
+          {saveState === 'saving' ? t('newchar.as_saving') : saveState === 'err' ? t('newchar.as_err') : savedAt ? t('newchar.as_saved').replace('{t}', savedAt) : ''}
+          {detail.character.installed ? '　·　' + t('newchar.installed_tag') : ''}{running ? '　·　' + t('newchar.running_tag') : ''}
         </span>
       </div>
       <nav aria-label={t('newchar.title')} className="flex gap-1.5 px-5 pb-3">
-        {STEPS.map((s, i) => (
-          <button key={s.key} className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm ${step === s.key ? 'bg-accent text-accent-ink font-semibold' : 'bg-white/5 hover:bg-white/10'}`} onClick={() => setStep(s.key)}>
-            <span className={`w-5 h-5 rounded-full inline-flex items-center justify-center text-[11px] ${step === s.key ? 'bg-black/15' : 'bg-white/10'}`}>{i + 1}</span>{t(s.label)}
-          </button>
-        ))}
+        {STEPS.map((s, i) => {
+          const mark = s.key === 'describe' ? (filled > 0 ? '✓' : '') : s.key === 'generate' ? (needRerun ? '•' : generated && !nextPhase ? '✓' : '') : s.key === 'result' ? (detail.character.installed && !needRerun ? '✓' : '') : '';
+          const optional = s.key === 'relation' || s.key === 'life' || s.key === 'confirm';
+          return (
+            <button key={s.key} className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm ${step === s.key ? 'bg-accent text-accent-ink font-semibold' : 'bg-white/5 hover:bg-white/10'}`} onClick={() => go(s.key)}>
+              <span className={`w-5 h-5 rounded-full inline-flex items-center justify-center text-[11px] ${step === s.key ? 'bg-black/15' : 'bg-white/10'}`}>{i + 1}</span>{t(s.label)}
+              {mark === '✓' && <span className={step === s.key ? '' : 'text-ok'}>✓</span>}
+              {mark === '•' && <span aria-label={t('newchar.gen_state.stale')} className="w-2 h-2 rounded-full bg-warn" />}
+              {optional && <span className={`text-[11px] ${step === s.key ? 'opacity-70' : 'text-muted'}`}>{t('newchar.optional')}</span>}
+            </button>
+          );
+        })}
       </nav>
       {notice && <p className={`px-5 pb-2 text-sm ${notice.kind === 'err' ? 'text-red-300' : 'text-green-300'}`}>{notice.text}</p>}
 
       <div className="flex-1 overflow-y-auto px-5 pb-5">
         <div className="flex gap-5 items-start">
           <main className="flex-1 min-w-0 space-y-5">
+            {needRerun && step !== 'generate' && step !== 'result' && (
+              <div className="flex items-center gap-3 rounded-xl border border-warn/40 px-4 py-2.5">
+                <span className="inline-flex items-center gap-2 text-sm text-warn"><span aria-hidden="true" className="w-2 h-2 rounded-full bg-warn" />{t('newchar.rerun_hint').replace('{n}', String(firstStale + 1))}</span>
+                <button className={`${btn} ml-auto`} onClick={() => go('generate')}>{t('newchar.go_generate')}</button>
+              </div>
+            )}
 
             {step === 'describe' && (
               <section className="rounded-2xl bg-panel border border-white/8 p-5 space-y-3">
@@ -356,7 +485,9 @@ export function NewCharacter({ onBack, initialId }: { onBack(): void; initialId?
                 <textarea id="box" className={`${field} min-h-[180px] text-[15px] leading-relaxed`} rows={8} value={describe[stem] ?? ''} onChange={(e) => { describeDirty.current = true; setDescribe({ ...describe, [stem]: e.target.value }); }} />
                 <div className="flex items-center gap-2">
                   <button className={btn} disabled={box === 0} onClick={() => setBox(box - 1)}>{t('newchar.prev_box')}</button>
-                  <button className={btn} disabled={box === STEMS.length - 1} onClick={() => setBox(box + 1)}>{t('newchar.next_box')}</button>
+                  {box < STEMS.length - 1
+                    ? <button className={btn} onClick={() => setBox(box + 1)}>{t('newchar.next_box')}</button>
+                    : <button className={btn} onClick={() => go('relation')}>{t('newchar.next_step')}</button>}
                   <span className="ml-auto text-xs opacity-60">{t('newchar.describe_note')}</span>
                 </div>
               </section>
@@ -368,7 +499,7 @@ export function NewCharacter({ onBack, initialId }: { onBack(): void; initialId?
                 <div className="grid grid-cols-2 gap-4">
                   <div className="rounded-2xl bg-panel border border-white/8 p-4 space-y-3">
                     <label className={label}>{t('newchar.relation_bar')}</label>
-                    <input type="range" min={0} max={4} step={1} className="w-full" value={Math.max(0, CLOSENESS.indexOf(profile.closeness || ''))} onChange={(e) => { relDirty.current = true; const i = Number(e.target.value); setProfile({ ...profile, closeness: i > 0 ? CLOSENESS[i] : null }); }} />
+                    <input type="range" min={0} max={4} step={1} className="w-full" value={Math.max(0, CLOSENESS.indexOf(profile.closeness || ''))} onChange={(e) => { relDirty.current = true; const i = Number(e.target.value); setProfile({ ...profile, closeness: CLOSENESS[i] }); }} />
                     <div className="flex justify-between text-[10px] opacity-50">{CLOSENESS.map((c) => <span key={c} className={c === (profile.closeness || CLOSENESS[0]) ? 'text-link font-bold opacity-100' : ''}>{c}</span>)}</div>
                     <p className="text-xs opacity-60">{t('newchar.relation_bar_hint')}</p>
                   </div>
@@ -378,26 +509,50 @@ export function NewCharacter({ onBack, initialId }: { onBack(): void; initialId?
                     <textarea className={`${field} min-h-[120px]`} rows={5} value={profile.shared_past ?? ''} onChange={(e) => { relDirty.current = true; setProfile({ ...profile, shared_past: e.target.value }); }} />
                   </div>
                 </div>
+                <button className={btn} onClick={() => go('life')}>{t('newchar.next_step')}</button>
               </section>
             )}
 
+            {step === 'life' && profile && (
+              <LifeStep profile={profile} setProfile={setProfile} detail={detail} samples={lifeSamples} onNext={() => go('generate')} />
+            )}
+
             {step === 'generate' && (
-              <section className="space-y-3">
-                <p className="text-xs opacity-60">{t('newchar.generate_note')}</p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <label className="text-sm">{t('newchar.model')}</label>
-                  <span className="text-sm opacity-80">{model || t('newchar.model_unset')}</span>
-                  <button className={primary} disabled={running} onClick={runAll}>{t('newchar.run_all')}</button>
-                  <button className={btn} disabled={running || !detail.character.phases.includes('intake')} onClick={continueThin} title={t('newchar.continue_note')}>{t('newchar.continue')}</button>
+              <section className="space-y-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <button className={primary} disabled={running || !model} onClick={() => (nextPhase ? run('all', true, false, nextPhase) : runAll())}>
+                    {nextPhase && nextPhase !== 'intake' ? t('newchar.gen_continue').replace('{n}', String(PHASES.indexOf(nextPhase) + 1)) : t('newchar.gen_all')}
+                  </button>
+                  {nextPhase && nextPhase !== 'intake' && <button className={btn} disabled={running || !model} onClick={runAll}>{t('newchar.gen_restart')}</button>}
+                  {lastFailed === 'intake' && detail.job?.exit_code === 2 && <button className={btn} disabled={running || !model} onClick={continueThin} title={t('newchar.continue_note')}>{t('newchar.continue')}</button>}
+                  <span className="text-xs text-muted">{t('newchar.model')}：{model || t('newchar.model_unset')}</span>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {PHASES.map((ph) => (
-                    <button key={ph} className={`${btn} ${detail.character.phases.includes(ph) ? 'ring-1 ring-ok/40' : ''}`} disabled={running} onClick={() => run(ph, true)}>
-                      {t('newchar.phase.' + ph)}
-                    </button>
-                  ))}
-                  <button className={btn} disabled={running || !detail.check || detail.check.includes('通過')} onClick={() => run('assemble', true, true)} title={t('newchar.force_note')}>{t('newchar.force')}</button>
-                </div>
+                <p className="text-xs text-muted">{t('newchar.gen_note')}</p>
+                <ol className="rounded-2xl border border-white/8 divide-y divide-white/8">
+                  {PHASES.map((ph, i) => {
+                    const st = phaseState(ph);
+                    return (
+                      <li key={ph} className="flex items-center gap-3 px-4 py-2.5">
+                        <span aria-hidden="true" className={`w-2.5 h-2.5 rounded-full shrink-0 ${st === 'done' ? 'bg-ok' : st === 'stale' ? 'bg-warn' : st === 'failed' ? 'bg-red-400' : st === 'running' ? 'bg-accent animate-pulse' : 'bg-white/20'}`} />
+                        <span className="w-6 text-sm text-muted tabular-nums">{i + 1}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium">{t('newchar.phase.' + ph).replace(/^\d+\s*/, '')}</div>
+                          <div className="text-xs text-muted">{t('newchar.gen_what.' + ph)}</div>
+                        </div>
+                        <span className={`text-xs w-24 text-right ${st === 'done' ? 'text-ok' : st === 'stale' ? 'text-warn' : st === 'failed' ? 'text-red-300' : 'text-muted'}`}>{t('newchar.gen_state.' + st)}{st === 'done' && detail.character.phase_times?.[ph] ? ' ' + new Date(detail.character.phase_times[ph] * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                        {rowMenu === ph
+                          ? <button className="px-3 py-1.5 rounded-lg text-sm border border-white/20 hover:bg-white/10 disabled:opacity-30" disabled={running || (!model && ph !== 'assemble')} onClick={() => { setRowMenu(null); run(ph, true); }}>{t('newchar.gen_run_one')}</button>
+                          : <button aria-label={t('newchar.gen_more')} title={t('newchar.gen_more')} className="w-8 h-8 rounded-lg border border-white/15 hover:bg-white/10 text-muted" onClick={() => setRowMenu(ph)}>⋯</button>}
+                      </li>
+                    );
+                  })}
+                </ol>
+                {detail.check && !detail.check.includes('通過') && (
+                  <div className="flex items-center gap-3 text-xs text-muted">
+                    <span>{t('newchar.force_note')}</span>
+                    <button className="px-3 py-1.5 rounded-lg text-sm border border-white/20 hover:bg-white/10 disabled:opacity-30" disabled={running} onClick={() => run('assemble', true, true)}>{t('newchar.force')}</button>
+                  </div>
+                )}
                 {(running || jobDone) && (
                   <div className="rounded-xl bg-black/30 p-3 text-xs space-y-1">
                     <div className="opacity-70">
@@ -432,90 +587,18 @@ export function NewCharacter({ onBack, initialId }: { onBack(): void; initialId?
               </section>
             )}
 
-            {step === 'confirm' && (
-              <section className="space-y-3">
-                <p className="text-xs opacity-60">{t('newchar.confirm_note')}{profile?.proposed?.model ? ` · ${profile.proposed.model} · ${profile.proposed.at}` : ''}</p>
-                {!profile?.proposed && <p className="text-sm opacity-60">{t('newchar.no_proposals')}</p>}
-                {profile && (
-                  <div className="space-y-3">
-                    <div className="grid gap-2">
-                      {METERS.map((k) => (
-                        <div key={k} className="rounded-lg bg-white/5 p-2">
-                          <div className="flex items-center gap-3 text-sm">
-                            <span className="w-44">{t('newchar.meter.' + k)}</span>
-                            <input type="range" min={0} max={1} step={0.05} className="flex-1" value={profile.thinking?.[k] ?? proposed('thinking', k) ?? 0.5} onChange={(e) => num('thinking', k, Number(e.target.value))} />
-                            <span className="w-10 text-right tabular-nums">{(profile.thinking?.[k] ?? proposed('thinking', k) ?? 0.5).toFixed(2)}</span>
-                            {profile.thinking?.[k] == null && <span className="text-xs text-amber-300">{t('newchar.unconfirmed')}</span>}
-                          </div>
-                          {evidence(k) && <div className="text-xs opacity-60 mt-1">{evidence(k)}</div>}
-                        </div>
-                      ))}
-                    </div>
-                    <label className="flex items-center gap-2 text-sm rounded-lg bg-white/5 p-2">
-                      <input type="checkbox" checked={!!profile.scratch} onChange={(e) => setProfile({ ...profile, scratch: e.target.checked })} />
-                      <span>{t('newchar.scratch')}</span><span className="text-xs opacity-60">{t('newchar.scratch_note')}</span>
-                    </label>
-                    <div className="rounded-lg bg-white/5 p-2 space-y-2">
-                      <label className={label}>{t('newchar.life')}</label>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <select className={`${field} w-auto`} value="" onChange={(e) => { const s = lifeSamples.find((x) => x.id === e.target.value); if (s) { setProfile({ ...profile, life: sampleSpec(s) }); setLifeKey((k) => k + 1); } }}>
-                          <option value="">{t('newchar.life_sample')}</option>
-                          {lifeSamples.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
-                        {lifeFromStructure(detail?.build?.structure?.life) && (
-                          <button className={btn} onClick={() => { setProfile({ ...profile, life: lifeFromStructure(detail?.build?.structure?.life) }); setLifeKey((k) => k + 1); }}>{t('newchar.life_from_describe')}</button>
-                        )}
-                        {profile.life && <button className={btn} onClick={() => { setProfile({ ...profile, life: null }); setLifeKey((k) => k + 1); }}>{t('newchar.life_clear')}</button>}
-                      </div>
-                      {profile.life ? (
-                        <LifeEditor key={lifeKey} life={profile.life} onChange={(next) => setProfile({ ...profile, life: next })} />
-                      ) : (
-                        <p className="text-xs opacity-60">{t('newchar.life_none')}</p>
-                      )}
-                      <div className="text-xs opacity-60">{t('newchar.life_hint')}</div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      {Object.keys(CHOICES).map((k) => (
-                        <div key={k} className="rounded-lg bg-white/5 p-2">
-                          <label className={label}>{t('newchar.choice.' + k)}</label>
-                          <select className={field} value={profile.choices?.[k] ?? profile.proposed?.choices?.[k] ?? ''} onChange={(e) => choice(k, e.target.value)}>
-                            {CHOICES[k].map((o) => <option key={o} value={o}>{o ? t('newchar.opt.' + o) : '—'}</option>)}
-                          </select>
-                          {evidence(k) && <div className="text-xs opacity-60 mt-1">{evidence(k)}</div>}
-                        </div>
-                      ))}
-                    </div>
-                    <details className="rounded-lg bg-white/5 p-2">
-                      <summary className="cursor-pointer text-sm">{t('newchar.personality')}</summary>
-                      <div className="grid gap-2 mt-2">
-                        {BIG5.map((k) => (
-                          <div key={k} className="flex items-center gap-3 text-sm">
-                            <span className="w-44">{t('newchar.big5.' + k)}</span>
-                            <input type="range" min={0} max={1} step={0.05} className="flex-1" value={profile.big5?.[k] ?? proposed('big5', k) ?? 0.5} onChange={(e) => num('big5', k, Number(e.target.value))} />
-                            <span className="w-10 text-right tabular-nums">{(profile.big5?.[k] ?? proposed('big5', k) ?? 0.5).toFixed(2)}</span>
-                          </div>
-                        ))}
-                        {CONSTANTS.map((k) => (
-                          <div key={k} className="flex items-center gap-3 text-sm">
-                            <span className="w-44">{t('newchar.const.' + k)}</span>
-                            <input type="range" min={k === 'chronotype' ? -1 : 0} max={1} step={0.05} className="flex-1" value={profile.constants?.[k] ?? proposed('constants', k) ?? (k === 'chronotype' ? 0 : 0.5)} onChange={(e) => num('constants', k, Number(e.target.value))} />
-                            <span className="w-10 text-right tabular-nums">{(profile.constants?.[k] ?? proposed('constants', k) ?? (k === 'chronotype' ? 0 : 0.5)).toFixed(2)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </details>
-                    <div className="flex gap-2">
-                      <button className={btn} disabled={!profile.proposed} onClick={acceptProposals}>{t('newchar.accept_all')}</button>
-                      <button className={primary} disabled={busy} onClick={saveProfile}>{t('newchar.save')}</button>
-                    </div>
-                  </div>
-                )}
-              </section>
+            {step === 'confirm' && profile && (
+              <ConfirmStep profile={profile} setProfile={setProfile} meters={METERS} choices={CHOICES} big5={BIG5} constants={CONSTANTS} onNext={() => go('result')} />
             )}
 
             {step === 'result' && (
               <section className="space-y-3">
-                {stale.length > 0 && <p className="text-sm text-amber-300">{t('newchar.stale').replace('{what}', stale.join('、'))}</p>}
+                {needRerun && (
+                  <div className="flex items-center gap-3 rounded-xl border border-warn/40 px-4 py-2.5">
+                    <span className="inline-flex items-center gap-2 text-sm text-warn"><span aria-hidden="true" className="w-2 h-2 rounded-full bg-warn" />{t('newchar.result_stale').replace('{n}', String(firstStale + 1))}</span>
+                    <button className={`${primary} ml-auto`} onClick={() => go('generate')}>{t('newchar.go_generate')}</button>
+                  </div>
+                )}
                 {detail.check && <pre className="rounded-lg bg-white/5 p-3 text-xs whitespace-pre-wrap">{detail.check}</pre>}
                 {detail.verify && <pre className="rounded-lg bg-white/5 p-3 text-xs whitespace-pre-wrap max-h-64 overflow-y-auto">{detail.verify}</pre>}
                 {detail.soul ? (
@@ -523,7 +606,7 @@ export function NewCharacter({ onBack, initialId }: { onBack(): void; initialId?
                     <div className="text-xs opacity-60">{t('newchar.soul_stats').replace('{chars}', String(detail.soul.length)).replace('{seeds}', String(detail.seeds)).replace('{people}', detail.people.join('、') || '—')}</div>
                     <pre className="rounded-lg bg-white/5 p-3 text-sm whitespace-pre-wrap max-h-[28rem] overflow-y-auto leading-relaxed">{detail.soul}</pre>
                     <div className="flex items-center gap-3">
-                      <button className={primary} disabled={running} onClick={install}>{detail.character.installed ? t('newchar.reinstall') : t('newchar.install')}</button>
+                      <button className={needRerun ? btn : primary} disabled={running} onClick={install}>{detail.character.installed ? t('newchar.reinstall') : t('newchar.install')}</button>
                       <span className="text-xs opacity-60">{detail.character.installed ? t('newchar.installed_note') : t('newchar.install_note')}</span>
                     </div>
                   </>
@@ -560,9 +643,8 @@ export function NewCharacter({ onBack, initialId }: { onBack(): void; initialId?
               </dl>
               <div className="flex flex-wrap gap-1.5">
                 {PHASES.map((ph) => {
-                  const ran = detail.character.phases.includes(ph);
-                  const staleNow = ran && stale.length > 0;
-                  return <span key={ph} className={`text-[11px] px-2 py-0.5 rounded-full ${!ran ? 'bg-white/8 text-muted' : staleNow ? 'bg-warn/15 text-warn' : 'bg-ok/15 text-ok'}`}>{t('newchar.phase.' + ph)}{ran && !staleNow ? ' ✓' : ''}</span>;
+                  const st = phaseState(ph);
+                  return <span key={ph} className="flex items-center gap-1.5 text-[11px] text-muted w-[45%]"><span aria-hidden="true" className={`w-1.5 h-1.5 rounded-full ${st === 'done' ? 'bg-ok' : st === 'stale' ? 'bg-warn' : st === 'failed' ? 'bg-red-400' : 'bg-white/20'}`} />{t('newchar.phase.' + ph)}</span>;
                 })}
               </div>
               {stale.length > 0 && <p className="text-xs opacity-60">{t('newchar.stale_hint')}</p>}
@@ -571,14 +653,6 @@ export function NewCharacter({ onBack, initialId }: { onBack(): void; initialId?
         </div>
       </div>
 
-      <footer className="flex flex-wrap items-center gap-3 px-5 py-3 border-t border-white/10 bg-panel">
-        <span aria-hidden="true" className={`w-2.5 h-2.5 rounded-full ${dirtyNames.length ? 'bg-warn' : 'bg-ok'}`} />
-        <span className="text-sm">{dirtyNames.length ? t('character.unsaved') + dirtyNames.join('、') : savedAt ? `${t('character.saved_at')} ${savedAt}` : t('character.no_changes')}</span>
-        <div className="ml-auto flex gap-2">
-          {dirtyNames.length > 0 && <button className={btn} onClick={discardInputs}>{t('character.discard')}</button>}
-          <button className={primary} disabled={busy || running || dirtyNames.length === 0} onClick={saveInputs}>{t('newchar.save')}</button>
-        </div>
-      </footer>
     </div>
   );
 }

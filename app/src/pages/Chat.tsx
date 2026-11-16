@@ -30,7 +30,7 @@ export function Chat() {
     connect();
     api.voice(selected || undefined).then((v) => { const eff = v.effective ?? v.voice; setVoiceOk({ stt: eff.stt.kind !== 'none', tts: eff.tts.kind !== 'none' }); }).catch(() => {});
     api.psycheSettings().then((r) => setProactiveSpeak((r.settings?.proactive?.speak as any) ?? 'follow')).catch(() => {});
-    api.history().then((h) => setHistory((h.messages ?? []).map((m, i) => ({ id: `h${i}`, role: m.role, text: m.text, ts: m.ts, source: m.source }))))
+    api.history().then((h) => setHistory((h.messages ?? []).map((m, i) => ({ id: `h${i}`, role: m.role, text: m.text, ts: m.ts, source: m.source, reaction: m.reaction }))))
       .catch(() => { /* backend not up yet; the header shows the status */ });
   }, [selected]);
 
@@ -97,12 +97,15 @@ export function Chat() {
             </div>
           </div>
         ) : (
-          <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[78%] px-3 py-2 rounded-2xl whitespace-pre-wrap leading-relaxed text-[15px] ${
+          <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} ${m.reaction ? 'pb-3' : ''}`}>
+            <div className={`relative max-w-[78%] px-3 py-2 rounded-2xl whitespace-pre-wrap leading-relaxed text-[15px] ${
               m.role === 'user' ? 'bg-accent text-white rounded-br-sm' : 'bg-white/10 rounded-bl-sm'
             } ${m.streaming ? 'animate-pulse' : ''}`}>
               {m.source && !OWN_SOURCES.has(m.source) && <span className="block text-[10px] uppercase tracking-wider opacity-60 mb-0.5">{m.source === 'event' ? t('chat.badge_event') : m.source}</span>}
               {m.text}
+              {m.reaction && (
+                <span title={t('chat.reacted')} className="absolute -bottom-4 left-1 text-base leading-none px-1 py-0.5 rounded-full bg-panel border border-white/10 shadow">{m.reaction}</span>
+              )}
             </div>
           </div>
         ))}

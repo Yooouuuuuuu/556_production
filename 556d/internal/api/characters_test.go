@@ -25,3 +25,26 @@ func TestLoadLifeSamples(t *testing.T) {
 		t.Fatalf("sample content lost: %#v", got[1])
 	}
 }
+
+// A change to one part of profile.json names the first phase that reads it, not the whole skill: her day → assemble,
+// the thinking numbers → parts; an untouched profile is not stale.
+func TestStaleInputsNamesTheProfileSection(t *testing.T) {
+	dir := t.TempDir()
+	_ = os.MkdirAll(filepath.Join(dir, "describe"), 0o755)
+	_ = os.WriteFile(filepath.Join(dir, "describe", "01.md"), []byte("x"), 0o644)
+	_ = os.WriteFile(filepath.Join(dir, "profile.json"), []byte(`{"life":null,"thinking":{"rationality":0.3},"proposed":{"a":1}}`), 0o644)
+	lock := `{"inputs":{"describe/01.md":"` + shortSHA(filepath.Join(dir, "describe", "01.md")) + `"},
+	  "profile_sections":{"parts":{"thinking":{"rationality":0.3},"big5":null},"assemble":{"life":null,"closeness":null}}}`
+	_ = os.WriteFile(filepath.Join(dir, "soul.lock.json"), []byte(lock), 0o644)
+	if got := staleInputs(dir); len(got) != 0 {
+		t.Fatalf("untouched: %v", got)
+	}
+	_ = os.WriteFile(filepath.Join(dir, "profile.json"), []byte(`{"life":{"schedule":{"wake":5}},"thinking":{"rationality":0.3},"proposed":{"a":2}}`), 0o644)
+	if got := staleInputs(dir); len(got) != 1 || got[0] != "profile.json:assemble" {
+		t.Fatalf("her day changed: %v", got)
+	}
+	_ = os.WriteFile(filepath.Join(dir, "profile.json"), []byte(`{"life":null,"thinking":{"rationality":0.9}}`), 0o644)
+	if got := staleInputs(dir); len(got) != 1 || got[0] != "profile.json:parts" {
+		t.Fatalf("thinking changed: %v", got)
+	}
+}

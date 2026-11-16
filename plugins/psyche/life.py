@@ -150,7 +150,10 @@ def activity_for(hour: float, sleep: Dict[str, Any], chatting: bool, life: Dict[
         return "meal"
     if mode == "work" and in_block(hour, sched.get("work", [])):
         return "work"
-    if mode == "hobby" and in_block(hour, sched.get("hobby", sched.get("work", []))):
+    # her own time (練琴、畫畫…): a worker has it after work too, not only someone whose busyness is the hobby itself
+    if mode == "work" and in_block(hour, sched.get("hobby", [])):
+        return "hobby"
+    if mode == "hobby" and in_block(hour, sched.get("hobby") or sched.get("work", [])):
         return "hobby"
     return "rest"
 
